@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       distanceM: a.distanceM, movingTimeS: a.movingTimeS, elapsedTimeS: a.elapsedTimeS ?? null, elevationGainM: a.elevationGainM ?? 0,
       avgHr: a.avgHr ?? null, maxHr: a.maxHr ?? null, calories: a.calories ?? null, startLat: a.startLat ?? null, startLng: a.startLng ?? null,
       polyline: pts.length > 1 ? encodePolyline(pts.map((p) => [p.lat, p.lng])) : null, trackPoints: track.length ? (track as unknown as Prisma.InputJsonValue) : undefined,
-      source: a.source, externalId: a.dedupeKey, story: activityStory(acts[i], hist, { tz }).text,
+      source: a.source, externalId: a.dedupeKey, dedupeKey: a.dedupeKey, story: activityStory(acts[i], hist, { tz }).text,
     };
   });
 

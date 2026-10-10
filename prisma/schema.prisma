@@ -9,11 +9,41 @@ datasource db {
 }
 
 // ───────── Enums ─────────
-enum ActivityType { RUN RIDE SWIM HIKE WALK WORKOUT OTHER }
-enum Feeling      { GREAT GOOD OK TIRED HARD }
-enum GoalMetric   { DISTANCE TIME ELEVATION ACTIVITIES }
-enum GoalPeriod   { WEEK MONTH YEAR }
-enum RecordKind   { LONGEST_DISTANCE LONGEST_TIME BEST_5K BEST_10K BEST_HALF BEST_ELEVATION }
+enum ActivityType {
+  RUN
+  RIDE
+  SWIM
+  HIKE
+  WALK
+  WORKOUT
+  OTHER
+}
+enum Feeling {
+  GREAT
+  GOOD
+  OK
+  TIRED
+  HARD
+}
+enum GoalMetric {
+  DISTANCE
+  TIME
+  ELEVATION
+  ACTIVITIES
+}
+enum GoalPeriod {
+  WEEK
+  MONTH
+  YEAR
+}
+enum RecordKind {
+  LONGEST_DISTANCE
+  LONGEST_TIME
+  BEST_5K
+  BEST_10K
+  BEST_HALF
+  BEST_ELEVATION
+}
 
 // ───────── Auth (NextAuth + PrismaAdapter) ─────────
 model User {
