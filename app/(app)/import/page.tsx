@@ -1,0 +1,83 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { importFiles } from "@/lib/import";
+import type { ParsedActivity } from "@/lib/import/types";
+
+const fmtTime = (s: number) => `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
+/** Allège les traces (≤ 600 points) pour rester sous la limite de taille des requêtes. */
+const slim = (a: ParsedActivity): ParsedActivity => { const step = Math.max(1, Math.ceil(a.points.length / 600)); return { ...a, points: a.points.filter((_, i) => i % step === 0 || i === a.points.length - 1) }; };
+
+export default function ImportPage() {
+  const [items, setItems] = useState<ParsedActivity[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [result, setResult] = useState<{ saved: number; duplicates: number; invalid: number } | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setBusy(true); setResult(null); setFailed(false);
+    try { const r = await importFiles(files); setItems(r.activities); setErrors(r.errors); } catch { setErrors(["Fichier illisible."]); setItems([]); }
+    setBusy(false);
+  }
+
+  async function save() {
+    setBusy(true); setFailed(false); const tot = { saved: 0, duplicates: 0, invalid: 0 };
+    try {
+      for (let i = 0; i < items.length; i += 5) {
+        setProgress({ done: i, total: items.length });
+        const r = await fetch("/api/activities/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activities: items.slice(i, i + 5).map(slim) }) });
+        if (!r.ok) throw new Error("http");
+        const j = await r.json(); tot.saved += j.saved; tot.duplicates += j.duplicates; tot.invalid += j.invalid;
+      }
+      setResult(tot); setItems([]);
+    } catch { setFailed(true); }
+    setProgress(null); setBusy(false);
+  }
+
+  return (
+    <section className="space-y-5">
+      <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
+      <h1 className="font-display text-3xl font-bold leading-none">Importer</h1>
+      <p className="text-ink-soft">Fichiers FIT ou GPX (Strava, MyWhoosh, votre montre), ou l’archive ZIP exportée de Strava. Les sorties déjà présentes sont ignorées.</p>
+
+      <label className="grid min-h-14 cursor-pointer place-items-center rounded-xl bg-brand px-4 font-display text-xl font-semibold text-brand-ink active:scale-[.98]">
+        {busy && !progress ? "Lecture en cours…" : "Choisir des fichiers"}
+        <input type="file" multiple accept=".fit,.gpx,.zip,.gz" onChange={onPick} className="sr-only" disabled={busy} />
+      </label>
+
+      {errors.length > 0 && <ul className="space-y-1 rounded-xl border border-line bg-surface p-3 text-sm text-ink-soft">{errors.slice(0, 5).map((m) => <li key={m}>{m}</li>)}{errors.length > 5 && <li>… et {errors.length - 5} autres</li>}</ul>}
+
+      {result && (
+        <div role="status" className="rounded-xl border border-line bg-surface p-4">
+          <p className="font-display text-2xl font-bold">{result.saved} sortie{result.saved > 1 ? "s" : ""} enregistrée{result.saved > 1 ? "s" : ""}</p>
+          <p className="mt-1 text-sm text-ink-soft">{result.duplicates > 0 ? `${result.duplicates} déjà présente${result.duplicates > 1 ? "s" : ""}, ignorée${result.duplicates > 1 ? "s" : ""}. ` : ""}{result.invalid > 0 ? `${result.invalid} illisible${result.invalid > 1 ? "s" : ""}.` : ""}</p>
+          <Link href="/activities" className="mt-3 grid min-h-12 place-items-center rounded-xl bg-surface-2 font-semibold">Voir mes activités</Link>
+        </div>
+      )}
+      {failed && <p role="alert" className="text-sm font-medium text-brand">L’enregistrement a échoué. Vérifiez votre connexion et réessayez : les sorties déjà enregistrées ne seront pas dupliquées.</p>}
+
+      {items.length > 0 && (
+        <>
+          <p className="font-semibold">{items.length} activité{items.length > 1 ? "s" : ""} prête{items.length > 1 ? "s" : ""}</p>
+          <button onClick={save} disabled={busy} className="min-h-14 w-full rounded-xl bg-ink font-display text-xl font-semibold text-bg disabled:opacity-60">
+            {progress ? `Enregistrement… ${Math.min(progress.done, progress.total)} / ${progress.total}` : `Enregistrer ${items.length} activité${items.length > 1 ? "s" : ""}`}
+          </button>
+          <ul className="space-y-2">
+            {items.slice(0, 50).map((a) => (
+              <li key={a.dedupeKey} className="flex items-center justify-between rounded-xl border border-line bg-surface p-4">
+                <div><div className="font-semibold">{a.title}</div><div className="text-sm text-ink-soft">{new Date(a.startedAt).toLocaleDateString("fr-FR")}</div></div>
+                <div className="text-right"><div className="font-display text-2xl font-bold">{(a.distanceM / 1000).toFixed(1).replace(".", ",")} km</div><div className="text-sm text-ink-soft">{fmtTime(a.movingTimeS)}</div></div>
+              </li>
+            ))}
+            {items.length > 50 && <li className="text-center text-sm text-ink-soft">… et {items.length - 50} autres</li>}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
