@@ -16,6 +16,17 @@ export default function ImportPage() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<{ saved: number; duplicates: number; invalid: number } | null>(null);
   const [failed, setFailed] = useState(false);
+  const [sync, setSync] = useState<{ busy: boolean; msg?: string; err?: string }>({ busy: false });
+
+  async function syncNow() {
+    setSync({ busy: true });
+    try {
+      const r = await fetch("/api/sync/intervals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 7 }) });
+      const j = await r.json();
+      if (!r.ok) return setSync({ busy: false, err: j.error ?? "Échec de la synchronisation" });
+      setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}` });
+    } catch { setSync({ busy: false, err: "Connexion impossible, réessayez." }); }
+  }
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -44,6 +55,14 @@ export default function ImportPage() {
       <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
       <h1 className="font-display text-3xl font-bold leading-none">Importer</h1>
       <p className="text-ink-soft">Fichiers FIT ou GPX (Strava, MyWhoosh, votre montre), ou l’archive ZIP exportée de Strava. Les sorties déjà présentes sont ignorées.</p>
+
+      <div className="rounded-xl border border-line bg-surface p-4">
+        <p className="font-bold">Synchroniser depuis Intervals.icu</p>
+        <p className="mt-1 text-sm text-ink-soft">Récupère vos sorties MyWhoosh des 7 derniers jours. Pulse le fait aussi chaque nuit, tout seul.</p>
+        <button onClick={syncNow} disabled={sync.busy} className="mt-3 min-h-12 w-full rounded-xl bg-brand font-display text-lg font-semibold text-brand-ink disabled:opacity-60">{sync.busy ? "Synchronisation…" : "Synchroniser maintenant"}</button>
+        {sync.msg && <p role="status" className="mt-2 text-sm">{sync.msg}</p>}
+        {sync.err && <p role="alert" className="mt-2 text-sm font-medium text-brand">{sync.err}</p>}
+      </div>
 
       <label className="grid min-h-14 cursor-pointer place-items-center rounded-xl bg-brand px-4 font-display text-xl font-semibold text-brand-ink active:scale-[.98]">
         {busy && !progress ? "Lecture en cours…" : "Choisir des fichiers"}

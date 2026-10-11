@@ -5,7 +5,7 @@ import type { ParsedActivity } from "./types";
 
 const ACTIVITY_FILE = /\.(fit|gpx)(\.gz)?$/i;
 
-async function parseOne(name: string, bytes: Uint8Array): Promise<ParsedActivity> {
+export async function parseOne(name: string, bytes: Uint8Array): Promise<ParsedActivity> {
   let data = bytes;
   let n = name.toLowerCase();
   if (n.endsWith(".gz")) { data = gunzipSync(bytes); n = n.slice(0, -3); } // archive Strava : *.fit.gz

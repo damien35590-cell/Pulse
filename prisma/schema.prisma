@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")      // pooled (Neon / Supabase pgbouncer)
+  url       = env("DIRECT_URL")        // pooled (Neon / Supabase pgbouncer)
   directUrl = env("DIRECT_URL")        // direct, for migrations
 }
 
@@ -121,6 +121,8 @@ model Activity {
   calories       Int?
   avgHr          Int?
   maxHr          Int?
+  avgPower       Int?                    // W (home trainer, capteur de puissance)
+  maxPower       Int?
   polyline       String?      @db.Text   // trace simplifiée (polyline encodée)
   trackPoints    Json?                   // [{lat,lng,ele,t}] pour graphes altitude/vitesse
   startLat       Float?

@@ -1,6 +1,6 @@
 export type ActivityKind = "RUN" | "RIDE" | "SWIM" | "HIKE" | "WALK" | "WORKOUT" | "OTHER";
 
-export type TrackPoint = { lat?: number; lng?: number; ele?: number; t: number; hr?: number };
+export type TrackPoint = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
 
 export type ParsedActivity = {
   /** Clé anti-doublon : début de l'activité arrondi à la minute (UTC). */
@@ -16,6 +16,8 @@ export type ParsedActivity = {
   elevationGainM: number;
   avgHr?: number;
   maxHr?: number;
+  avgPower?: number;
+  maxPower?: number;
   calories?: number;
   startLat?: number;
   startLng?: number;

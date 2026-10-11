@@ -9,11 +9,12 @@ import { SPORTS } from "@/lib/sports";
 import { fmtDuration, fmtKm, fmtNum, fmtPace } from "@/lib/format";
 import { RouteMapLazy } from "@/components/activity/route-map-lazy";
 import { ElevationChart } from "@/components/activity/elevation-chart";
+import { PowerChart } from "@/components/activity/power-chart";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
 const FEELING: Record<string, string> = { GREAT: "Super", GOOD: "Bien", OK: "Correct", TIRED: "Fatigué", HARD: "Difficile" };
-type TP = { lat: number; lng: number; ele?: number; t: number };
+type TP = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
 
 export default async function ActivityPage({ params }: { params: { id: string } }) {
   const s = await auth();
@@ -22,9 +23,12 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   if (!a) notFound();
 
   const route = a.polyline ? decodePolyline(a.polyline) : [];
-  const tp = ((a.trackPoints as TP[] | null) ?? []).filter((p) => typeof p.ele === "number");
+  const raw = (a.trackPoints as TP[] | null) ?? [];
+  const tp = raw.filter((p) => typeof p.ele === "number" && p.lat != null && p.lng != null);
+  const t0 = raw[0]?.t ?? 0;
+  const series = raw.filter((p) => p.power != null || p.hr != null).map((p) => ({ min: (p.t - t0) / 60000, power: p.power, hr: p.hr }));
   let km = 0;
-  const full = tp.map((p, i) => { if (i) km += haversine({ ...tp[i - 1], t: 0 }, { ...p, t: 0 }) / 1000; return { km, ele: p.ele as number }; });
+  const full = tp.map((p, i) => { if (i) km += haversine({ lat: tp[i - 1].lat!, lng: tp[i - 1].lng!, t: 0 }, { lat: p.lat!, lng: p.lng!, t: 0 }) / 1000; return { km, ele: p.ele as number }; });
   const step = Math.max(1, Math.ceil(full.length / 120));
   const profile = full.filter((_, i) => i % step === 0);
 
@@ -34,6 +38,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
     { l: "Distance", v: `${fmtKm(a.distanceM)} km` }, { l: "Durée", v: fmtDuration(a.movingTimeS) },
     pace && { l: pace.label, v: `${pace.value} ${pace.unit}` },
     a.elevationGainM > 0 && { l: "Dénivelé +", v: `${fmtNum(a.elevationGainM, 0)} m` },
+    a.avgPower && { l: "Puissance moyenne", v: `${a.avgPower} W` }, a.maxPower && { l: "Puissance max", v: `${a.maxPower} W` },
     a.calories && { l: "Calories", v: `${fmtNum(a.calories, 0)} kcal` }, a.avgHr && { l: "FC moyenne", v: `${a.avgHr} bpm` },
   ].filter(Boolean) as { l: string; v: string }[];
 
@@ -50,6 +55,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       </dl>
       {route.length > 1 && <RouteMapLazy points={route} />}
       {profile.length > 5 && <section><h2 className="mb-2 font-display text-lg font-bold">Altitude</h2><ElevationChart data={profile} /></section>}
+      {series.length > 5 && <section><h2 className="mb-2 font-display text-lg font-bold">Puissance et cardio</h2><PowerChart data={series} /></section>}
       {(w || a.feeling) && (
         <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-soft">
           {w?.tempC != null && <span className="inline-flex items-center gap-1.5"><Thermometer className="h-4 w-4" aria-hidden />{Math.round(w.tempC)} °C au départ</span>}

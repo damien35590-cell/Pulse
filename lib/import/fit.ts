@@ -24,7 +24,7 @@ export function parseFit(buf: ArrayBuffer, fileName: string): Promise<ParsedActi
         .map((r: any) => ({
           lat: r.position_lat, lng: r.position_long,
           ele: r.enhanced_altitude ?? r.altitude,
-          t: new Date(r.timestamp).getTime(), hr: r.heart_rate,
+          t: new Date(r.timestamp).getTime(), hr: r.heart_rate, power: r.power, cad: r.cadence,
         }));
 
       const startedAt = new Date(s.start_time ?? points[0]?.t).toISOString();
@@ -36,13 +36,14 @@ export function parseFit(buf: ArrayBuffer, fileName: string): Promise<ParsedActi
         source: "fit",
         fileName,
         type,
-        title: TITLES[type],
+        title: s.sub_sport === "virtual_activity" ? "Vélo virtuel" : TITLES[type],
         startedAt,
         distanceM: s.total_distance ?? 0,
         movingTimeS: Math.round(s.total_timer_time ?? 0),
         elapsedTimeS: Math.round(s.total_elapsed_time ?? s.total_timer_time ?? 0),
         elevationGainM: s.total_ascent ?? 0,
         avgHr: s.avg_heart_rate, maxHr: s.max_heart_rate, calories: s.total_calories,
+        avgPower: s.avg_power, maxPower: s.max_power,
         startLat: first?.lat, startLng: first?.lng,
         points,
       });

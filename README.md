@@ -56,3 +56,20 @@ Application web installable sur Android (PWA), pour une seule personne : course,
 ## Technique
 
 Next.js 14, Prisma, PostgreSQL, NextAuth (mot de passe, Google en option), Recharts, Leaflet, PWA via `@ducanh2912/next-pwa`. Le projet n'a pas été compilé avant livraison : les erreurs de typage sont ignorées au build (`next.config.mjs`) pour ne pas bloquer le déploiement.
+
+## 6. Synchro automatique MyWhoosh (sans rien télécharger)
+
+MyWhoosh n'a pas d'API publique. La voie propre : MyWhoosh envoie vos séances à **Intervals.icu** (compte gratuit), et Pulse les y récupère une fois par jour, avec le fichier original (puissance, cardio).
+
+1. Créez un compte sur intervals.icu et reliez-y MyWhoosh (cherchez MyWhoosh dans les connexions d'Intervals.icu, ou Intervals.icu dans les connexions de l'app MyWhoosh).
+2. Dans Intervals.icu : Settings > Developer Settings > **Create API Key**. Copiez la clé.
+3. Dans Vercel (Settings > Environment Variables), ajoutez :
+   - `INTERVALS_API_KEY` : la clé copiée ;
+   - `CRON_SECRET` : 32 caractères aléatoires ou plus.
+   Puis redéployez.
+4. C'est tout : chaque nuit (vers minuit), Pulse récupère vos nouvelles séances. Pour ne pas attendre, ouvrez la page Importer et touchez **Synchroniser maintenant**.
+
+Limite : une séance qui n'arrive dans Intervals.icu que par Strava n'a pas de fichier original : Pulse ne peut pas la lire.
+
+### Option B : script sur le PC (si MyWhoosh enregistre ses fichiers en local)
+`tools\trouver-fit.ps1` (clic droit, Exécuter avec PowerShell) liste les `.fit` modifiés ces 3 dernières heures. Si un dossier apparaît, renseignez-le dans `tools\lancer-pulse-sync.bat` (variable `INGEST_TOKEN` dans Vercel). Le script vérifie le dossier toutes les 10 minutes.

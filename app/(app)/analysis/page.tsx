@@ -39,7 +39,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const shares = MY_SPORTS.map((k, i) => ({ k, pct: (sum(inWin.filter((a) => a.type === k), (a) => a.movingTimeS) / tt) * 100, o: [1, 0.7, 0.45, 0.25][i] }));
   let off = 0;
   const cells = new Map<string, number>(); for (const a of acts.filter(hit)) { const k = dayKey(a.startedAt, TZ), key = `${ago(a.startedAt)}-${dow(k)}`; cells.set(key, (cells.get(key) ?? 0) + a.distanceM / 1000 + 0.001); }
-  const wd = [0, 1, 2, 3, 4, 5, 6].map((r) => sum(cur.filter((a) => dow(dayKey(a.startedAt, TZ)) === r), (a) => a.distanceM) / 1000 / W), wm = Math.max(...wd, 0.1), fav = wd.indexOf(wm);
+  const wd = [0, 1, 2, 3, 4, 5, 6].map((r) => sum(cur.filter((a) => dow(dayKey(a.startedAt, TZ)) === r), (a) => a.distanceM) / 1000 / W), wm = Math.max(...wd, 0.1), fav = Math.max(0, wd.indexOf(wm));
   const best = Math.max(0, ...weekly.map((x) => x.km)), longest = Math.max(0, ...cur.map((a) => a.distanceM)) / 1000, days = new Set(cur.map((a) => dayKey(a.startedAt, TZ))).size;
   const recent = acts.filter(hit).slice(-14).reverse(), A = recent.find((a) => a.id === searchParams.a) ?? recent[0], B = recent.find((a) => a.id === searchParams.b) ?? recent[1];
   const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ w: String(W), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
@@ -68,7 +68,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
       <h2 className={h2}>Vos jours de sortie</h2>
       <div className={card}><div className="grid h-24 grid-cols-7 items-end gap-1.5">{wd.map((v, r) => <div key={r} className="flex h-full flex-col items-center justify-end gap-1.5 text-xs text-ink-soft"><b className="w-full rounded-md bg-brand" style={{ height: Math.max(4, (v / wm) * 70), opacity: r === fav ? 1 : 0.4 }} />{DAYS[r]}</div>)}</div>
-        <p className="mt-3 text-sm text-ink-soft">Votre jour préféré : <b className="text-ink">{FULL[fav]}</b>, {fmtNum(wd[fav], 1)} km en moyenne.</p></div>
+        <p className="mt-3 text-sm text-ink-soft">{wd[fav] > 0 ? <>Votre jour préféré : <b className="text-ink">{FULL[fav]}</b>, {fmtNum(wd[fav], 1)} km en moyenne.</> : "Pas encore de sorties sur cette période."}</p></div>
 
       <h2 className={h2}>À retenir</h2>
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">{[["Meilleure semaine", `${fmtNum(best, 1)} km`], ["Plus longue sortie", `${fmtNum(longest, 1)} km`], ["Tours Eiffel grimpées", fmtNum(sum(cur, (a) => a.elevationGainM) / 330, 1)], ["Jours actifs", `${days}/${W * 7}`]].map(([l, v]) => <div key={l} className="bg-surface px-4 py-3"><dt className="text-xs text-ink-soft">{l}</dt><dd className="font-display text-2xl font-bold tabular-nums">{v}</dd></div>)}</dl>
