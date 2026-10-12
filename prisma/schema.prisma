@@ -67,6 +67,11 @@ model User {
   plans      TrainingPlan[]
   records    PersonalRecord[]
   badges     UserBadge[]
+  
+  // Nouvelles relations
+  zones      UserZones?
+  equipments Equipment[]
+  raceEvents RaceEvent[]
 }
 
 model Account {
@@ -132,11 +137,17 @@ model Activity {
   weather        Json?                   // {tempC, precipMm} à l'heure de départ
   story          String?                 // anecdote générée à l'enregistrement
   dedupeKey      String?      // début à la minute (UTC) : évite les doublons à l'import
+  isCommute      Boolean      @default(false) // Permet d'exclure les trajets utilitaires
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  photos   ActivityPhoto[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos      ActivityPhoto[]
+  
+  // Nouvelles relations
+  timeSeries  TimeSeriesData?
+  equipmentId String?
+  equipment   Equipment?      @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
 
   @@unique([userId, dedupeKey])
   @@unique([userId, source, externalId])
@@ -154,7 +165,6 @@ model ActivityPhoto {
   @@index([activityId])
 }
 
-// ───────── Social ─────────
 // ───────── Objectifs, records, badges ─────────
 model Goal {
   id        String        @id @default(cuid())
@@ -201,7 +211,7 @@ model UserBadge {
   @@id([userId, badgeId])
 }
 
-// ───────── Programme d'entraînement (un seul actif à la fois) ─────────
+// ───────── Programme d'entraînement ─────────
 model TrainingPlan {
   id        String       @id @default(cuid())
   userId    String
@@ -216,11 +226,14 @@ model TrainingPlan {
 
   @@index([userId, createdAt(sort: Desc)])
 }
-// Stockage de tes seuils physiologiques
+
+// ───────── NOUVEAUX MODULES ─────────
+
+// 1. Seuils physiologiques (PPR, TiZ)
 model UserZones {
   id        String   @id @default(cuid())
   userId    String   @unique
-  ftp       Int?     // Functional Threshold Power (Watts) pour le Van Rysel
+  ftp       Int?     // Functional Threshold Power (Watts)
   maxHr     Int?     // Fréquence cardiaque maximale (BPM)
   restHr    Int?     // Fréquence cardiaque de repos
   updatedAt DateTime @updatedAt
@@ -228,14 +241,45 @@ model UserZones {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Stockage haute résolution (1 Hz) pour les graphiques
+// 2. Séries temporelles 1 Hz (PPR, Détection d'intervalles)
 model TimeSeriesData {
   id         String   @id @default(cuid())
   activityId String   @unique
   
-  // Le champ Json stockera les tableaux { watts: [...], hr: [...], cadence: [...] }
+  // Format attendu : { watts: [...], hr: [...], cadence: [...], time: [...] }
   data       Json
 
-  // Remplace "Activity" par le nom exact de ton modèle qui stocke les sorties (ex: Workout, Session)
   activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+// 3. Gestion du Matériel (Gear Tracker)
+model Equipment {
+  id           String     @id @default(cuid())
+  userId       String
+  name         String     // ex: "Genesis Croix de Fer", "Asics Trabuco"
+  type         String     // ex: "BIKE", "SHOES"
+  maxLifespan  Float      // Durée de vie max (en km ou mètres)
+  currentUsage Float      @default(0) // Usure actuelle (en km ou mètres)
+  createdAt    DateTime   @default(now())
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities   Activity[] 
+
+  @@index([userId])
+}
+
+// 4. Échéances et Courses (Event Timeline)
+model RaceEvent {
+  id              String       @id @default(cuid())
+  userId          String
+  name            String       // ex: "Trail Glazig 28km"
+  date            DateTime
+  sport           ActivityType
+  targetDistance  Float        // en mètres ou km
+  targetElevation Float?       // en mètres
+  createdAt       DateTime     @default(now())
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date(sort: Asc)])
 }
