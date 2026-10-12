@@ -216,3 +216,26 @@ model TrainingPlan {
 
   @@index([userId, createdAt(sort: Desc)])
 }
+// Stockage de tes seuils physiologiques
+model UserZones {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  ftp       Int?     // Functional Threshold Power (Watts) pour le Van Rysel
+  maxHr     Int?     // Fréquence cardiaque maximale (BPM)
+  restHr    Int?     // Fréquence cardiaque de repos
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Stockage haute résolution (1 Hz) pour les graphiques
+model TimeSeriesData {
+  id         String   @id @default(cuid())
+  activityId String   @unique
+  
+  // Le champ Json stockera les tableaux { watts: [...], hr: [...], cadence: [...] }
+  data       Json
+
+  // Remplace "Activity" par le nom exact de ton modèle qui stocke les sorties (ex: Workout, Session)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
