@@ -23,12 +23,36 @@ export const authOptions: NextAuthOptions = {
         return { id: u.id, email: u.email, name: u.name };
       },
     }),
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [GoogleProvider({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, allowDangerousEmailAccountLinking: true })] : []),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            allowDangerousEmailAccountLinking: true,
+            authorization: {
+              params: {
+                scope:
+                  "openid profile email https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.location.read",
+                prompt: "consent",
+                access_type: "offline",
+                response_type: "code",
+              },
+            },
+          }),
+        ]
+      : []),
   ],
   callbacks: {
     signIn({ user }) { const allowed = process.env.ALLOWED_EMAIL?.trim().toLowerCase(); return !!allowed && user.email?.toLowerCase() === allowed; },
-    jwt({ token, user }) { if (user) token.uid = user.id; return token; },
-    session({ session, token }) { if (session.user) session.user.id = token.uid as string; return session; },
+    jwt({ token, user, account }) {
+      if (user) token.uid = user.id;
+      if (account?.access_token) token.accessToken = account.access_token;
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) session.user.id = token.uid as string;
+      return session;
+    },
   },
 };
 
