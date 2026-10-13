@@ -1,8 +1,8 @@
 import { dayKey, localHour, shiftDay, weekKeys } from "../dates";
 import { sunTimes } from "./sun";
+import { climbCompare, distanceCompare, tonnageCompare } from "./landmarks";
 import type { Act, Insight, Story } from "./types";
 
-const EIFFEL_M = 330, FLOOR_M = 3, MARATHON_KM = 42.195;
 const fr = (n: number, d = 0) => n.toLocaleString("fr-FR", { maximumFractionDigits: d });
 const hash = (s: string) => { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 const pick = <T,>(a: T[], seed: string) => a[hash(seed) % a.length];
@@ -20,13 +20,12 @@ export function weeklyInsights(acts: Act[], { now, tz }: WeeklyCtx): Insight[] {
   const out: Insight[] = [];
 
   const climb = sum(cur, (a) => a.elevationGainM);
-  if (climb >= EIFFEL_M / 2) {
-    const t = climb / EIFFEL_M;
-    out.push({ id: "eiffel", tone: "wow", icon: "mountain", title: `${fr(t, 1)} tour${t >= 2 ? "s" : ""} Eiffel`, body: `C’est ce que vous avez grimpé cette semaine : ${fr(climb)} m de dénivelé positif.` });
-  }
+  const seed = weekKeys(now, tz)[0], cc = climbCompare(climb, seed);
+  if (cc) out.push({ id: "climb", tone: "wow", icon: "mountain", title: cc.short, body: `${fr(climb)} m de D+ cette semaine : c’est ${cc.text}.` });
 
   const km = sum(cur, (a) => a.distanceM) / 1000, pkm = sum(prev, (a) => a.distanceM) / 1000;
-  if (km >= MARATHON_KM) out.push({ id: "marathon", tone: "wow", icon: "zap", title: `${fr(km / MARATHON_KM, 1)} marathon${km >= 2 * MARATHON_KM ? "s" : ""}`, body: `${fr(km, 1)} km cumulés depuis lundi, tous sports confondus.` });
+  const dc = distanceCompare(km, seed);
+  if (dc) out.push({ id: "distance", tone: "wow", icon: "zap", title: dc.short, body: `${fr(km, 1)} km cumulés depuis lundi : ${dc.text}.` });
   if (pkm > 0) {
     const pct = Math.round(((km - pkm) / pkm) * 100);
     if (pct >= 10) out.push({ id: "wow-week", tone: "progress", icon: "trend", title: `+${pct} % vs semaine dernière`, body: `${fr(km, 1)} km contre ${fr(pkm, 1)} km. Belle montée en puissance.` });
@@ -79,8 +78,8 @@ export function activityStory(a: Act, history: Act[], { tz, lifetimeKmBefore, pr
     }
   }
 
-  const floors = Math.round(a.elevationGainM / FLOOR_M);
-  if (floors >= 30) return { tag: "floors", text: `Vous avez grimpé l’équivalent de ${floors} étages aujourd’hui. Vos jambes vous remercieront… un jour.` };
+  const cl = climbCompare(a.elevationGainM, seed);
+  if (cl) return { tag: "climb", text: pick([`${fr(a.elevationGainM)} m de D+ : ${cl.text}. Les jambes s’en souviendront.`, `Dénivelé du jour : ${cl.text}. Pas mal pour une sortie.`, `Vous avez grimpé ${cl.text}.`], seed) };
   if (a.movingTimeS >= 7200) return { tag: "long", text: `${hm(a.movingTimeS)} dehors. Mention spéciale pour la patience.` };
 
   const h = localHour(a.startedAt, tz);
@@ -88,4 +87,12 @@ export function activityStory(a: Act, history: Act[], { tz, lifetimeKmBefore, pr
   if (h >= 21) return { tag: "night", text: "Sortie de nuit. Les rues sont à vous, et il n’y a personne pour vous voir sourire." };
 
   return { tag: "generic", text: pick([`${fr(km, 1)} km de plus au compteur. Chaque sortie compte, même les ordinaires.`, `${hm(a.movingTimeS)} pour vous, et personne d’autre. Bien joué.`, `Une de plus dans la boîte. La régularité fait le reste.`], seed) };
+}
+
+
+/** Anecdote d'une séance de musculation : tonnage soulevé avec un repère imagé, sinon le nombre de séries. */
+export function workoutStory(w: { volumeKg: number; exercises: number; sets: number }, seed: string): Story {
+  const t = tonnageCompare(w.volumeKg, seed);
+  if (t) return { tag: "tonnage", text: `${fr(w.volumeKg / 1000, 1)} t soulevées en une séance : ${t}.` };
+  return { tag: "workout", text: pick([`${w.sets} séries sur ${w.exercises} exercice${w.exercises > 1 ? "s" : ""}. Du solide.`, `Séance bouclée : ${w.sets} séries, rien n’a été lâché.`], seed) };
 }

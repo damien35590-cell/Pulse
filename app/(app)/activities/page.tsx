@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { uniqueById } from "@/lib/utils";
 import { ActivityCard } from "@/components/dashboard/activity-card";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,14 @@ const TZ = "Europe/Paris";
 export default async function ActivitiesPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const acts = await prisma.activity.findMany({
+  const rows = await prisma.activity.findMany({
     where: { userId: s.user.id }, orderBy: { startedAt: "desc" }, take: 150,
-    select: { id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, polyline: true },
+    select: {
+      id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, polyline: true, avgHr: true, avgPower: true,
+      exercises: { select: { sets: true, reps: true, loadKg: true } },
+    },
   });
+  const acts = uniqueById(rows); // filet de sécurité : jamais deux cartes pour le même id
   const fmt = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: TZ });
   const groups = new Map<string, typeof acts>();
   for (const a of acts) { const k = fmt.format(a.startedAt); groups.set(k, [...(groups.get(k) ?? []), a]); }

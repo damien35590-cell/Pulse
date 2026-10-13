@@ -1,5 +1,7 @@
 export type ActivityKind = "RUN" | "RIDE" | "SWIM" | "HIKE" | "WALK" | "WORKOUT" | "OTHER";
 
+import type { StreamData } from "../stream";
+
 export type TrackPoint = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
 
 export type ParsedActivity = {
@@ -17,6 +19,7 @@ export type ParsedActivity = {
   avgHr?: number;
   maxHr?: number;
   avgPower?: number;
+  stream?: StreamData; // série à 1 Hz (calculée dans le navigateur ou sur le serveur)
   maxPower?: number;
   calories?: number;
   startLat?: number;

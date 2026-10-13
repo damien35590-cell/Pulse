@@ -19,7 +19,7 @@ export async function syncIntervals(uid: string, days = 3) {
   if (!r.ok) throw new Error(`Intervals.icu a répondu ${r.status}`);
   const list = (await r.json()) as { id: string; file_type?: string | null }[];
 
-  const out = { found: list.length, withFile: 0, saved: 0, duplicates: 0, skipped: 0, errors: [] as string[] };
+  const out = { found: list.length, withFile: 0, saved: 0, duplicates: 0, backfilled: 0, skipped: 0, errors: [] as string[] };
   for (const a of list) {
     if (!a.file_type) { out.skipped++; continue; }
     out.withFile++;
@@ -30,7 +30,7 @@ export async function syncIntervals(uid: string, days = 3) {
       const gz = bytes[0] === 0x1f && bytes[1] === 0x8b; // le fichier peut arriver compressé ou déjà décompressé
       const act = await parseOne(`${a.id}.${a.file_type}${gz ? ".gz" : ""}`, bytes);
       const res = await saveActivities(uid, [act]);
-      out.saved += res.saved; out.duplicates += res.duplicates;
+      out.saved += res.saved; out.duplicates += res.duplicates; out.backfilled += res.backfilled;
     } catch (e) {
       out.errors.push(`${a.id} : ${e instanceof Error ? e.message : "erreur"}`);
     }

@@ -3,18 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { importFiles } from "@/lib/import";
+import { buildStream } from "@/lib/stream";
 import type { ParsedActivity } from "@/lib/import/types";
 
 const fmtTime = (s: number) => `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
 /** Allège les traces (≤ 600 points) pour rester sous la limite de taille des requêtes. */
-const slim = (a: ParsedActivity): ParsedActivity => { const step = Math.max(1, Math.ceil(a.points.length / 600)); return { ...a, points: a.points.filter((_, i) => i % step === 0 || i === a.points.length - 1) }; };
+const slim = (a: ParsedActivity): ParsedActivity => { const stream = buildStream(a.points) ?? undefined, step = Math.max(1, Math.ceil(a.points.length / 600)); return { ...a, stream, points: a.points.filter((_, i) => i % step === 0 || i === a.points.length - 1) }; };
 
 export default function ImportPage() {
   const [items, setItems] = useState<ParsedActivity[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [result, setResult] = useState<{ saved: number; duplicates: number; invalid: number } | null>(null);
+  const [result, setResult] = useState<{ saved: number; duplicates: number; invalid: number; backfilled: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const [sync, setSync] = useState<{ busy: boolean; msg?: string; err?: string }>({ busy: false });
 
@@ -24,7 +25,7 @@ export default function ImportPage() {
       const r = await fetch("/api/sync/intervals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 7 }) });
       const j = await r.json();
       if (!r.ok) return setSync({ busy: false, err: j.error ?? "Échec de la synchronisation" });
-      setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}` });
+      setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.backfilled ? `, ${j.backfilled} complétée(s) avec le détail` : ""}${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}` });
     } catch { setSync({ busy: false, err: "Connexion impossible, réessayez." }); }
   }
 
@@ -37,13 +38,13 @@ export default function ImportPage() {
   }
 
   async function save() {
-    setBusy(true); setFailed(false); const tot = { saved: 0, duplicates: 0, invalid: 0 };
+    setBusy(true); setFailed(false); const tot = { saved: 0, duplicates: 0, invalid: 0, backfilled: 0 };
     try {
       for (let i = 0; i < items.length; i += 5) {
         setProgress({ done: i, total: items.length });
         const r = await fetch("/api/activities/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activities: items.slice(i, i + 5).map(slim) }) });
         if (!r.ok) throw new Error("http");
-        const j = await r.json(); tot.saved += j.saved; tot.duplicates += j.duplicates; tot.invalid += j.invalid;
+        const j = await r.json(); tot.saved += j.saved; tot.duplicates += j.duplicates; tot.invalid += j.invalid; tot.backfilled += j.backfilled ?? 0;
       }
       setResult(tot); setItems([]);
     } catch { setFailed(true); }
@@ -74,7 +75,7 @@ export default function ImportPage() {
       {result && (
         <div role="status" className="rounded-xl border border-line bg-surface p-4">
           <p className="font-display text-2xl font-bold">{result.saved} sortie{result.saved > 1 ? "s" : ""} enregistrée{result.saved > 1 ? "s" : ""}</p>
-          <p className="mt-1 text-sm text-ink-soft">{result.duplicates > 0 ? `${result.duplicates} déjà présente${result.duplicates > 1 ? "s" : ""}, ignorée${result.duplicates > 1 ? "s" : ""}. ` : ""}{result.invalid > 0 ? `${result.invalid} illisible${result.invalid > 1 ? "s" : ""}.` : ""}</p>
+          <p className="mt-1 text-sm text-ink-soft">{result.backfilled > 0 ? `${result.backfilled} séance${result.backfilled > 1 ? "s" : ""} complétée${result.backfilled > 1 ? "s" : ""} avec le détail (puissance, cardio). ` : ""}{result.duplicates > 0 ? `${result.duplicates} déjà présente${result.duplicates > 1 ? "s" : ""}, ignorée${result.duplicates > 1 ? "s" : ""}. ` : ""}{result.invalid > 0 ? `${result.invalid} illisible${result.invalid > 1 ? "s" : ""}.` : ""}</p>
           <Link href="/activities" className="mt-3 grid min-h-12 place-items-center rounded-xl bg-surface-2 font-semibold">Voir mes activités</Link>
         </div>
       )}

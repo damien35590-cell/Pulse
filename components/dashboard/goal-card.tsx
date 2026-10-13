@@ -2,19 +2,26 @@
 import { motion } from "framer-motion";
 import { Flame } from "lucide-react";
 import { fmtNum } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export function GoalCard({ km, goalKm, streak }: { km: number; goalKm: number; streak: number }) {
-  const pct = Math.min(100, (km / goalKm) * 100), left = Math.max(0, goalKm - km);
+  const real = (km / goalKm) * 100, pct = Math.min(100, real), over = real > 100, left = Math.max(0, goalKm - km);
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-xl font-semibold">Objectif de {fmtNum(goalKm, 0)} km</h2>
-        <span className="font-display text-2xl font-bold tabular-nums">{Math.round(pct)} %</span>
+        {/* Pourcentage RÉEL : 142 km sur 30 km = 473 % */}
+        <span className={cn("font-display text-2xl font-bold tabular-nums", over && "text-green-600 dark:text-green-400")}>{Math.round(real).toLocaleString("fr-FR")} %</span>
       </div>
       <div className="my-3 h-3 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-        <motion.div className="h-full rounded-full bg-brand" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }} />
+        <motion.div
+          className={cn("h-full rounded-full", over ? "bg-green-500 shadow-[0_0_14px_rgba(34,197,94,0.65)]" : "bg-brand")}
+          initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
+        />
       </div>
-      <p className="text-sm text-ink-soft">{left > 0 ? `Plus que ${fmtNum(left)} km. Pas de pression, juste une belle sortie.` : "Objectif atteint. Le reste de la semaine est du bonus."}</p>
+      <p className="text-sm text-ink-soft">
+        {over ? <>Objectif dépassé de <b className="text-ink">{fmtNum(km - goalKm)} km</b>. Belle semaine.</> : left > 0 ? `Plus que ${fmtNum(left)} km. Pas de pression, juste une belle sortie.` : "Objectif atteint. Le reste de la semaine est du bonus."}
+      </p>
       {streak > 0 && (
         <p className="mt-3 flex items-center gap-2 text-sm">
           <Flame className="h-5 w-5 text-brand" aria-hidden />

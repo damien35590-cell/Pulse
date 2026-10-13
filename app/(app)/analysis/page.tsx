@@ -3,9 +3,15 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { dayKey, shiftDay, weekKeys } from "@/lib/dates";
+import { fillMissingDates, groupByWeek } from "@/lib/fill-dates";
+import { climbCompare } from "@/lib/insights/landmarks";
 import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { fmtDuration, fmtNum } from "@/lib/format";
 import { WeeklyBars, PaceArea } from "@/components/analysis/charts";
+import { DisciplineRadar } from "@/components/analysis/discipline-radar";
+import { PowerCurveChart } from "@/components/activity/power-curve-chart";
+import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
+import { getAdvanced } from "@/lib/data/advanced";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Analyse" };
@@ -23,6 +29,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     where: { userId: session.user.id, startedAt: { gte: new Date(+now - (Math.max(2 * W, 26) * 7 + 14) * 864e5) } }, orderBy: { startedAt: "asc" },
     select: { id: true, type: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
   });
+  const adv = await getAdvanced(session.user.id, TZ);
   const mon = weekKeys(now, TZ)[0], today = dayKey(now, TZ);
   const ago = (d: Date) => { const diff = (Date.parse(mon) - Date.parse(dayKey(d, TZ))) / 864e5; return diff <= 0 ? 0 : Math.ceil(diff / 7); };
   const hit = (a: { type: string }) => S === "all" || a.type === S, sum = <T,>(l: T[], f: (x: T) => number) => l.reduce((s, x) => s + f(x), 0);
@@ -33,7 +40,9 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     { l: "Dénivelé +", c: sum(cur, (a) => a.elevationGainM), p: sum(prev, (a) => a.elevationGainM), f: (v: number) => `${fmtNum(v, 0)} m` },
     { l: "Sorties", c: cur.length, p: prev.length, f: (v: number) => String(v) },
   ];
-  const weekly = Array.from({ length: W }, (_, i) => { const k = W - 1 - i; return { label: lab(shiftDay(mon, -7 * k)), km: sum(cur.filter((a) => ago(a.startedAt) === k), (a) => a.distanceM) / 1000 }; });
+  // Jours sans activité injectés à 0 : l'axe X reste continu et proportionnel (aucune semaine ne « disparaît »).
+  const daily = fillMissingDates(acts.filter(hit), shiftDay(mon, -7 * (W - 1)), today, TZ);
+  const weekly = groupByWeek(daily).map((w) => ({ label: lab(w.weekStart), km: w.distance, time: w.time, dPlus: w.dPlus }));
   const pace = Array.from({ length: W }, (_, i) => { const k = W - 1 - i, r = acts.filter((a) => a.type === "RUN" && a.distanceM >= 2000 && ago(a.startedAt) === k); return r.length ? { label: lab(shiftDay(mon, -7 * k)), pace: sum(r, (a) => a.movingTimeS) / 60 / (sum(r, (a) => a.distanceM) / 1000) } : null; }).filter(Boolean) as { label: string; pace: number }[];
   const inWin = acts.filter((a) => ago(a.startedAt) < W), tt = sum(inWin, (a) => a.movingTimeS) || 1;
   const shares = MY_SPORTS.map((k, i) => ({ k, pct: (sum(inWin.filter((a) => a.type === k), (a) => a.movingTimeS) / tt) * 100, o: [1, 0.7, 0.45, 0.25][i] }));
@@ -71,8 +80,15 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
         <p className="mt-3 text-sm text-ink-soft">{wd[fav] > 0 ? <>Votre jour préféré : <b className="text-ink">{FULL[fav]}</b>, {fmtNum(wd[fav], 1)} km en moyenne.</> : "Pas encore de sorties sur cette période."}</p></div>
 
       <h2 className={h2}>À retenir</h2>
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">{[["Meilleure semaine", `${fmtNum(best, 1)} km`], ["Plus longue sortie", `${fmtNum(longest, 1)} km`], ["Tours Eiffel grimpées", fmtNum(sum(cur, (a) => a.elevationGainM) / 330, 1)], ["Jours actifs", `${days}/${W * 7}`]].map(([l, v]) => <div key={l} className="bg-surface px-4 py-3"><dt className="text-xs text-ink-soft">{l}</dt><dd className="font-display text-2xl font-bold tabular-nums">{v}</dd></div>)}</dl>
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">{[["Meilleure semaine", `${fmtNum(best, 1)} km`], ["Plus longue sortie", `${fmtNum(longest, 1)} km`], ["Dénivelé en repères", climbCompare(sum(cur, (a) => a.elevationGainM), mon)?.short ?? `${fmtNum(sum(cur, (a) => a.elevationGainM), 0)} m`], ["Jours actifs", `${days}/${W * 7}`]].map(([l, v]) => <div key={l} className="bg-surface px-4 py-3"><dt className="text-xs text-ink-soft">{l}</dt><dd className="font-display text-2xl font-bold tabular-nums">{v}</dd></div>)}</dl>
 
+      <h2 className={h2}>Profil par discipline</h2><div className={card}><DisciplineRadar cycling={adv.cycling} running={adv.running} /></div>
+      {adv.record.some(Boolean) && (
+        <><h2 className={h2}>Courbe de puissance</h2>
+          <div className={card}><PowerCurveChart record={adv.record} recent={adv.last30} />
+            <p className="mt-1 text-xs text-ink-soft">Meilleure puissance moyenne maintenue sur chaque durée : record absolu (gris) et 30 derniers jours (orange).</p></div></>
+      )}
+      <h2 className={h2}>Muscles sollicités (7 jours)</h2><div className={card}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div>
       {A && B && <>
         <h2 className={h2}>Comparer deux sorties</h2>
         <form className={card} action="/analysis"><input type="hidden" name="w" value={W} /><input type="hidden" name="s" value={S} />

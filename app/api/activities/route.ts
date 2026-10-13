@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { encodePolyline } from "@/lib/polyline";
 import { bestEffort, type Pt } from "@/lib/geo";
 import { fetchWeather } from "@/lib/weather";
-import { activityStory } from "@/lib/insights/engine";
+import { activityStory, workoutStory } from "@/lib/insights/engine";
 import type { Act } from "@/lib/insights/types";
 
 const TYPES = ["RUN", "RIDE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
@@ -18,6 +18,16 @@ export async function POST(req: Request) {
   const startedAt = new Date(b?.startedAt);
   if (!b || !TYPES.includes(b.type) || !b.title || !(b.movingTimeS > 0) || isNaN(+startedAt))
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+
+  // Musculation : blocs d'exercices validés et nettoyés ; pas de distance ni de dénivelé.
+  const isWorkout = b.type === "WORKOUT";
+  const exercises = isWorkout && Array.isArray(b.exercises)
+    ? b.exercises.slice(0, 40).map((e: Record<string, unknown>, i: number) => {
+        const load = e?.loadKg == null || e.loadKg === "" ? NaN : Number(e.loadKg), rest = e?.restS == null || e.restS === "" ? NaN : Number(e.restS);
+        return { position: i, name: String(e?.name ?? "").trim().slice(0, 80), sets: Math.round(Number(e?.sets)), reps: Math.round(Number(e?.reps)), loadKg: Number.isFinite(load) && load >= 0 ? load : null, restS: Number.isFinite(rest) && rest >= 0 ? Math.round(rest) : null, comment: e?.comment ? String(e.comment).slice(0, 200) : null };
+      }).filter((e: { name: string; sets: number; reps: number }) => e.name && e.sets > 0 && e.reps > 0)
+    : [];
+  if (isWorkout) { b.distanceM = 0; b.elevationGainM = 0; }
 
   const pts: Pt[] = Array.isArray(b.trackPoints) ? b.trackPoints.slice(0, 20000) : [];
   const startLat = b.startLat ?? pts[0]?.lat ?? null, startLng = b.startLng ?? pts[0]?.lng ?? null;
@@ -47,7 +57,10 @@ export async function POST(req: Request) {
   }
 
   const self: Act = { id: `${uid}-${+startedAt}`, type: b.type, startedAt, distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, startLat, startLng, weather };
-  const story = activityStory(self, hist as Act[], { tz: user?.timezone ?? "Europe/Paris", lifetimeKmBefore: (life._sum.distanceM ?? 0) / 1000, pr });
+  const volumeKg = exercises.reduce((s: number, e: { sets: number; reps: number; loadKg: number | null }) => s + e.sets * e.reps * (e.loadKg ?? 0), 0);
+  const story = isWorkout && exercises.length
+    ? workoutStory({ volumeKg, exercises: exercises.length, sets: exercises.reduce((s: number, e: { sets: number }) => s + e.sets, 0) }, self.id)
+    : activityStory(self, hist as Act[], { tz: user?.timezone ?? "Europe/Paris", lifetimeKmBefore: (life._sum.distanceM ?? 0) / 1000, pr });
 
   try {
     const a = await prisma.activity.create({
@@ -55,6 +68,7 @@ export async function POST(req: Request) {
         userId: uid, type: b.type, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, startedAt,
         distanceM: self.distanceM, movingTimeS: self.movingTimeS, elevationGainM: self.elevationGainM, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined, story: story.text,
+        exercises: exercises.length ? { create: exercises } : undefined,
         source: b.source ?? "manual", externalId: b.externalId ?? null, trackPoints: pts.length ? (pts as unknown as Prisma.InputJsonValue) : undefined,
       },
       select: { id: true },

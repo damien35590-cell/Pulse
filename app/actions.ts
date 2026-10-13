@@ -41,3 +41,22 @@ export async function toggleSession(planId: string, key: string) {
   revalidatePath("/plan");
 }
 export async function deletePlan() { const userId = await uid(); await prisma.trainingPlan.deleteMany({ where: { userId } }); revalidatePath("/plan"); }
+
+// ───────── Échéances et seuils ─────────
+const num = (v: FormDataEntryValue | null) => { const n = parseFloat(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : NaN; };
+
+export async function addEvent(fd: FormData) {
+  const userId = await uid(), name = String(fd.get("name") ?? "").trim().slice(0, 80), date = new Date(`${String(fd.get("date"))}T12:00:00Z`), sport = String(fd.get("sport")), dist = num(fd.get("distance")), elev = num(fd.get("elevation"));
+  if (!name || isNaN(+date) || !MY.includes(sport)) return;
+  await prisma.raceEvent.create({ data: { userId, name, date, sport: sport as ActivityType, targetDistance: dist > 0 ? dist : null, targetElevation: elev > 0 ? elev : null } });
+  revalidatePath("/events"); revalidatePath("/");
+}
+export async function deleteEvent(id: string) { const userId = await uid(); await prisma.raceEvent.deleteMany({ where: { id, userId } }); revalidatePath("/events"); revalidatePath("/"); }
+
+/** Champ vide = retour à l'estimation automatique. */
+export async function saveZones(fd: FormData) {
+  const userId = await uid(), ftp = num(fd.get("ftp")), hrMax = num(fd.get("hrMax"));
+  const data = { ftp: ftp >= 50 && ftp <= 600 ? Math.round(ftp) : null, hrMax: hrMax >= 120 && hrMax <= 230 ? Math.round(hrMax) : null };
+  await prisma.userZones.upsert({ where: { userId }, update: data, create: { userId, ...data } });
+  revalidatePath("/profile"); revalidatePath("/analysis");
+}
