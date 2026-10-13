@@ -17,16 +17,29 @@ export default function ImportPage() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<{ saved: number; duplicates: number; invalid: number; backfilled: number } | null>(null);
   const [failed, setFailed] = useState(false);
+  
+  // États pour les synchronisations
   const [sync, setSync] = useState<{ busy: boolean; msg?: string; err?: string }>({ busy: false });
+  const [syncFit, setSyncFit] = useState<{ busy: boolean; msg?: string; err?: string }>({ busy: false });
 
   async function syncNow() {
-    setSync({ busy: true });
+    setSync({ busy: true, msg: undefined, err: undefined });
     try {
       const r = await fetch("/api/sync/intervals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 7 }) });
       const j = await r.json();
       if (!r.ok) return setSync({ busy: false, err: j.error ?? "Échec de la synchronisation" });
       setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.backfilled ? `, ${j.backfilled} complétée(s) avec le détail` : ""}${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}` });
     } catch { setSync({ busy: false, err: "Connexion impossible, réessayez." }); }
+  }
+
+  async function syncFitNow() {
+    setSyncFit({ busy: true, msg: undefined, err: undefined });
+    try {
+      const r = await fetch("/api/sync/google-fit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 7 }) });
+      const j = await r.json();
+      if (!r.ok) return setSyncFit({ busy: false, err: j.error ?? "Échec de la synchronisation Google Fit" });
+      setSyncFit({ busy: false, msg: j.count === 0 ? "Aucune activité trouvée sur Google Fit ces 7 derniers jours." : j.message });
+    } catch { setSyncFit({ busy: false, err: "Connexion impossible, réessayez." }); }
   }
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -57,10 +70,20 @@ export default function ImportPage() {
       <h1 className="font-display text-3xl font-bold leading-none">Importer</h1>
       <p className="text-ink-soft">Fichiers FIT ou GPX (Strava, MyWhoosh, votre montre), ou l’archive ZIP exportée de Strava. Les sorties déjà présentes sont ignorées.</p>
 
+      {/* Bloc Google Fit */}
+      <div className="rounded-xl border border-line bg-surface p-4">
+        <p className="font-bold">Synchroniser depuis Google Fit</p>
+        <p className="mt-1 text-sm text-ink-soft">Récupère vos activités physiques (vélo, course, etc.) des 7 derniers jours.</p>
+        <button onClick={syncFitNow} disabled={syncFit.busy} className="mt-3 min-h-12 w-full rounded-xl border border-brand bg-transparent font-display text-lg font-semibold text-brand disabled:opacity-60">{syncFit.busy ? "Synchronisation…" : "Synchroniser Google Fit"}</button>
+        {syncFit.msg && <p role="status" className="mt-2 text-sm">{syncFit.msg}</p>}
+        {syncFit.err && <p role="alert" className="mt-2 text-sm font-medium text-brand">{syncFit.err}</p>}
+      </div>
+
+      {/* Bloc Intervals.icu */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <p className="font-bold">Synchroniser depuis Intervals.icu</p>
         <p className="mt-1 text-sm text-ink-soft">Récupère vos sorties MyWhoosh des 7 derniers jours. Pulse le fait aussi chaque nuit, tout seul.</p>
-        <button onClick={syncNow} disabled={sync.busy} className="mt-3 min-h-12 w-full rounded-xl bg-brand font-display text-lg font-semibold text-brand-ink disabled:opacity-60">{sync.busy ? "Synchronisation…" : "Synchroniser maintenant"}</button>
+        <button onClick={syncNow} disabled={sync.busy} className="mt-3 min-h-12 w-full rounded-xl bg-brand font-display text-lg font-semibold text-brand-ink disabled:opacity-60">{sync.busy ? "Synchronisation…" : "Synchroniser Intervals"}</button>
         {sync.msg && <p role="status" className="mt-2 text-sm">{sync.msg}</p>}
         {sync.err && <p role="alert" className="mt-2 text-sm font-medium text-brand">{sync.err}</p>}
       </div>
