@@ -25,9 +25,14 @@ export function BottomNav() {
           const { href, label, icon: Icon } = item, active = isActive(href), record = "record" in item;
           return (
             <li key={href} className="flex justify-center">
-              <Link href={href} prefetch={true} onPointerDown={() => tap(6)} aria-current={active ? "page" : undefined} aria-label={label}
-  className="flex min-h-14 min-w-14 flex-col items-center justify-center gap-0.5">
-                className="flex min-h-14 min-w-14 flex-col items-center justify-center gap-0.5">
+              <Link
+                href={href}
+                prefetch={true}
+                onPointerDown={() => tap(6)}
+                aria-current={active ? "page" : undefined}
+                aria-label={label}
+                className="flex min-h-14 min-w-14 flex-col items-center justify-center gap-0.5"
+              >
                 {record ? (
                   <span className="grid h-14 w-14 -translate-y-2.5 place-items-center rounded-full bg-brand text-brand-ink shadow-md ring-4 ring-surface transition-transform active:scale-95">
                     <Icon className="h-6 w-6" fill="currentColor" aria-hidden />
