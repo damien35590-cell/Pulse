@@ -23,15 +23,17 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     }
   );
 
+  // MODIFICATION ICI : Récupération du message d'erreur exact
   if (!res.ok) {
-    throw new Error("Erreur de communication avec l'API Google Fit");
+    const errorText = await res.text();
+    console.error("Détail de l'erreur Google :", errorText);
+    throw new Error(`Google (${res.status}) : ${errorText.substring(0, 80)}`);
   }
 
   const data = await res.json();
   const sessions = data.session || [];
 
   // Pour l'instant, on renvoie simplement les données brutes sans les écrire dans la base
-  // Cela permettra de vérifier que la connexion fonctionne et de voir le format des données
   return { 
     success: true, 
     count: sessions.length, 
