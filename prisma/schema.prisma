@@ -1,135 +1,271 @@
-import { prisma } from "@/lib/prisma";
-
-// Traduit les codes d'activité Google Fit vers ton ActivityType Prisma
-function mapFitType(typeId: number) {
-  switch (typeId) {
-    case 8: return "RUN";      // Course à pied
-    case 1: 
-    case 17: return "RIDE";    // Vélo classique, Spinning/Home trainer
-    case 7: return "WALK";     // Marche
-    case 76: return "SWIM";    // Natation
-    case 97:                   // Musculation/Haltérophilie
-    case 11:                   // Crossfit
-    case 9: return "WORKOUT";  // Fitness/Aerobics
-    default: return "OTHER";   // Autre sport par défaut
-  }
+generator client {
+  provider = "prisma-client-js"
 }
 
-// Fonction pour rafraîchir le jeton Google s'il est expiré
-async function getValidAccessToken(account: any) {
-  if (!account.refresh_token) return account.access_token;
-
-  try {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        grant_type: "refresh_token",
-        refresh_token: account.refresh_token,
-      }),
-    });
-
-    const tokens = await response.json();
-    if (!response.ok) throw tokens;
-
-    await prisma.account.update({
-      where: { 
-        provider_providerAccountId: { 
-          provider: "google", 
-          providerAccountId: account.providerAccountId 
-        } 
-      },
-      data: {
-        access_token: tokens.access_token,
-        expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
-        ...(tokens.refresh_token && { refresh_token: tokens.refresh_token }),
-      },
-    });
-
-    return tokens.access_token;
-  } catch (error) {
-    console.error("Erreur de rafraîchissement du token :", error);
-    return account.access_token;
-  }
+datasource db {
+  provider  = "postgresql"
+  url       = env("DIRECT_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-export async function syncGoogleFit(uid: string, days: number = 7) {
-  const account = await prisma.account.findFirst({
-    where: { userId: uid, provider: "google" },
-  });
+// ───────── Enums ─────────
+enum ActivityType {
+  RUN
+  RIDE
+  SWIM
+  HIKE
+  WALK
+  WORKOUT
+  OTHER
+}
+enum Feeling {
+  GREAT
+  GOOD
+  OK
+  TIRED
+  HARD
+}
+enum GoalMetric {
+  DISTANCE
+  TIME
+  ELEVATION
+  ACTIVITIES
+}
+enum GoalPeriod {
+  WEEK
+  MONTH
+  YEAR
+}
+enum RecordKind {
+  LONGEST_DISTANCE
+  LONGEST_TIME
+  BEST_5K
+  BEST_10K
+  BEST_HALF
+  BEST_ELEVATION
+}
 
-  if (!account || !account.access_token) {
-    throw new Error("Compte Google non lié.");
-  }
+// ───────── Auth (NextAuth + PrismaAdapter) ─────────
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  username      String?   @unique
+  bio           String?
+  weightKg      Float?    // estimation des calories
+  timezone      String    @default("Europe/Paris")
+  ageBand       String?   // "30-39" : sert aux repères de comparaison
+  sex           String?   // "H" | "F"
+  createdAt     DateTime  @default(now())
 
-  const validToken = await getValidAccessToken(account);
+  accounts   Account[]
+  sessions   Session[]
+  activities Activity[]
+  goals      Goal[]
+  plans      TrainingPlan[]
+  zones      UserZones?
+  events     RaceEvent[]
+  records    PersonalRecord[]
+  badges     UserBadge[]
+}
 
-  const endTime = new Date();
-  const startTime = new Date();
-  startTime.setDate(endTime.getDate() - days);
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  refresh_token_expires_in Int?
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  const res = await fetch(
-    `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`,
-    {
-      headers: { Authorization: `Bearer ${validToken}` },
-    }
-  );
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Google (${res.status}) : ${errorText.substring(0, 80)}`);
-  }
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  const data = await res.json();
-  const sessions = data.session || [];
+  @@index([userId])
+}
 
-  let saved = 0;
-  let duplicates = 0;
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
 
-  for (const session of sessions) {
-    const start = new Date(parseInt(session.startTimeMillis));
-    const end = new Date(parseInt(session.endTimeMillis));
-    const durationS = Math.floor((end.getTime() - start.getTime()) / 1000);
-    
-    const dedupeKey = `gfit-${session.id}`;
+// ───────── Activités ─────────
+model Activity {
+  id             String       @id @default(cuid())
+  userId         String
+  type           ActivityType
+  title          String
+  notes          String?
+  feeling        Feeling?
+  startedAt      DateTime
+  distanceM      Float        @default(0)
+  movingTimeS    Int          @default(0)
+  elapsedTimeS   Int?
+  elevationGainM Float        @default(0)
+  calories       Int?
+  avgHr          Int?
+  maxHr          Int?
+  avgPower       Int?                    // W (home trainer, capteur de puissance)
+  maxPower       Int?
+  polyline       String?      @db.Text   // trace simplifiée (polyline encodée)
+  trackPoints    Json?                   // [{lat,lng,ele,t}] pour graphes altitude/vitesse
+  startLat       Float?
+  startLng       Float?
+  source         String       @default("manual") // manual | gpx | fit | strava | mywhoosh
+  externalId     String?                 // Activity ID Strava, empreinte MyWhoosh…
+  weather        Json?                   // {tempC, precipMm} à l'heure de départ
+  story          String?                 // anecdote générée à l'enregistrement
+  dedupeKey      String?      // début à la minute (UTC) : évite les doublons à l'import
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-    const existing = await prisma.activity.findFirst({
-      where: { userId: uid, dedupeKey: dedupeKey }
-    });
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos    ActivityPhoto[]
+  exercises WorkoutExercise[]
+  stream    ActivityStream?
 
-    if (existing) {
-      duplicates++;
-      continue;
-    }
+  @@unique([userId, dedupeKey])
+  @@unique([userId, source, externalId])
+  @@index([userId, startedAt(sort: Desc)])
+}
 
-    // Le champ "type" (enum) est désormais géré correctement
-    const typeEnum = mapFitType(session.activityType);
+model ActivityPhoto {
+  id         String   @id @default(cuid())
+  activityId String
+  url        String
+  key        String?  // clé Uploadthing / public_id Cloudinary
+  position   Int      @default(0)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
-    try {
-      await prisma.activity.create({
-        data: {
-          userId: uid,
-          dedupeKey: dedupeKey,
-          externalId: session.id, // Sauvegarde de l'ID natif Google
-          source: "fit",          // Indication de l'origine
-          title: session.name || `Activité ${typeEnum}`,
-          type: typeEnum as any,
-          startedAt: start,
-          movingTimeS: durationS,
-          distanceM: 0,
-        }
-      });
-      saved++;
-    } catch (e) {
-      console.error("Impossible de sauvegarder la session", session.id, e);
-    }
-  }
+  @@index([activityId])
+}
 
-  return { 
-    success: true, 
-    count: sessions.length, 
-    message: `${saved} nouvelle(s) sortie(s) enregistrée(s), ${duplicates} déjà présente(s).`
-  };
+// ───────── Social ─────────
+// ───────── Objectifs, records, badges ─────────
+model Goal {
+  id        String        @id @default(cuid())
+  userId    String
+  metric    GoalMetric
+  period    GoalPeriod
+  target    Float         // m, s, m D+ ou nombre d'activités
+  type      ActivityType? // null = tous sports
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
+
+model PersonalRecord {
+  id         String       @id @default(cuid())
+  userId     String
+  kind       RecordKind
+  type       ActivityType
+  value      Float        // secondes ou mètres selon `kind`
+  activityId String?
+  achievedAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, type])
+}
+
+model Badge {
+  id          String @id // ex: "first-5k", "streak-7"
+  name        String
+  description String
+  icon        String
+  users UserBadge[]
+}
+
+model UserBadge {
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, badgeId])
+}
+
+// ───────── Programme d'entraînement (un seul actif à la fois) ─────────
+model TrainingPlan {
+  id        String       @id @default(cuid())
+  userId    String
+  sport     ActivityType
+  goalLabel String
+  weeks     Int
+  days      Int
+  data      Json         // plan complet généré (semaines, séances)
+  done      String[]     // clés des séances cochées : "semaine-index"
+  createdAt DateTime     @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ───────── Musculation : un bloc par exercice (à découper plus finement en séries si besoin) ─────────
+model WorkoutExercise {
+  id         String   @id @default(cuid())
+  activityId String
+  position   Int
+  name       String
+  sets       Int
+  reps       Int
+  loadKg     Float?
+  restS      Int?
+  comment    String?
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId, position])
+}
+
+// ───────── Séries complètes à 1 Hz (puissance, cardio, cadence) : courbe de puissance, zones, intervalles ─────────
+model ActivityStream {
+  activityId String @id
+  data       Json   // { t0, n, power[], hr[], cad[] } : une valeur par seconde
+  curve      Json?  // meilleure puissance moyenne sur 5 s, 30 s, 1 min, 5 min, 20 min, 1 h
+  avgCad     Int?
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+// ───────── Seuils personnels (vides = estimés automatiquement) ─────────
+model UserZones {
+  userId    String   @id
+  ftp       Int?     // watts
+  hrMax     Int?     // bpm
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ───────── Échéances (courses, objectifs datés) ─────────
+model RaceEvent {
+  id              String       @id @default(cuid())
+  userId          String
+  name            String
+  date            DateTime
+  sport           ActivityType
+  targetDistance  Float?       // km
+  targetElevation Float?       // m de D+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
