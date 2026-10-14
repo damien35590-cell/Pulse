@@ -1,5 +1,20 @@
 import { prisma } from "@/lib/prisma";
 
+// Traduit les codes d'activité Google Fit vers ton ActivityType Prisma
+function mapFitType(typeId: number) {
+  switch (typeId) {
+    case 8: return "RUN";      // Course à pied
+    case 1: 
+    case 17: return "RIDE";    // Vélo classique, Spinning/Home trainer
+    case 7: return "WALK";     // Marche
+    case 76: return "SWIM";    // Natation
+    case 97:                   // Musculation/Haltérophilie
+    case 11:                   // Crossfit
+    case 9: return "WORKOUT";  // Fitness/Aerobics
+    default: return "OTHER";   // Autre sport par défaut
+  }
+}
+
 // Fonction pour rafraîchir le jeton Google s'il est expiré
 async function getValidAccessToken(account: any) {
   if (!account.refresh_token) return account.access_token;
@@ -73,17 +88,20 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   let saved = 0;
   let duplicates = 0;
 
-  // Boucle pour enregistrer chaque séance dans Pulse
   for (const session of sessions) {
-    // Calcul de la date et de la durée
+    // 1. Sécurité : si la date de départ n'existe pas, on ignore
+    if (!session.startTimeMillis) continue;
+
     const start = new Date(parseInt(session.startTimeMillis));
-    const end = new Date(parseInt(session.endTimeMillis));
-    const durationS = Math.floor((end.getTime() - start.getTime()) / 1000);
+    let durationS = 0;
     
-    // Clé unique pour ne pas importer 2 fois la même activité
+    // 2. Sécurité : calcul de la durée seulement si la séance est terminée
+    if (session.endTimeMillis) {
+      durationS = Math.floor((parseInt(session.endTimeMillis) - start.getTime()) / 1000);
+    }
+    
     const dedupeKey = `gfit-${session.id}`;
 
-    // Vérifier si la séance existe déjà dans ta base
     const existing = await prisma.activity.findFirst({
       where: { userId: uid, dedupeKey: dedupeKey }
     });
@@ -93,21 +111,26 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
       continue;
     }
 
-    // Création de l'activité dans Prisma
+    const typeEnum = mapFitType(session.activityType);
+
     try {
       await prisma.activity.create({
         data: {
           userId: uid,
           dedupeKey: dedupeKey,
-          title: session.name || "Activité Google Fit",
+          externalId: session.id || dedupeKey, 
+          source: "fit",          
+          title: session.name || `Activité ${typeEnum}`,
+          type: typeEnum as any,
           startedAt: start,
-          movingTimeS: durationS,
-          distanceM: 0, // À 0 par défaut pour les sessions simples
+          movingTimeS: durationS > 0 ? durationS : 0,
+          distanceM: 0,
         }
       });
       saved++;
-    } catch (e) {
-      console.error("Impossible de sauvegarder la session", session.id, e);
+    } catch (e: any) {
+      // 3. ICI : On bloque et on renvoie l'erreur brute pour qu'elle s'affiche en rouge
+      throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
     }
   }
 
