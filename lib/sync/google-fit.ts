@@ -19,7 +19,6 @@ async function getValidAccessToken(account: any) {
     const tokens = await response.json();
     if (!response.ok) throw tokens;
 
-    // Sauvegarder le nouveau jeton tout neuf dans la base Neon
     await prisma.account.update({
       where: { 
         provider_providerAccountId: { 
@@ -50,7 +49,6 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     throw new Error("Compte Google non lié.");
   }
 
-  // Vérification et rafraîchissement automatique du jeton
   const validToken = await getValidAccessToken(account);
 
   const endTime = new Date();
@@ -72,10 +70,50 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   const data = await res.json();
   const sessions = data.session || [];
 
+  let saved = 0;
+  let duplicates = 0;
+
+  // Boucle pour enregistrer chaque séance dans Pulse
+  for (const session of sessions) {
+    // Calcul de la date et de la durée
+    const start = new Date(parseInt(session.startTimeMillis));
+    const end = new Date(parseInt(session.endTimeMillis));
+    const durationS = Math.floor((end.getTime() - start.getTime()) / 1000);
+    
+    // Clé unique pour ne pas importer 2 fois la même activité
+    const dedupeKey = `gfit-${session.id}`;
+
+    // Vérifier si la séance existe déjà dans ta base
+    const existing = await prisma.activity.findFirst({
+      where: { userId: uid, dedupeKey: dedupeKey }
+    });
+
+    if (existing) {
+      duplicates++;
+      continue;
+    }
+
+    // Création de l'activité dans Prisma
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: uid,
+          dedupeKey: dedupeKey,
+          title: session.name || "Activité Google Fit",
+          startedAt: start,
+          movingTimeS: durationS,
+          distanceM: 0, // À 0 par défaut pour les sessions simples
+        }
+      });
+      saved++;
+    } catch (e) {
+      console.error("Impossible de sauvegarder la session", session.id, e);
+    }
+  }
+
   return { 
     success: true, 
     count: sessions.length, 
-    message: `Trouvé ${sessions.length} séances sur Google Fit.`,
-    sessions: sessions 
+    message: `${saved} nouvelle(s) sortie(s) enregistrée(s), ${duplicates} déjà présente(s).`
   };
 }
