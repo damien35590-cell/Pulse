@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
+const AGGREGATE_URL =
+  "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate";
+
 // Traduit les codes d'activité Google Fit vers ton ActivityType Prisma
 function mapFitType(typeId: number) {
   switch (typeId) {
@@ -14,6 +17,14 @@ function mapFitType(typeId: number) {
     default: return "OTHER";   // Autre sport par défaut
   }
 }
+
+// Activités détectées automatiquement qu'on importe : vélo, marche, course
+const AUTO_TYPES = new Set([1, 7, 8]);
+const AUTO_TITLES: Record<string, string> = {
+  RIDE: "Vélo",
+  WALK: "Marche",
+  RUN: "Course à pied",
+};
 
 // Fonction pour rafraîchir le jeton Google s'il est expiré
 async function getValidAccessToken(account: any) {
@@ -55,28 +66,25 @@ async function getValidAccessToken(account: any) {
   }
 }
 
-// Récupère la distance (en mètres) parcourue pendant une séance
+// Récupère la distance (en mètres) sur une période (null si indisponible)
 async function fetchSessionDistanceM(
   token: string,
   startMs: number,
   endMs: number
 ): Promise<number | null> {
   try {
-    const res = await fetch(
-      "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          aggregateBy: [{ dataTypeName: "com.google.distance.delta" }],
-          startTimeMillis: startMs,
-          endTimeMillis: endMs,
-        }),
-      }
-    );
+    const res = await fetch(AGGREGATE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        aggregateBy: [{ dataTypeName: "com.google.distance.delta" }],
+        startTimeMillis: startMs,
+        endTimeMillis: endMs,
+      }),
+    });
 
     if (!res.ok) {
       console.warn(
@@ -98,6 +106,48 @@ async function fetchSessionDistanceM(
   } catch (e) {
     console.warn("[google-fit] distance: erreur", e);
     return null;
+  }
+}
+
+// Récupère les activités détectées automatiquement (vélo, marche, course)
+async function fetchActivitySegments(
+  token: string,
+  startMs: number,
+  endMs: number
+): Promise<{ activity: number; startMs: number; endMs: number }[]> {
+  try {
+    const res = await fetch(AGGREGATE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        aggregateBy: [{ dataTypeName: "com.google.activity.segment" }],
+        bucketByActivitySegment: { minDurationMillis: 5 * 60 * 1000 },
+        startTimeMillis: startMs,
+        endTimeMillis: endMs,
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn(
+        `[google-fit] segments ${res.status}: ${(await res.text()).substring(0, 120)}`
+      );
+      return [];
+    }
+
+    const data = await res.json();
+    return (data.bucket ?? [])
+      .filter((b: any) => AUTO_TYPES.has(b.activity))
+      .map((b: any) => ({
+        activity: b.activity as number,
+        startMs: Number(b.startTimeMillis),
+        endMs: Number(b.endTimeMillis),
+      }));
+  } catch (e) {
+    console.warn("[google-fit] segments: erreur", e);
+    return [];
   }
 }
 
@@ -134,15 +184,16 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   let saved = 0;
   let duplicates = 0;
   let updated = 0;
+  let auto = 0;
+  const sessionRanges: { startMs: number; endMs: number }[] = [];
 
+  // ---------- 1. Séances enregistrées (méthode d'origine) ----------
   for (const session of sessions) {
-    // 1. Sécurité : si la date de départ n'existe pas, on ignore
     if (!session.startTimeMillis) continue;
 
     const start = new Date(parseInt(session.startTimeMillis));
     let durationS = 0;
 
-    // 2. Sécurité : calcul de la durée seulement si la séance est terminée
     if (session.endTimeMillis) {
       durationS = Math.floor(
         (parseInt(session.endTimeMillis) - start.getTime()) / 1000
@@ -151,8 +202,9 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
 
     const dedupeKey = `gfit-${session.id}`;
 
-    // Distance réelle de la séance (null si indisponible)
     const endMs = session.endTimeMillis ? parseInt(session.endTimeMillis) : null;
+    if (endMs) sessionRanges.push({ startMs: start.getTime(), endMs });
+
     const distanceM = endMs
       ? await fetchSessionDistanceM(validToken, start.getTime(), endMs)
       : null;
@@ -162,7 +214,6 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     });
 
     if (existing) {
-      // Les anciennes activités à 0 m récupèrent leur vraie distance
       if (distanceM && existing.distanceM === 0) {
         await prisma.activity.update({
           where: { id: existing.id },
@@ -196,9 +247,84 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     }
   }
 
+  // ---------- 2. Activités détectées automatiquement ----------
+  const segments = await fetchActivitySegments(
+    validToken,
+    startTime.getTime(),
+    endTime.getTime()
+  );
+
+  const TOLERANCE_MS = 5 * 60 * 1000;
+
+  for (const seg of segments) {
+    // Déjà couvert par une séance enregistrée ? On ignore.
+    const overlaps = sessionRanges.some(
+      (r) => seg.startMs < r.endMs && seg.endMs > r.startMs
+    );
+    if (overlaps) continue;
+
+    const typeEnum = mapFitType(seg.activity);
+
+    // Les bornes d'un segment peuvent bouger de quelques secondes :
+    // on cherche donc une activité du même type qui démarre à ±5 min.
+    const existing = await prisma.activity.findFirst({
+      where: {
+        userId: uid,
+        source: "fit",
+        type: typeEnum as any,
+        startedAt: {
+          gte: new Date(seg.startMs - TOLERANCE_MS),
+          lte: new Date(seg.startMs + TOLERANCE_MS),
+        },
+      },
+    });
+
+    if (existing) {
+      if (existing.distanceM === 0) {
+        const d = await fetchSessionDistanceM(validToken, seg.startMs, seg.endMs);
+        if (d) {
+          await prisma.activity.update({
+            where: { id: existing.id },
+            data: { distanceM: d },
+          });
+          updated++;
+        }
+      }
+      duplicates++;
+      continue;
+    }
+
+    const distanceM = await fetchSessionDistanceM(
+      validToken,
+      seg.startMs,
+      seg.endMs
+    );
+    const dedupeKey = `gfit-seg-${seg.activity}-${seg.startMs}`;
+    const durationS = Math.floor((seg.endMs - seg.startMs) / 1000);
+
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: uid,
+          dedupeKey: dedupeKey,
+          externalId: dedupeKey,
+          source: "fit",
+          title: AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`,
+          type: typeEnum as any,
+          startedAt: new Date(seg.startMs),
+          movingTimeS: durationS > 0 ? durationS : 0,
+          distanceM: distanceM ?? 0,
+        },
+      });
+      auto++;
+    } catch (e: any) {
+      throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
+    }
+  }
+
   return {
     success: true,
-    count: sessions.length,
-    message: `${saved} nouvelle(s) sortie(s), ${updated} distance(s) mise(s) à jour, ${duplicates} déjà présente(s).`,
+    count: sessions.length + segments.length,
+    message: `${saved} séance(s), ${auto} activité(s) automatique(s), ${updated} distance(s) mise(s) à jour, ${duplicates} déjà présente(s).`,
   };
 }
