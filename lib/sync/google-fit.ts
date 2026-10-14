@@ -156,3 +156,49 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     const distanceM = endMs
       ? await fetchSessionDistanceM(validToken, start.getTime(), endMs)
       : null;
+
+    const existing = await prisma.activity.findFirst({
+      where: { userId: uid, dedupeKey: dedupeKey },
+    });
+
+    if (existing) {
+      // Les anciennes activités à 0 m récupèrent leur vraie distance
+      if (distanceM && existing.distanceM === 0) {
+        await prisma.activity.update({
+          where: { id: existing.id },
+          data: { distanceM },
+        });
+        updated++;
+      }
+      duplicates++;
+      continue;
+    }
+
+    const typeEnum = mapFitType(session.activityType);
+
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: uid,
+          dedupeKey: dedupeKey,
+          externalId: session.id || dedupeKey,
+          source: "fit",
+          title: session.name || `Activité ${typeEnum}`,
+          type: typeEnum as any,
+          startedAt: start,
+          movingTimeS: durationS > 0 ? durationS : 0,
+          distanceM: distanceM ?? 0,
+        },
+      });
+      saved++;
+    } catch (e: any) {
+      throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
+    }
+  }
+
+  return {
+    success: true,
+    count: sessions.length,
+    message: `${saved} nouvelle(s) sortie(s), ${updated} distance(s) mise(s) à jour, ${duplicates} déjà présente(s).`,
+  };
+}
