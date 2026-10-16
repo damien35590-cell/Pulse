@@ -16,11 +16,22 @@ import { detectIntervals } from "@/lib/detect-intervals";
 import type { StreamData } from "@/lib/stream";
 import { ElevationChart } from "@/components/activity/elevation-chart";
 import { PowerChart } from "@/components/activity/power-chart";
+import { FeelNote } from "@/components/activity/feelnote";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
-const FEELING: Record<string, string> = { GREAT: "Super", GOOD: "Bien", OK: "Correct", TIRED: "Fatigué", HARD: "Difficile" };
 type TP = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
+
+function feelingToInt(feeling: string | null): number | null {
+  switch (feeling) {
+    case "GREAT": return 1;
+    case "GOOD": return 2;
+    case "OK": return 3;
+    case "TIRED": return 4;
+    case "HARD": return 5;
+    default: return null;
+  }
+}
 
 export default async function ActivityPage({ params }: { params: { id: string } }) {
   const s = await auth();
@@ -34,13 +45,14 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const t0 = raw[0]?.t ?? 0;
   const series = raw.filter((p) => p.power != null || p.hr != null).map((p) => ({ min: (p.t - t0) / 60000, power: p.power, hr: p.hr }));
   const gps = raw.filter((p) => p.lat != null && p.lng != null) as { lat: number; lng: number; ele?: number; t: number }[];
-  // Séries à 1 Hz : temps par zone et intervalles. Seuils saisis, sinon estimés à partir de vos séances.
+  
   const st = (a.stream?.data ?? null) as StreamData | null, zones = await getZones(s.user.id);
   const powerTiz = st?.power?.length && zones.ftp ? timeInZones(st.power, bounds(zones.ftp, POWER_PCT)) : null;
   const hrTiz = st?.hr?.length && zones.hrMax ? timeInZones(st.hr, bounds(zones.hrMax, HR_PCT), true) : null;
   const thr = zones.ftp ? Math.round(zones.ftp * 0.9) : 0;
   const intervals = st?.power?.length && thr ? detectIntervals(st.power.map((p, k) => ({ t: k, power: p, hr: st.hr[k] })), thr) : [];
   const mmss = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, "0")}`;
+  
   let km = 0;
   const full = tp.map((p, i) => { if (i) km += haversine({ lat: tp[i - 1].lat!, lng: tp[i - 1].lng!, t: 0 }, { lat: p.lat!, lng: p.lng!, t: 0 }) / 1000; return { km, ele: p.ele as number }; });
   const step = Math.max(1, Math.ceil(full.length / 120));
@@ -94,7 +106,6 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-soft">
           {w?.tempC != null && <span className="inline-flex items-center gap-1.5"><Thermometer className="h-4 w-4" aria-hidden />{Math.round(w.tempC)} °C au départ</span>}
           {(w?.precipMm ?? 0) >= 1 && <span className="inline-flex items-center gap-1.5"><CloudRain className="h-4 w-4" aria-hidden />{fmtNum(w!.precipMm!, 1)} mm de pluie</span>}
-          {a.feeling && <span>Ressenti : {FEELING[a.feeling]}</span>}
         </p>
       )}
       {a.exercises.length > 0 && (
@@ -111,7 +122,13 @@ export default async function ActivityPage({ params }: { params: { id: string } 
           </ul>
         </section>
       )}
-      {a.notes && <p className="whitespace-pre-line rounded-xl border border-line bg-surface p-4">{a.notes}</p>}
+      
+      <FeelNote 
+        activityId={a.id} 
+        initialFeel={feelingToInt(a.feeling)} 
+        initialComment={a.notes} 
+      />
+
     </article>
   );
 }
