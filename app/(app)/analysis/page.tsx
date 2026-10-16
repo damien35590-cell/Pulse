@@ -88,7 +88,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
           <div className={card}><PowerCurveChart record={adv.record} recent={adv.last30} />
             <p className="mt-1 text-xs text-ink-soft">Meilleure puissance moyenne maintenue sur chaque durée : record absolu (gris) et 30 derniers jours (orange).</p></div></>
       )}
-      <h2 className={h2}>Muscles sollicités (7 jours)</h2><div className={card}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div>
+      {S === "WORKOUT" && <><h2 className={h2}>Muscles sollicités (7 jours)</h2><div className={card}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div></>}
       {A && B && <>
         <h2 className={h2}>Comparer deux sorties</h2>
         <form className={card} action="/analysis"><input type="hidden" name="w" value={W} /><input type="hidden" name="s" value={S} />
