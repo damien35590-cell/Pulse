@@ -45,6 +45,16 @@ enum RecordKind {
   BEST_HALF
   BEST_ELEVATION
 }
+enum GearKind {
+  BIKE
+  EBIKE
+  TRAINER
+  SHOES
+  CHAIN
+  CASSETTE
+  TIRE
+  OTHER
+}
 
 // ───────── Auth (NextAuth + PrismaAdapter) ─────────
 model User {
@@ -70,6 +80,7 @@ model User {
   events     RaceEvent[]
   records    PersonalRecord[]
   badges     UserBadge[]
+  gear       Gear[]
 }
 
 model Account {
@@ -143,6 +154,7 @@ model Activity {
   photos    ActivityPhoto[]
   exercises WorkoutExercise[]
   stream    ActivityStream?
+  gear      Gear[]
 
   @@unique([userId, dedupeKey])
   @@unique([userId, source, externalId])
@@ -269,4 +281,26 @@ model RaceEvent {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+}
+
+// ───────── Matériel : vélos, home trainer, chaussures et leurs composants d'usure ─────────
+model Gear {
+  id          String         @id @default(cuid())
+  userId      String
+  parentId    String?        // composant (chaîne, cassette…) monté sur un vélo ou un home trainer : hérite de ses sorties
+  kind        GearKind
+  name        String
+  sports      ActivityType[] // sports pour lesquels il est proposé à l'enregistrement
+  isDefault   Boolean        @default(false) // affecté d'office aux nouvelles sorties de ces sports
+  startKm     Float          @default(0)     // km déjà parcourus avant le suivi dans Pulse
+  limitKm     Float?         // seuil critique ; null = simple compteur
+  installedAt DateTime       @default(now()) // un composant ne compte que les sorties de son support à partir de cette date
+  retiredAt   DateTime?
+  createdAt   DateTime       @default(now())
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent     Gear?      @relation("GearParts", fields: [parentId], references: [id], onDelete: Cascade)
+  parts      Gear[]     @relation("GearParts")
+  activities Activity[]
+
+  @@index([userId, retiredAt])
 }
