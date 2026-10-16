@@ -8,7 +8,7 @@ import { fetchWeather } from "@/lib/weather";
 import { activityStory, workoutStory } from "@/lib/insights/engine";
 import type { Act } from "@/lib/insights/types";
 
-const TYPES = ["RUN", "RIDE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
+const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
 export async function POST(req: Request) {
   const uid = (await auth())?.user?.id;

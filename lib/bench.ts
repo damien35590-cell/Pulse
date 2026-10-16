@@ -23,8 +23,8 @@ const phi = (z: number) => { const t = 1 / (1 + 0.2316419 * Math.abs(z)), d = 0.
 export function benchRows(p: { age: string; sex: string }, r: ReturnType<typeof recentStats>) {
   const v = VOL[p.age] ?? 1, pa = PACE[p.age] ?? 1, F = p.sex === "F";
   const rows: { label: string; value: number; median: number; unit: string; low?: boolean }[] = [
-    { label: "Course : km par semaine", value: r.runKmWeek, median: 18 * v * (F ? 0.85 : 1), unit: "km" },
-    ...(r.runPace ? [{ label: "Course : allure moyenne", value: r.runPace, median: (6.1 + (F ? 0.6 : 0)) * pa, unit: "min/km", low: true }] : []),
+    { label: "Running : km par semaine", value: r.runKmWeek, median: 18 * v * (F ? 0.85 : 1), unit: "km" },
+    ...(r.runPace ? [{ label: "Running : allure moyenne", value: r.runPace, median: (6.1 + (F ? 0.6 : 0)) * pa, unit: "min/km", low: true }] : []),
     { label: "Vélo : km par semaine", value: r.rideKmWeek, median: 45 * v * (F ? 0.75 : 1), unit: "km" },
     { label: "Rando : dénivelé par mois", value: r.hikeElevMonth, median: 1200 * v * (F ? 0.9 : 1), unit: "m" },
     { label: "Musculation : séances par semaine", value: r.gymWeek, median: 2, unit: "" },

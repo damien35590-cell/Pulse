@@ -4,21 +4,33 @@ import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, Responsi
 import type { Axis } from "@/lib/radar";
 import { cn } from "@/lib/utils";
 
-export function DisciplineRadar({ cycling, running }: { cycling: Axis[] | null; running: Axis[] | null }) {
-  const [tab, setTab] = useState<"cycling" | "running">(!cycling && running ? "running" : "cycling");
-  const data = tab === "cycling" ? cycling : running;
+const DISCIPLINES = [
+  { k: "RIDE", tab: "Vélo", name: "cyclisme", empty: "Aucune séance de vélo avec données détaillées sur 90 jours." },
+  { k: "RUN", tab: "Running", name: "running", empty: "Aucune sortie running sur 90 jours." },
+  { k: "HIKE", tab: "Rando", name: "randonnée", empty: "Aucune randonnée sur 90 jours." },
+  { k: "WORKOUT", tab: "Muscu", name: "musculation", empty: "Aucune séance de musculation sur 90 jours." },
+] as const;
+type Key = (typeof DISCIPLINES)[number]["k"];
+
+/** Suit le sport choisi en haut de la page ; sur « Tous », des onglets permettent de passer d'un profil à l'autre. */
+export function DisciplineRadar({ profiles, sport }: { profiles: Record<Key, Axis[] | null>; sport: string }) {
+  const fixed = DISCIPLINES.find((d) => d.k === sport);
+  const [tab, setTab] = useState<Key>(DISCIPLINES.find((d) => profiles[d.k])?.k ?? "RIDE");
+  const cur = fixed ?? DISCIPLINES.find((d) => d.k === tab)!, data = profiles[cur.k];
   return (
     <div>
-      <div role="tablist" aria-label="Discipline" className="flex gap-1 rounded-full bg-surface-2 p-1">
-        {([["cycling", "Cyclisme"], ["running", "Course à pied"]] as const).map(([k, l]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("min-h-10 flex-1 rounded-full text-sm", tab === k ? "bg-surface font-bold shadow" : "text-ink-soft")}>{l}</button>
-        ))}
-      </div>
+      {!fixed && (
+        <div role="tablist" aria-label="Discipline" className="flex gap-1 rounded-full bg-surface-2 p-1">
+          {DISCIPLINES.map((d) => (
+            <button key={d.k} role="tab" aria-selected={tab === d.k} onClick={() => setTab(d.k)} className={cn("min-h-10 flex-1 rounded-full text-sm", tab === d.k ? "bg-surface font-bold shadow" : "text-ink-soft")}>{d.tab}</button>
+          ))}
+        </div>
+      )}
       {!data ? (
-        <p className="py-8 text-center text-sm text-ink-soft">{tab === "cycling" ? "Aucune séance de vélo avec données détaillées sur 90 jours." : "Aucune course sur 90 jours."}</p>
+        <p className="py-8 text-center text-sm text-ink-soft">{cur.empty}</p>
       ) : (
         <>
-          <div className="h-64" role="img" aria-label={`Profil ${tab === "cycling" ? "cyclisme" : "course"}`}>
+          <div className="h-64" role="img" aria-label={`Profil ${cur.name}`}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={data} outerRadius="68%">
                 <PolarGrid stroke="#8A8A95" strokeOpacity={0.35} />

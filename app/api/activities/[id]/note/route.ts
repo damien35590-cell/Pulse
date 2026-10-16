@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import type { ActivityType, Feeling } from "@prisma/client";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const FEEL_MAP: Record<number, string> = {
+const FEEL_MAP: Record<number, Feeling> = {
   1: "GREAT",
   2: "GOOD",
   3: "OK",
@@ -9,14 +11,25 @@ const FEEL_MAP: Record<number, string> = {
   5: "HARD",
 };
 
+// Seul reclassement autorisé : vélo musculaire ↔ E-bike.
+const BIKE_TYPES: ActivityType[] = ["RIDE", "EBIKE"];
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const uid = (await auth())?.user?.id;
+  if (!uid) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
     const body = await request.json();
-    let { feeling, feel, notes, comment } = body;
+    let { feeling, feel, notes, comment, type } = body;
+
+    const current = await prisma.activity.findFirst({ where: { id, userId: uid }, select: { type: true } });
+    if (!current) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    if (type !== undefined && !(BIKE_TYPES.includes(type) && BIKE_TYPES.includes(current.type)))
+      return NextResponse.json({ error: "invalid_type" }, { status: 400 });
 
     // Convertit le chiffre du composant (1-5) vers l'Enum Prisma
     if (feel !== undefined) {
@@ -29,13 +42,15 @@ export async function PATCH(
     const activity = await prisma.activity.update({
       where: { id },
       data: {
-        feeling: feeling !== undefined ? (feeling as any) : undefined,
-        notes: finalNotes !== undefined ? String(finalNotes) : undefined,
+        type: type as ActivityType | undefined,
+        feeling: feeling !== undefined ? (feeling as Feeling | null) : undefined,
+        notes: finalNotes !== undefined ? (finalNotes === null ? null : String(finalNotes)) : undefined,
       },
-      select: { 
-        id: true, 
-        feeling: true, 
-        notes: true 
+      select: {
+        id: true,
+        type: true,
+        feeling: true,
+        notes: true
       },
     });
 

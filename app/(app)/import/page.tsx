@@ -73,7 +73,7 @@ export default function ImportPage() {
       {/* Bloc Google Fit */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <p className="font-bold">Synchroniser depuis Google Fit</p>
-        <p className="mt-1 text-sm text-ink-soft">Récupère vos activités physiques (vélo, course, etc.) des 7 derniers jours.</p>
+        <p className="mt-1 text-sm text-ink-soft">Récupère vos activités physiques (vélo, running, etc.) des 7 derniers jours.</p>
         <button onClick={syncFitNow} disabled={syncFit.busy} className="mt-3 min-h-12 w-full rounded-xl border border-brand bg-transparent font-display text-lg font-semibold text-brand disabled:opacity-60">{syncFit.busy ? "Synchronisation…" : "Synchroniser Google Fit"}</button>
         {syncFit.msg && <p role="status" className="mt-2 text-sm">{syncFit.msg}</p>}
         {syncFit.err && <p role="alert" className="mt-2 text-sm font-medium text-brand">{syncFit.err}</p>}

@@ -63,7 +63,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
       <div className="mt-4 grid grid-cols-2 gap-2.5">{kpis.map((k) => { const d = k.p > 0 ? Math.round(((k.c - k.p) / k.p) * 100) : null; return <div key={k.l} className="rounded-xl border border-line bg-surface p-3.5"><p className="text-sm text-ink-soft">{k.l}</p><p className="font-display text-3xl font-bold leading-tight tabular-nums">{k.f(k.c)}</p>{d != null && <p className={`text-xs font-semibold ${d >= 0 ? "text-brand" : "text-ink-soft"}`}>{d > 0 ? "+" : ""}{d} % vs période préc.</p>}</div>; })}</div>
 
       <h2 className={h2}>Distance par semaine</h2><div className={card}><WeeklyBars data={weekly} /></div>
-      <h2 className={h2}>Allure en course</h2><div className={card}>{pace.length > 2 ? <><PaceArea data={pace} /><p className="text-xs text-ink-soft">Plus la courbe monte, plus vous allez vite.</p></> : <p className="text-sm text-ink-soft">Pas assez de courses sur cette période.</p>}</div>
+      <h2 className={h2}>Allure en running</h2><div className={card}>{pace.length > 2 ? <><PaceArea data={pace} /><p className="text-xs text-ink-soft">Plus la courbe monte, plus vous allez vite.</p></> : <p className="text-sm text-ink-soft">Pas assez de sorties running sur cette période.</p>}</div>
 
       <h2 className={h2}>Répartition du temps</h2>
       <div className={`${card} flex items-center gap-4`}>
@@ -82,7 +82,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
       <h2 className={h2}>À retenir</h2>
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">{[["Meilleure semaine", `${fmtNum(best, 1)} km`], ["Plus longue sortie", `${fmtNum(longest, 1)} km`], ["Dénivelé en repères", climbCompare(sum(cur, (a) => a.elevationGainM), mon)?.short ?? `${fmtNum(sum(cur, (a) => a.elevationGainM), 0)} m`], ["Jours actifs", `${days}/${W * 7}`]].map(([l, v]) => <div key={l} className="bg-surface px-4 py-3"><dt className="text-xs text-ink-soft">{l}</dt><dd className="font-display text-2xl font-bold tabular-nums">{v}</dd></div>)}</dl>
 
-      <h2 className={h2}>Profil par discipline</h2><div className={card}><DisciplineRadar cycling={adv.cycling} running={adv.running} /></div>
+      <h2 className={h2}>Profil par discipline</h2><div className={card}><DisciplineRadar profiles={adv.profiles} sport={S} /></div>
       {adv.record.some(Boolean) && (
         <><h2 className={h2}>Courbe de puissance</h2>
           <div className={card}><PowerCurveChart record={adv.record} recent={adv.last30} />

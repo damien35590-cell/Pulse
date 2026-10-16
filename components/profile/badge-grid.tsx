@@ -18,9 +18,9 @@ const ICONS: Record<BadgeIcon, LucideIcon> = {
 type Tab = "ALL" | Discipline;
 const TABS: { key: Tab; label: string }[] = [
   { key: "ALL", label: "Tous" }, { key: "GLOBAL", label: "Général" }, { key: "RIDE", label: "Vélo" },
-  { key: "RUN", label: "Course" }, { key: "HIKE", label: "Rando" }, { key: "WORKOUT", label: "Muscu" },
+  { key: "RUN", label: "Running" }, { key: "HIKE", label: "Rando" }, { key: "WORKOUT", label: "Muscu" },
 ];
-const DISC_LABEL: Record<Discipline, string> = { GLOBAL: "Général", RIDE: "Vélo", RUN: "Course", HIKE: "Randonnée", WORKOUT: "Musculation" };
+const DISC_LABEL: Record<Discipline, string> = { GLOBAL: "Général", RIDE: "Vélo", RUN: "Running", HIKE: "Randonnée", WORKOUT: "Musculation" };
 const TIER_COLORS = ["#b87333", "#aab2bd", "#f2b705", "#4cc9f0"];
 const TIER_NAMES = ["Bronze", "Argent", "Or", "Diamant"];
 

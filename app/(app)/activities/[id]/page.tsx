@@ -17,6 +17,7 @@ import type { StreamData } from "@/lib/stream";
 import { ElevationChart } from "@/components/activity/elevation-chart";
 import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote } from "@/components/activity/feelnote";
+import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
@@ -74,6 +75,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       <header>
         <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt)}</p>
         <h1 className="mt-1 font-display text-3xl font-bold leading-tight">{a.title}</h1>
+        {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
       </header>
       {a.story && <p className="rounded-xl bg-surface-2 px-4 py-3 text-[17px] leading-snug">{a.story}</p>}
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">

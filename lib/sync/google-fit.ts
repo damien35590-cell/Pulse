@@ -23,7 +23,7 @@ const AUTO_TYPES = new Set([1, 7, 8]);
 const AUTO_TITLES: Record<string, string> = {
   RIDE: "Vélo",
   WALK: "Marche",
-  RUN: "Course à pied",
+  RUN: "Running",
 };
 
 // Fonction pour rafraîchir le jeton Google s'il est expiré

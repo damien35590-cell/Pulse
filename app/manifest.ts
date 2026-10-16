@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "Pulse — Suivi sportif",
     short_name: "Pulse",
-    description: "Course, vélo, natation, rando : suivez chaque sortie. Gratuit, sans pub.",
+    description: "Running, vélo, natation, rando : suivez chaque sortie. Gratuit, sans pub.",
     lang: "fr",
     dir: "ltr",
     start_url: "/?source=pwa",

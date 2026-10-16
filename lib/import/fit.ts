@@ -4,10 +4,10 @@ import type { ActivityKind, ParsedActivity, TrackPoint } from "./types";
 
 const SPORTS: Record<string, ActivityKind> = {
   running: "RUN", cycling: "RIDE", swimming: "SWIM", hiking: "HIKE",
-  walking: "WALK", training: "WORKOUT", e_biking: "RIDE", virtual_activity: "RIDE",
+  walking: "WALK", training: "WORKOUT", e_biking: "EBIKE", virtual_activity: "RIDE",
 };
 const TITLES: Record<ActivityKind, string> = {
-  RUN: "Course", RIDE: "Sortie vélo", SWIM: "Natation", HIKE: "Randonnée",
+  RUN: "Running", RIDE: "Sortie vélo", EBIKE: "E-bike", SWIM: "Natation", HIKE: "Randonnée",
   WALK: "Marche", WORKOUT: "Séance", OTHER: "Activité importée",
 };
 
@@ -28,7 +28,7 @@ export function parseFit(buf: ArrayBuffer, fileName: string): Promise<ParsedActi
         }));
 
       const startedAt = new Date(s.start_time ?? points[0]?.t).toISOString();
-      const type = SPORTS[String(s.sub_sport === "virtual_activity" ? "virtual_activity" : s.sport)] ?? "OTHER";
+      const type = String(s.sub_sport ?? "").startsWith("e_bike") ? "EBIKE" : SPORTS[String(s.sub_sport === "virtual_activity" ? "virtual_activity" : s.sport)] ?? "OTHER";
       const first = points.find((p) => p.lat != null);
 
       resolve({

@@ -12,12 +12,12 @@ export async function getDashboard(userId: string) {
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } });
   const tz = user?.timezone ?? "Europe/Paris";
-  const [rows, goal, goalCount, allXp, fitActs, eventsRaw] = await Promise.all([
+  const [rows, goalRows, goalCount, allXp, fitActs, eventsRaw] = await Promise.all([
     prisma.activity.findMany({
       where: { userId, startedAt: { gte: new Date(+now - 100 * 864e5) } }, orderBy: { startedAt: "desc" },
       select: { id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, calories: true, avgHr: true, avgPower: true, polyline: true, startLat: true, startLng: true, weather: true, exercises: { select: { sets: true, reps: true, loadKg: true } } },
     }),
-    prisma.goal.findFirst({ where: { userId, active: true, metric: "DISTANCE", period: "WEEK", type: null } }),
+    prisma.goal.findMany({ where: { userId, active: true, metric: "DISTANCE", period: "WEEK" }, orderBy: { createdAt: "asc" } }),
     prisma.goal.count({ where: { userId, active: true } }),
     prisma.activity.findMany({ where: { userId }, select: { distanceM: true, elevationGainM: true, movingTimeS: true, type: true } }),
     prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true } }),
@@ -45,12 +45,15 @@ export async function getDashboard(userId: string) {
   const insights = weeklyInsights(rows.map((r) => ({ ...r, weather: r.weather as Act["weather"] })), { now, tz });
   const fit = fitnessSeries(fitActs, now, tz).at(-1)!, xp = level(allXp.reduce((t, a) => t + xpOf(a), 0));
   const weekXp = week.reduce((t, a) => t + xpOf(a), 0);
+  // Un objectif par sport (ou « tous sports ») : la distance de la semaine ne compte que le sport concerné. Sans objectif : 30 km, tous sports.
+  const goals = (goalRows.length ? goalRows.map((g) => ({ id: g.id, sport: g.type as string | null, goalKm: g.target / 1000 })) : [{ id: "default", sport: null as string | null, goalKm: 30 }])
+    .map((g) => ({ ...g, km: sum(week.filter((a) => !g.sport || a.type === g.sport), (a) => a.distanceM) / 1000 }));
   const events = eventsRaw.map((e) => ({ id: e.id, name: e.name, date: e.date, sport: e.sport as string, targetDistance: e.targetDistance, targetElevation: e.targetElevation, days: daysUntil(e.date, now, tz), ...readiness(e, rows, now) })).filter((e) => e.days >= 0);
   return {
     fit, xp, weekXp, goalCount, events,
     km: sum(week, (a) => a.distanceM) / 1000, days, streak, insights,
     timeS: sum(week, (a) => a.movingTimeS), elevation: sum(week, (a) => a.elevationGainM), kcal: week.some((a) => a.calories != null) ? sum(week, (a) => a.calories ?? 0) : null,
-    goalKm: goal ? goal.target / 1000 : 30, recent: rows.slice(0, 5), empty: rows.length === 0,
+    goals, recent: rows.slice(0, 5), empty: rows.length === 0,
     range: new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).formatRange(new Date(keys[0]), new Date(keys[6])),
   };
 }

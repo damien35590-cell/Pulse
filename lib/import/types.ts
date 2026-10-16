@@ -1,4 +1,4 @@
-export type ActivityKind = "RUN" | "RIDE" | "SWIM" | "HIKE" | "WALK" | "WORKOUT" | "OTHER";
+export type ActivityKind = "RUN" | "RIDE" | "EBIKE" | "SWIM" | "HIKE" | "WALK" | "WORKOUT" | "OTHER";
 
 import type { StreamData } from "../stream";
 

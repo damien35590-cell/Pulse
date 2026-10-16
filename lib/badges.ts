@@ -43,7 +43,7 @@ export const BADGES: BadgeDef[] = [
   B("GLOBAL", "g-days", "Jours de sport", "Jours différents avec au moins une sortie.", "calendar", "activeDays", "jours", [10, 50, 150, 365]),
   B("GLOBAL", "g-weeks", "Rythme de croisière", "Semaines d’affilée avec au moins une sortie, sans pression au jour le jour.", "calendar", "weekStreak", "semaines", [4, 12, 26, 52]),
   B("GLOBAL", "g-months", "Toute l’année", "Mois de l’année où vous avez bougé au moins une fois.", "sun", "monthsOfYear", "mois", [3, 6, 9, 12]),
-  B("GLOBAL", "g-multi", "Touche-à-tout", "Disciplines pratiquées : vélo, course, rando, musculation.", "sparkles", "sports", "disciplines", [1, 2, 3, 4]),
+  B("GLOBAL", "g-multi", "Touche-à-tout", "Disciplines pratiquées : vélo, running, rando, musculation.", "sparkles", "sports", "disciplines", [1, 2, 3, 4]),
   B("GLOBAL", "g-early", "Lève-tôt", "Sorties commencées avant 7 h.", "sunrise", "early", "sorties", [1, 10, 30, 100]),
   B("GLOBAL", "g-late", "Noctambule", "Sorties commencées après 20 h.", "moon", "late", "sorties", [1, 5, 15, 40]),
   B("GLOBAL", "g-rain", "Sous la pluie", "Sorties sous la pluie (quand la météo est enregistrée).", "rain", "rain", "sorties", [1, 10, 30, 80]),

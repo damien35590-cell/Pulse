@@ -12,6 +12,7 @@ datasource db {
 enum ActivityType {
   RUN
   RIDE
+  EBIKE
   SWIM
   HIKE
   WALK

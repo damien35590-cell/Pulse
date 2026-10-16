@@ -1,20 +1,41 @@
-export const GROUPS = ["pectoraux", "dorsaux", "épaules", "bras", "quadriceps", "ischio-jambiers", "mollets"] as const;
+export const GROUPS = ["pectoraux", "dorsaux", "épaules", "biceps", "triceps", "abdominaux", "quadriceps", "ischio-jambiers", "mollets"] as const;
 export type Group = (typeof GROUPS)[number];
 export type MuscleLoad = { tonnage: number; sets: number };
 
 /** Premier motif qui correspond gagne : (muscle, part de la charge). Le nom d'exercice est du texte libre, d'où ce dictionnaire. */
 const RULES: [RegExp, [Group, number][]][] = [
-  [/(souleve de terre roumain|romanian|good morning|leg curl|ischio|hip thrust|pont fessier)/, [["ischio-jambiers", 1], ["dorsaux", 0.2]]],
-  [/(souleve de terre|deadlift)/, [["ischio-jambiers", 0.8], ["dorsaux", 0.8], ["quadriceps", 0.4]]],
+  [/(souleve de terre roumain|romanian|good morning|leg curl|ischio|hip thrust|pont fessier|jambes tendues|glute.?ham)/, [["ischio-jambiers", 1], ["dorsaux", 0.2]]],
+  [/(souleve de terre|deadlift|\bsdt\b)/, [["ischio-jambiers", 0.8], ["dorsaux", 0.8], ["quadriceps", 0.4]]],
   [/(squat|presse|leg press|fente|lunge|leg extension|extension jambe|quadri|hack|step.?up)/, [["quadriceps", 1], ["ischio-jambiers", 0.4]]],
   [/(mollet|calf|talon)/, [["mollets", 1]]],
-  [/(traction|pull.?up|chin.?up|tirage|rowing|\brow\b|dorsal|pull.?over)/, [["dorsaux", 1], ["bras", 0.5]]],
-  [/(developpe militaire|overhead|shoulder press|arnold|elevation|oiseau|epaule|rear delt|face pull)/, [["épaules", 1], ["bras", 0.3]]],
-  [/(curl|biceps|triceps|barre au front|skull|kickback|\bbras\b)/, [["bras", 1]]],
-  [/(pompe|push.?up|dips?|developpe|bench|ecarte|\bfly\b|\bpec)/, [["pectoraux", 1], ["épaules", 0.4], ["bras", 0.4]]],
+  [/(traction|pull.?up|chin.?up|tirage|rowing|\brow\b|dorsal|pull.?over|lombaire)/, [["dorsaux", 1], ["biceps", 0.5]]],
+  [/(developpe militaire|overhead|shoulder press|arnold|elevation|oiseau|epaule|rear delt|face pull|shrug|haussement)/, [["épaules", 1], ["triceps", 0.3]]],
+  [/(triceps|barre au front|skull|kickback|extension (nuque|triceps|verticale|couche)|dips? (arriere|banc)|bench dips?)/, [["triceps", 1]]],
+  [/(curl|biceps)/, [["biceps", 1]]],
+  [/\bbras\b/, [["biceps", 0.5], ["triceps", 0.5]]],
+  [/(pompe|push.?up|dips?|developpe|\bdc\b|bench|ecarte|\bfly\b|\bpec)/, [["pectoraux", 1], ["épaules", 0.4], ["triceps", 0.4]]],
+  [/(abdo|crunch|gainage|planche|plank|releve de jambes|leg raise|sit.?up|frog kick|roulette|ab wheel|oblique|russian twist|hollow|mountain climber)/, [["abdominaux", 1]]],
 ];
-const flat = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-export const musclesOf = (name: string) => RULES.find(([re]) => re.test(flat(name)))?.[1] ?? [];
+const flat = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/** Méthode Lafay : on saisit souvent le code seul (« A1 », « F », « B2 - dips »). La lettre donne l'exercice de base, le chiffre sa variante. */
+const LAFAY: Record<string, [Group, number][]> = {
+  a: [["pectoraux", 1], ["épaules", 0.4], ["triceps", 0.4]], // pompes
+  b: [["pectoraux", 1], ["triceps", 0.6], ["épaules", 0.4]], // dips
+  c: [["dorsaux", 1], ["biceps", 0.5]], // tractions
+  d: [["triceps", 1]], // dips arrière
+  e: [["quadriceps", 1], ["ischio-jambiers", 0.4]], // flexions : cuisses, fessiers (comptés sur les ischios)
+  f: [["quadriceps", 1], ["mollets", 0.6]], // flexions : cuisses, mollets
+  g: [["abdominaux", 1]], // abdominaux
+  h: [["abdominaux", 1]], // abdominaux
+  i: [["dorsaux", 1]], // tractions (dos)
+};
+// Lettre + chiffres (« a1 », « b2 dips ») ou lettre seule / suivie d'un séparateur (« f », « c - tractions ») ; « a la barre » n'en est pas un
+const LAFAY_CODE = /^([a-i])(?:\d{1,2}(?=$|[\s\-–:.])|(?=$|\s*[-–:.]))/;
+export const musclesOf = (name: string) => {
+  const n = flat(name).trim(), code = LAFAY_CODE.exec(n);
+  return code ? LAFAY[code[1]] : RULES.find(([re]) => re.test(n))?.[1] ?? [];
+};
 
 type Ex = { name: string; sets: number; reps: number; loadKg: number | null };
 /** Tonnage réparti par groupe musculaire. Sans charge (poids de corps), on compte 60 % du poids du corps (70 kg par défaut). */
@@ -27,8 +48,9 @@ export function volumeByMuscle(exercises: Ex[], bodyKg = 70): Record<Group, Musc
   return out;
 }
 
-/** Gris sombre (0) vers rouge vif (1). */
+/** Pêche (peu sollicité) → orange de la marque → rouge profond (très sollicité). Le repos (0) est géré par la carte, en couleur neutre du thème. */
+const HEAT = [[255, 200, 160], [242, 74, 0], [178, 18, 0]];
 export function heatColor(r: number): string {
-  const t = Math.max(0, Math.min(1, r)), a = [58, 58, 66], b = [255, 45, 22];
-  return `rgb(${a.map((x, i) => Math.round(x + (b[i] - x) * t)).join(",")})`;
+  const t = Math.max(0, Math.min(1, r)) * 2, i = Math.min(1, Math.floor(t)), f = t - i, [a, b] = [HEAT[i], HEAT[i + 1]];
+  return `rgb(${a.map((x, k) => Math.round(x + (b[k] - x) * f)).join(",")})`;
 }

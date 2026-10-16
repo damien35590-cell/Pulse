@@ -4,6 +4,7 @@ import type { ActivityKind, ParsedActivity, TrackPoint } from "./types";
 const kindOf = (t: string): ActivityKind => {
   const s = t.toLowerCase();
   if (/run|course|9\b/.test(s)) return "RUN";
+  if (/e-?bik|e_bik|vae|[ée]lectrique/.test(s)) return "EBIKE";
   if (/bik|cycl|ride|velo|vélo|1\b/.test(s)) return "RIDE";
   if (/swim|nat/.test(s)) return "SWIM";
   if (/hik|rando/.test(s)) return "HIKE";

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDashboard } from "@/lib/data/dashboard";
@@ -19,12 +20,12 @@ export default async function DashboardPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const d = await getDashboard(s.user.id);
-  const first = s.user.name?.split(" ")[0];
+  const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" }).format(new Date());
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-3xl font-bold leading-none">{first ? `Salut ${first}` : "Cette semaine"}</h1>
+        <h1 className="font-display text-3xl font-bold capitalize leading-none">{today}</h1>
         <p className="mt-1 text-sm text-ink-soft">Semaine du {d.range}</p>
       </header>
 
@@ -51,12 +52,12 @@ export default async function DashboardPage() {
               </div>
             );
           })()}
-          <GoalCard km={d.km} goalKm={d.goalKm} streak={d.streak} />
+          {d.goals.map((g, i) => <GoalCard key={g.id} km={g.km} goalKm={g.goalKm} sport={g.sport} streak={i === 0 ? d.streak : 0} />)}
           <EventTimeline events={d.events} />
           <Shortcuts ctl={d.fit.ctl} form={d.fit.form} goals={d.goalCount} />
           <InsightCarousel items={d.insights} />
           <section aria-label="Activités récentes" className="space-y-2.5">
-            <h2 className="font-display text-xl font-semibold">Activités récentes</h2>
+            <div className="flex items-baseline justify-between"><h2 className="font-display text-xl font-bold">Activités récentes</h2><Link href="/activities" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Tout voir<ChevronRight className="h-4 w-4" aria-hidden /></Link></div>
             {uniqueById(d.recent).map((a) => <ActivityCard key={a.id} a={a} />)}
           </section>
         </>

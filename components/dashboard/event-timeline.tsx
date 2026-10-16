@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { SPORTS } from "@/lib/sports";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +25,7 @@ export function EventTimeline({ events }: { events: EventView[] }) {
   const [next, ...others] = events;
   return (
     <section aria-label="Prochaines échéances">
-      <div className="mb-3 flex items-baseline justify-between"><h2 className="font-display text-xl font-bold">Prochaines échéances</h2><Link href="/events" className="text-sm font-semibold text-brand">Gérer</Link></div>
+      <div className="mb-3 flex items-baseline justify-between"><h2 className="font-display text-xl font-bold">Prochaines échéances</h2><Link href="/events" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Gérer<ChevronRight className="h-4 w-4" aria-hidden /></Link></div>
       {!next ? (
         <Link href="/events" className="block rounded-xl border border-dashed border-line bg-surface p-4 text-ink-soft">Aucune échéance. <b className="text-brand">Ajoutez une course</b> pour suivre votre préparation.</Link>
       ) : (
@@ -41,7 +42,7 @@ export function EventTimeline({ events }: { events: EventView[] }) {
           </article>
           {others.length > 0 && (
             <ul className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4">
-              {others.map((e) => <li key={e.id} className={cn("w-40 shrink-0 rounded-xl border border-line bg-surface p-3")}><p className="font-display text-2xl font-bold text-brand">{jx(e.days)}</p><p className="truncate font-semibold">{e.name}</p><p className="text-xs capitalize text-ink-soft">{fmtDay(e.date)}</p></li>)}
+              {others.map((e) => <li key={e.id} className="w-40 shrink-0"><Link href="/events" className={cn("block h-full rounded-xl border border-line bg-surface p-3 transition hover:border-brand/40 active:scale-[.98] active:bg-surface-2")}><p className="font-display text-2xl font-bold text-brand">{jx(e.days)}</p><p className="truncate font-semibold">{e.name}</p><p className="text-xs capitalize text-ink-soft">{fmtDay(e.date)}</p></Link></li>)}
             </ul>
           )}
         </div>

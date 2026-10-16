@@ -31,3 +31,26 @@ export function runningRadar(s: RunningStats): Axis[] {
     { axis: "FC cible", value: normalize(s.hrTargetShare, 0, 0.7), raw: s.hrTargetShare != null ? `${Math.round(s.hrTargetShare * 100)} % du temps en Z2–Z3` : "pas de données cardio" },
   ];
 }
+
+export type HikingStats = { longestKm: number; maxDPlus: number; longestHours: number; climbRate: number | null; activeDaysPerWeek: number };
+export function hikingRadar(s: HikingStats): Axis[] {
+  return [
+    { axis: "Distance", value: normalize(s.longestKm, 5, 25), raw: `${f1(s.longestKm)} km, rando la plus longue` },
+    { axis: "Dénivelé", value: normalize(s.maxDPlus, 200, 1500), raw: `${Math.round(s.maxDPlus)} m de D+ en une sortie` },
+    { axis: "Durée d'effort", value: normalize(s.longestHours, 1, 8), raw: `${f1(s.longestHours)} h, sortie la plus longue` },
+    { axis: "Vitesse de montée", value: normalize(s.climbRate, 100, 500), raw: s.climbRate != null ? `${Math.round(s.climbRate)} m de D+ par heure` : "pas de dénivelé" },
+    { axis: "Régularité", value: normalize(s.activeDaysPerWeek, 0, 2), raw: `${f1(s.activeDaysPerWeek)} jours par semaine` },
+  ];
+}
+
+export type WorkoutStats = { sessionsPerWeek: number; tonnagePerWeek: number; avgLoad: number | null; bodyKg: number; groupsWorked: number; groupsTotal: number; setsPerSession: number | null };
+export function workoutRadar(s: WorkoutStats): Axis[] {
+  const rel = s.avgLoad != null ? s.avgLoad / s.bodyKg : null;
+  return [
+    { axis: "Régularité", value: normalize(s.sessionsPerWeek, 0, 4), raw: `${f1(s.sessionsPerWeek)} séances par semaine` },
+    { axis: "Volume", value: normalize(s.tonnagePerWeek, 0, 20000), raw: `${f1(s.tonnagePerWeek / 1000)} t soulevées par semaine` },
+    { axis: "Intensité", value: normalize(rel, 0.2, 1), raw: s.avgLoad != null && rel != null ? `${Math.round(s.avgLoad)} kg en moyenne (${Math.round(rel * 100)} % du poids du corps)` : "pas de charges saisies" },
+    { axis: "Polyvalence", value: normalize(s.groupsWorked, 0, s.groupsTotal), raw: `${s.groupsWorked} groupes musculaires sur ${s.groupsTotal}` },
+    { axis: "Séries par séance", value: normalize(s.setsPerSession, 5, 25), raw: s.setsPerSession != null ? `${Math.round(s.setsPerSession)} séries en moyenne` : "pas d'exercices saisis" },
+  ];
+}

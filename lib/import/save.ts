@@ -10,7 +10,7 @@ import { powerCurve } from "@/lib/power";
 import { compactTrack } from "./track";
 import type { ParsedActivity } from "./types";
 
-const KINDS = ["RUN", "RIDE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"];
+const KINDS = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"];
 
 /** Série à 1 Hz prête à enregistrer (données + courbe de puissance + cadence moyenne), ou null si l'activité n'a ni puissance ni cardio. */
 function prepStream(a: ParsedActivity) {

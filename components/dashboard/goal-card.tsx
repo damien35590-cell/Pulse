@@ -1,13 +1,21 @@
 "use client";
 import { motion } from "framer-motion";
-import { Flame } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Flame, Target } from "lucide-react";
+import { SPORTS } from "@/lib/sports";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function GoalCard({ km, goalKm, streak }: { km: number; goalKm: number; streak: number }) {
+export function GoalCard({ km, goalKm, sport, streak }: { km: number; goalKm: number; sport: string | null; streak: number }) {
+  const S = sport ? SPORTS[sport] : null, Icon = S?.icon ?? Target, label = S?.label ?? "Tous sports";
   const real = (km / goalKm) * 100, pct = Math.min(100, real), over = real > 100, left = Math.max(0, goalKm - km);
   return (
-    <section className="rounded-xl border border-line bg-surface p-4">
+    <Link href="/goals" aria-label={`Objectif ${label} de ${fmtNum(goalKm, 0)} km cette semaine : modifier`}
+      className="group block rounded-xl border border-line bg-surface p-4 transition hover:border-brand/40 hover:shadow-sm active:scale-[.99] active:bg-surface-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft"><Icon className="h-3.5 w-3.5" aria-hidden />{label} · cette semaine</p>
+        <span className="flex items-center text-xs font-semibold text-brand">Modifier<ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden /></span>
+      </div>
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-xl font-semibold">Objectif de {fmtNum(goalKm, 0)} km</h2>
         {/* Pourcentage RÉEL : 142 km sur 30 km = 473 % */}
@@ -28,6 +36,6 @@ export function GoalCard({ km, goalKm, streak }: { km: number; goalKm: number; s
           <span><b className="font-semibold">{streak} semaine{streak > 1 ? "s" : ""} d’affilée.</b> <span className="text-ink-soft">Les jours de repos comptent aussi.</span></span>
         </p>
       )}
-    </section>
+    </Link>
   );
 }

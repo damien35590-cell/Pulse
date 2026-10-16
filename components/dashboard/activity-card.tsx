@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { routePath } from "@/lib/polyline";
-import { SPORTS, sportColor } from "@/lib/sports";
+import { Leaf } from "lucide-react";
+import { SPORTS, isSoft, sportColor } from "@/lib/sports";
+import { cn } from "@/lib/utils";
 import { fmtKm, fmtDuration, fmtNum, fmtPace } from "@/lib/format";
 
 type A = {
@@ -32,26 +34,28 @@ const COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "g
 export function ActivityCard({ a, tz = "Europe/Paris" }: { a: A; tz?: string }) {
   const color = sportColor(a.type), r = a.polyline ? routePath(a.polyline, 320, 110, 12) : null, Icon = (SPORTS[a.type] ?? SPORTS.OTHER).icon;
   const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: tz }).format(a.startedAt);
-  const grid = cells(a);
+  // Activités douces (E-bike, marche) : carte compacte et discrète, sans tracé ni anecdote.
+  const soft = isSoft(a.type), grid = soft ? cells(a).slice(0, 3) : cells(a);
   return (
-    <Link href={`/activities/${a.id}`} className="block overflow-hidden rounded-xl border border-line bg-surface transition-colors active:bg-surface-2">
+    <Link href={`/activities/${a.id}`} className={cn("block overflow-hidden rounded-xl border border-line transition-colors active:bg-surface-2", soft ? "border-dashed bg-surface/60" : "bg-surface")}>
       <div className="flex items-center gap-3 px-4 pt-3.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2"><Icon className="h-[18px] w-[18px]" aria-hidden /></span>
-        <div className="min-w-0">
+        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2", soft && "text-ink-soft")}><Icon className="h-[18px] w-[18px]" aria-hidden /></span>
+        <div className="min-w-0 flex-1">
           <p className="truncate text-[12px] capitalize text-ink-soft">{when}</p>
-          <p className="truncate text-base font-bold leading-tight">{a.title}</p>
+          <p className={cn("truncate text-base leading-tight", soft ? "font-semibold" : "font-bold")}>{a.title}</p>
         </div>
+        {soft && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-soft"><Leaf className="h-3 w-3" aria-hidden />Douce</span>}
       </div>
-      {a.story && <p className="line-clamp-2 px-4 pt-1.5 text-[12.5px] leading-snug text-ink-soft">{a.story}</p>}
-      <dl className={`mt-3 grid divide-x divide-line border-y border-line ${COLS[grid.length] ?? "grid-cols-4"}`}>
+      {!soft && a.story && <p className="line-clamp-2 px-4 pt-1.5 text-[12.5px] leading-snug text-ink-soft">{a.story}</p>}
+      <dl className={cn("mt-3 grid divide-x divide-line border-t border-line", !soft && r && "border-b", COLS[grid.length] ?? "grid-cols-4")}>
         {grid.map((c) => (
-          <div key={c.l} className="min-w-0 px-3 py-2">
+          <div key={c.l} className={cn("min-w-0 px-3", soft ? "py-1.5" : "py-2")}>
             <dt className="truncate text-[11px] text-ink-soft">{c.l}</dt>
-            <dd className="font-display text-[19px] font-bold leading-tight tabular-nums">{c.v}{c.u && <span className="ml-0.5 text-[11px] font-medium text-ink-soft">{c.u}</span>}</dd>
+            <dd className={cn("font-display font-bold leading-tight tabular-nums", soft ? "text-base" : "text-[19px]")}>{c.v}{c.u && <span className="ml-0.5 text-[11px] font-medium text-ink-soft">{c.u}</span>}</dd>
           </div>
         ))}
       </dl>
-      {r && (
+      {!soft && r && (
         <div className="bg-surface-2">
           <svg viewBox="0 0 320 110" width="100%" height="110" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d={r.d} stroke={color} strokeWidth="3.2" /><circle cx={r.end[0]} cy={r.end[1]} r="5" fill={color} stroke="rgb(var(--surface))" strokeWidth="2" />

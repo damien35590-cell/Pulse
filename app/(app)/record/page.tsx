@@ -9,7 +9,7 @@ import { tap } from "@/lib/haptics";
 import { StoryReveal } from "@/components/record/story-reveal";
 
 const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
-const SPORT_KEYS = ["RUN", "RIDE", "HIKE", "WORKOUT"] as const;
+const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
 type Ex = { id: number; name: string; sets: string; reps: string; loadKg: string; restS: string; comment: string };
 const blank = (id: number): Ex => ({ id, name: "", sets: "3", reps: "10", loadKg: "", restS: "90", comment: "" });
 const num = (v: string) => parseFloat(v.replace(",", ".")) || 0;
