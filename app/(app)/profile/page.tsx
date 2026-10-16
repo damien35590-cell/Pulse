@@ -20,12 +20,16 @@ export default async function ProfilePage() {
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
   const zones = await getZones(userId);
-  const [all, acts, exercises, records, longest] = await Promise.all([
+  const [all, acts, exercises, records, longest, noted] = await Promise.all([
     prisma.activity.aggregate({ where: { userId }, _count: true, _sum: { distanceM: true, elevationGainM: true, movingTimeS: true } }),
-    prisma.activity.findMany({ where: { userId }, select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgPower: true } }),
-    prisma.workoutExercise.findMany({ where: { activity: { userId } }, select: { sets: true, reps: true, loadKg: true } }),
+    prisma.activity.findMany({
+      where: { userId },
+      select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgPower: true, maxPower: true, weather: true, feeling: true },
+    }),
+    prisma.workoutExercise.findMany({ where: { activity: { userId } }, select: { activityId: true, name: true, sets: true, reps: true, loadKg: true } }),
     prisma.personalRecord.findMany({ where: { userId, type: "RUN" } }),
     prisma.activity.findFirst({ where: { userId, distanceM: { gt: 0 } }, orderBy: { distanceM: "desc" }, select: { type: true, distanceM: true } }),
+    prisma.activity.count({ where: { userId, AND: [{ notes: { not: null } }, { notes: { not: "" } }] } }),
   ]);
   const st = {
     count: all._count,
@@ -33,9 +37,10 @@ export default async function ProfilePage() {
     totalElevation: all._sum.elevationGainM ?? 0,
     hours: (all._sum.movingTimeS ?? 0) / 3600,
   };
-  const badges = evaluateBadges(buildBadgeStats(acts, exercises, TZ));
 
   const rec = Object.fromEntries(records.map((r) => [r.kind, r.value]));
+  const badges = evaluateBadges(buildBadgeStats(acts, exercises, TZ, { noted, best5kSec: rec.BEST_5K ?? null }));
+
   type Row = { label: string; value: string; Icon?: LucideIcon };
   const rows: Row[] = [
     rec.BEST_5K && { label: "Meilleur 5 km", value: fmtClock(rec.BEST_5K) },
