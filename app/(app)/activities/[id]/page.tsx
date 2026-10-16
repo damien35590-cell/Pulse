@@ -18,6 +18,9 @@ import { ElevationChart } from "@/components/activity/elevation-chart";
 import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
+import { GearPicker } from "@/components/gear/gear-picker";
+import { getGear } from "@/lib/data/gear";
+import { selectableGear } from "@/lib/gear";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
@@ -37,8 +40,12 @@ function feelingToInt(feeling: string | null): number | null {
 export default async function ActivityPage({ params }: { params: { id: string } }) {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const a = await prisma.activity.findFirst({ where: { id: params.id, userId: s.user.id }, include: { exercises: { orderBy: { position: "asc" } }, stream: true } });
+  const a = await prisma.activity.findFirst({ where: { id: params.id, userId: s.user.id }, include: { exercises: { orderBy: { position: "asc" } }, stream: true, gear: { select: { id: true, name: true, retiredAt: true } } } });
   if (!a) notFound();
+  // Matériel : celui compatible avec le sport, plus celui déjà affecté (même si son sport a changé depuis).
+  const gear = a.type === "WORKOUT" ? [] : await getGear(s.user.id);
+  const gearOpts = gear.filter((g) => !g.retiredAt && !g.parentId && (selectableGear([g], a.type).length > 0 || a.gear.some((x) => x.id === g.id)))
+    .map((g) => ({ id: g.id, name: g.name, kind: g.kind, km: g.km, worn: gear.filter((p) => !p.retiredAt && (p.id === g.id || p.parentId === g.id) && p.level === "critical").map((p) => p.name) }));
 
   const route = a.polyline ? decodePolyline(a.polyline) : [];
   const raw = (a.trackPoints as TP[] | null) ?? [];
@@ -125,6 +132,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         </section>
       )}
       
+      {gearOpts.length > 0 && <GearPicker activityId={a.id} options={gearOpts} selected={a.gear.filter((g) => !g.retiredAt).map((g) => g.id)} retired={a.gear.filter((g) => g.retiredAt).map((g) => g.name)} />}
+
       <FeelNote 
         activityId={a.id} 
         initialFeel={feelingToInt(a.feeling)} 

@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import type { ActivityType, GoalMetric, GoalPeriod } from "@prisma/client";
+import type { ActivityType, GearKind, GoalMetric, GoalPeriod } from "@prisma/client";
+import { GEAR_KINDS, GEAR_SPORTS, type GearKindKey } from "@/lib/gear";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AGE_BANDS } from "@/lib/bench";
@@ -52,6 +53,68 @@ export async function addEvent(fd: FormData) {
   revalidatePath("/events"); revalidatePath("/");
 }
 export async function deleteEvent(id: string) { const userId = await uid(); await prisma.raceEvent.deleteMany({ where: { id, userId } }); revalidatePath("/events"); revalidatePath("/"); }
+
+// ───────── Matériel ─────────
+const gearPaths = () => { revalidatePath("/gear"); revalidatePath("/"); revalidatePath("/record"); };
+
+/** Un seul matériel par défaut par sport (le home trainer a sa propre place : il sert aux sorties en intérieur). */
+async function clearOtherDefaults(userId: string, g: { id: string; kind: GearKind; sports: ActivityType[] }) {
+  if (!g.sports.length) return;
+  await prisma.gear.updateMany({ where: { userId, id: { not: g.id }, isDefault: true, sports: { hasSome: g.sports }, kind: g.kind === "TRAINER" ? "TRAINER" : { not: "TRAINER" } }, data: { isDefault: false } });
+}
+
+export async function addGear(fd: FormData) {
+  const userId = await uid(), kind = String(fd.get("kind")) as GearKindKey, name = String(fd.get("name") ?? "").trim().slice(0, 60);
+  if (!name || !(kind in GEAR_KINDS)) return;
+  const K = GEAR_KINDS[kind], parentId = String(fd.get("parentId") ?? "");
+  const parent = parentId ? await prisma.gear.findFirst({ where: { id: parentId, userId, parentId: null } }) : null;
+  const picked = fd.getAll("sports").map(String).filter((s) => (GEAR_SPORTS as readonly string[]).includes(s));
+  const fallback: string[] = K.sports.length ? K.sports : K.part ? ["RIDE"] : [...GEAR_SPORTS];
+  const sports = (parent ? [] : picked.length ? picked : fallback) as ActivityType[];
+  const start = num(fd.get("startKm")), limit = num(fd.get("limitKm"));
+  const g = await prisma.gear.create({ data: {
+    userId, kind, name, sports, parentId: parent?.id ?? null, isDefault: !parent && fd.get("isDefault") === "on",
+    startKm: start > 0 ? start : 0, limitKm: limit > 0 ? limit : fd.get("limitKm") === "" ? K.limitKm : null,
+  } });
+  if (g.isDefault) await clearOtherDefaults(userId, g);
+  gearPaths();
+}
+
+export async function updateGear(id: string, fd: FormData) {
+  const userId = await uid(), name = String(fd.get("name") ?? "").trim().slice(0, 60), start = num(fd.get("startKm")), limit = num(fd.get("limitKm"));
+  await prisma.gear.updateMany({ where: { id, userId }, data: { ...(name && { name }), startKm: start > 0 ? start : 0, limitKm: limit > 0 ? limit : null } });
+  gearPaths();
+}
+
+export async function setDefaultGear(id: string) {
+  const userId = await uid(), g = await prisma.gear.findFirst({ where: { id, userId, parentId: null, retiredAt: null } });
+  if (!g) return;
+  await prisma.gear.update({ where: { id }, data: { isDefault: !g.isDefault } });
+  if (!g.isDefault) await clearOtherDefaults(userId, g);
+  gearPaths();
+}
+
+/** Remplacement (chaîne neuve, nouvelle paire…) : l'ancien est retiré avec son historique, le neuf repart de zéro avec le même rôle. */
+export async function replaceGear(id: string) {
+  const userId = await uid(), g = await prisma.gear.findFirst({ where: { id, userId, retiredAt: null } });
+  if (!g) return;
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.gear.update({ where: { id }, data: { retiredAt: now, isDefault: false } }),
+    prisma.gear.create({ data: { userId, kind: g.kind, name: g.name, sports: g.sports, parentId: g.parentId, isDefault: g.isDefault, limitKm: g.limitKm, installedAt: now } }),
+    // Les composants d'un vélo remplacé restent sur l'ancien : ils sont retirés avec lui.
+    prisma.gear.updateMany({ where: { userId, parentId: id, retiredAt: null }, data: { retiredAt: now } }),
+  ]);
+  gearPaths();
+}
+
+export async function retireGear(id: string) {
+  const userId = await uid(), now = new Date();
+  await prisma.gear.updateMany({ where: { userId, OR: [{ id }, { parentId: id }], retiredAt: null }, data: { retiredAt: now, isDefault: false } });
+  gearPaths();
+}
+
+export async function deleteGear(id: string) { const userId = await uid(); await prisma.gear.deleteMany({ where: { id, userId } }); gearPaths(); }
 
 /** Champ vide = retour à l'estimation automatique. */
 export async function saveZones(fd: FormData) {

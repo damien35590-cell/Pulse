@@ -7,6 +7,7 @@ import { bestEffort, type Pt } from "@/lib/geo";
 import { fetchWeather } from "@/lib/weather";
 import { activityStory, workoutStory } from "@/lib/insights/engine";
 import type { Act } from "@/lib/insights/types";
+import { autoGearIds, gearAlerts, ownGearIds } from "@/lib/data/gear";
 
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
@@ -33,6 +34,9 @@ export async function POST(req: Request) {
   const startLat = b.startLat ?? pts[0]?.lat ?? null, startLng = b.startLng ?? pts[0]?.lng ?? null;
   const stride = Math.max(1, Math.ceil(pts.length / 500));
   const polyline = pts.length > 1 ? encodePolyline(pts.filter((_, i) => i % stride === 0).map((p) => [p.lat, p.lng])) : null;
+
+  // Matériel choisi dans la liste déroulante ; à défaut (autres clients), celui par défaut du sport.
+  const gearIds = Array.isArray(b.gearIds) ? await ownGearIds(uid, b.gearIds) : await autoGearIds(uid, b.type, startLat == null);
 
   const [user, hist, life, weather] = await Promise.all([
     prisma.user.findUnique({ where: { id: uid }, select: { timezone: true } }),
@@ -69,11 +73,13 @@ export async function POST(req: Request) {
         distanceM: self.distanceM, movingTimeS: self.movingTimeS, elevationGainM: self.elevationGainM, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined, story: story.text,
         exercises: exercises.length ? { create: exercises } : undefined,
+        gear: gearIds.length ? { connect: gearIds.map((id) => ({ id })) } : undefined,
         source: b.source ?? "manual", externalId: b.externalId ?? null, trackPoints: pts.length ? (pts as unknown as Prisma.InputJsonValue) : undefined,
       },
       select: { id: true },
     });
-    return NextResponse.json({ id: a.id, story: story.text, tag: story.tag, record: !!pr }, { status: 201 });
+    const worn = gearIds.length ? (await gearAlerts(uid, gearIds)).filter((g) => g.level === "critical").map((g) => ({ name: g.name, kind: g.kind, km: Math.round(g.km), limitKm: g.limitKm })) : [];
+    return NextResponse.json({ id: a.id, story: story.text, tag: story.tag, record: !!pr, gearAlerts: worn }, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return NextResponse.json({ error: "duplicate" }, { status: 409 });
     throw e;

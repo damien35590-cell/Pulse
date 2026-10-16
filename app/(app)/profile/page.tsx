@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Wrench, type LucideIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildBadgeStats, evaluateBadges } from "@/lib/badges";
@@ -10,6 +11,7 @@ import { ZonesForm } from "@/components/profile/zones-form";
 import { BadgeGrid } from "@/components/profile/badge-grid";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SignOut } from "@/components/profile/sign-out";
+import { getGear } from "@/lib/data/gear";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Vous" };
@@ -19,7 +21,8 @@ export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const zones = await getZones(userId);
+  const [zones, gear] = await Promise.all([getZones(userId), getGear(userId)]);
+  const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
   const [acts, exercises, records, noted] = await Promise.all([
     prisma.activity.findMany({
       where: { userId },
@@ -59,6 +62,11 @@ export default async function ProfilePage() {
           {rows.length ? rows.map(({ label, value, Icon }) => <p key={label} className="flex items-center justify-between py-3"><span>{label}</span><span className="flex items-center gap-2">{Icon && <Icon className="h-5 w-5 text-brand" aria-hidden />}<b className="font-display text-2xl tabular-nums">{value}</b></span></p>) : <p className="py-4 text-ink-soft">Vos records apparaîtront dès qu’une sortie avec trace GPS les établira.</p>}
         </div>
       </section>
+      <Link href="/gear" className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 active:bg-surface-2">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand"><Wrench className="h-5 w-5" aria-hidden /></span>
+        <span className="min-w-0 flex-1"><b className="block font-display text-lg">Matériel</b><span className={wornGear ? "text-sm font-semibold text-red-600 dark:text-red-400" : "text-sm text-ink-soft"}>{wornGear ? `${wornGear} à remplacer` : activeGear.length ? `${activeGear.length} suivi${activeGear.length > 1 ? "s" : ""}, usure et entretien` : "Vélos, chaussures, chaîne, cassette…"}</span></span>
+        <ChevronRight className="h-5 w-5 text-ink-soft" aria-hidden />
+      </Link>
       <BadgeGrid badges={badges} />
       <ZonesForm zones={zones} />
       <InstallPrompt variant="card" />

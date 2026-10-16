@@ -1,12 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { SPORTS } from "@/lib/sports";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 import { StoryReveal } from "@/components/record/story-reveal";
+import { defaultGear, GEAR_KINDS, selectableGear, type WearLevel } from "@/lib/gear";
 
 const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
 const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
@@ -15,6 +16,8 @@ const blank = (id: number): Ex => ({ id, name: "", sets: "3", reps: "10", loadKg
 const num = (v: string) => parseFloat(v.replace(",", ".")) || 0;
 const localNow = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const field = "mt-1 min-h-14 w-full rounded-xl border border-line bg-surface px-4 font-display text-2xl font-bold tabular-nums";
+type GearOpt = { id: string; name: string; kind: keyof typeof GEAR_KINDS; sports: string[]; isDefault: boolean; parentId: string | null; retiredAt: null; km: number; limitKm: number | null; level: WearLevel };
+type WornGear = { name: string; km: number; limitKm: number | null };
 const small = "mt-1 min-h-12 w-full rounded-xl border border-line bg-surface px-3 font-display text-xl font-bold tabular-nums";
 
 export default function RecordPage() {
@@ -24,7 +27,13 @@ export default function RecordPage() {
   const [feeling, setFeeling] = useState<string | null>(null);
   const [exs, setExs] = useState<Ex[]>([blank(1)]), [nextId, setNextId] = useState(2);
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
-  const [res, setRes] = useState<{ story: string; record: boolean; id: string } | null>(null);
+  const [res, setRes] = useState<{ story: string; record: boolean; id: string; gearAlerts?: WornGear[] } | null>(null);
+  const [gear, setGear] = useState<GearOpt[]>([]), [gearId, setGearId] = useState("");
+  useEffect(() => { fetch("/api/gear").then((r) => (r.ok ? r.json() : [])).then(setGear).catch(() => {}); }, []);
+  // Changement de sport (ou matériel chargé) : on repart du matériel par défaut de ce sport.
+  useEffect(() => { setGearId(defaultGear(gear, type)?.id ?? ""); }, [gear, type]);
+  const gearOpts = selectableGear(gear, type);
+  const worn = gear.filter((g) => gearId && (g.id === gearId || g.parentId === gearId) && g.level === "critical");
   const workout = type === "WORKOUT"; // rendu conditionnel : tout le formulaire en dépend
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
   const upd = (id: number, k: keyof Ex, v: string) => setExs((l) => l.map((e) => (e.id === id ? { ...e, [k]: v } : e)));
@@ -45,10 +54,10 @@ export default function RecordPage() {
     const hour = new Date(f.when).getHours();
     const title = f.title.trim() || `${SPORTS[type].label} ${hour < 12 ? "du matin" : hour < 18 ? "de l’après-midi" : "du soir"}`;
     const r = await fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      type, title, startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, notes: f.notes || null, exercises }) });
+      type, title, startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, notes: f.notes || null, exercises, gearIds: gearId ? [gearId] : [] }) });
     setBusy(false);
     if (!r.ok) return setErr("Impossible d’enregistrer. Vérifiez votre connexion et réessayez.");
-    const j = await r.json(); setRes({ story: j.story, record: j.record, id: j.id });
+    const j = await r.json(); setRes({ story: j.story, record: j.record, id: j.id, gearAlerts: j.gearAlerts });
   }
 
   return (
@@ -94,6 +103,17 @@ export default function RecordPage() {
         </section>
       )}
 
+      {!workout && gearOpts.length > 0 && (
+        <div>
+          <label className="block text-sm text-ink-soft">Matériel utilisé
+            <select value={gearId} onChange={(e) => { tap(); setGearId(e.target.value); }} className={cn(field, "text-lg font-semibold")}>
+              <option value="">Aucun</option>
+              {gearOpts.map((g) => <option key={g.id} value={g.id}>{gear.some((p) => (p.id === g.id || p.parentId === g.id) && p.level === "critical") ? "⚠ " : ""}{g.name} ({GEAR_KINDS[g.kind].label}, {g.km.toLocaleString("fr-FR")} km)</option>)}
+            </select>
+          </label>
+          {worn.length > 0 && <p role="status" className="mt-2 flex gap-2 rounded-xl bg-red-600/10 px-3 py-2.5 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{worn.map((g) => `${g.name} : ${g.km.toLocaleString("fr-FR")} / ${g.limitKm?.toLocaleString("fr-FR")} km`).join(" · ")}. Seuil critique dépassé.</p>}
+        </div>
+      )}
       <label className="block text-sm text-ink-soft">Date et heure<input type="datetime-local" value={f.when} onChange={set("when")} className={cn(field, "text-lg font-semibold")} /></label>
       <label className="block text-sm text-ink-soft">Titre (facultatif)<input value={f.title} onChange={set("title")} className={cn(field, "text-lg font-semibold")} /></label>
       <div role="radiogroup" aria-label="Ressenti" className="flex flex-wrap gap-2">
@@ -103,7 +123,7 @@ export default function RecordPage() {
       {err && <p role="alert" className="text-sm font-medium text-brand">{err}</p>}
       <button disabled={busy} className="min-h-14 w-full rounded-xl bg-brand font-display text-xl font-semibold text-brand-ink disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer la sortie"}</button>
       <p className="text-center text-sm text-ink-soft">Vous avez un fichier GPX ou FIT ? <Link href="/import" className="font-semibold text-brand">Importez-le</Link></p>
-      {res && <StoryReveal story={res.story} record={res.record} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />}
+      {res && <StoryReveal story={res.story} record={res.record} alerts={res.gearAlerts?.map((g) => `${g.name} a atteint ${g.km.toLocaleString("fr-FR")} km (seuil ${g.limitKm?.toLocaleString("fr-FR")} km) : pensez à le remplacer.`)} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />}
     </form>
   );
 }

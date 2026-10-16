@@ -13,13 +13,15 @@ import { LevelCard } from "@/components/dashboard/level-card";
 import { Shortcuts } from "@/components/dashboard/shortcuts";
 import { EventTimeline } from "@/components/dashboard/event-timeline";
 import { ActivityCard } from "@/components/dashboard/activity-card";
+import { GearAlert } from "@/components/gear/gear-alert";
+import { gearAlerts } from "@/lib/data/gear";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const d = await getDashboard(s.user.id);
+  const [d, worn] = await Promise.all([getDashboard(s.user.id), gearAlerts(s.user.id)]);
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" }).format(new Date());
 
   return (
@@ -30,6 +32,7 @@ export default async function DashboardPage() {
       </header>
 
       <InstallPrompt />
+      <GearAlert gear={worn.sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))} />
 
       {d.empty ? (
         <section className="rounded-xl border border-line bg-surface p-6">
