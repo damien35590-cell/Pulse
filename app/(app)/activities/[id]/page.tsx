@@ -137,7 +137,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       <FeelNote 
         activityId={a.id} 
         initialFeel={feelingToInt(a.feeling)} 
-        initialComment={a.notes} 
+        initialComment={a.notes}
+        initialRpe={a.rpe}
       />
 
     </article>

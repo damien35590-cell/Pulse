@@ -147,6 +147,9 @@ model Activity {
   weather        Json?                   // {tempC, precipMm} à l'heure de départ
   story          String?                 // anecdote générée à l'enregistrement
   dedupeKey      String?      // début à la minute (UTC) : évite les doublons à l'import
+  rpe            Int?                    // effort ressenti 1-10 (échelle de Borg CR-10)
+  load           Float?                  // charge d'entraînement calculée (lib/load.ts), en points type TSS
+  loadSource     String?                 // "power" | "hr" | "rpe" | "estimate"
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

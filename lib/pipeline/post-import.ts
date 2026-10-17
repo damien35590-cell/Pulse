@@ -4,6 +4,7 @@ import { bestEffort, type Pt } from "@/lib/geo";
 import { activityStory, workoutStory } from "@/lib/insights/engine";
 import type { Act, Story } from "@/lib/insights/types";
 import { awardBadges } from "@/lib/data/badges";
+import { refreshLoad } from "@/lib/data/load";
 
 /** Deux activités se recouvrant sur plus de 70 % sont la même sortie, enregistrée par deux sources. */
 export const OVERLAP_RATIO = 0.7;
@@ -35,7 +36,7 @@ export function compareRichness(a: Richness, b: Richness) {
 const FULL = {
   id: true, userId: true, type: true, title: true, notes: true, feeling: true, startedAt: true, distanceM: true, movingTimeS: true, elapsedTimeS: true,
   elevationGainM: true, calories: true, avgHr: true, maxHr: true, avgPower: true, maxPower: true, polyline: true, trackPoints: true,
-  startLat: true, startLng: true, source: true, weather: true, story: true, createdAt: true,
+  startLat: true, startLng: true, source: true, weather: true, story: true, rpe: true, createdAt: true,
   stream: { select: { activityId: true } }, gear: { select: { id: true } }, _count: { select: { exercises: true } },
 } satisfies Prisma.ActivitySelect;
 const loadFull = (id: string) => prisma.activity.findUnique({ where: { id }, select: FULL });
@@ -46,7 +47,7 @@ const richnessOf = (a: Full): Richness => ({
   hr: (a.avgHr ?? 0) > 0,
   gps: !!a.polyline,
   distance: a.distanceM > 0,
-  manual: a._count.exercises > 0 || !!a.notes || !!a.feeling || a.source === "manual",
+  manual: a._count.exercises > 0 || !!a.notes || !!a.feeling || a.rpe != null || a.source === "manual",
 });
 
 /** Activités du même utilisateur qui recouvrent la période donnée à plus de 70 %. */
@@ -61,11 +62,11 @@ export async function findOverlapping(userId: string, span: Span, excludeId?: st
 
 /** Copie dans `keep` ce qui lui manque et que `drop` possède, rattache série, exercices, photos, matériel et records, puis supprime `drop`. */
 async function mergeInto(keep: Full, drop: Full) {
-  const fill = <K extends "notes" | "feeling" | "elapsedTimeS" | "calories" | "avgHr" | "maxHr" | "avgPower" | "maxPower" | "polyline" | "startLat" | "startLng" | "story">(k: K) =>
+  const fill = <K extends "notes" | "feeling" | "rpe" | "elapsedTimeS" | "calories" | "avgHr" | "maxHr" | "avgPower" | "maxPower" | "polyline" | "startLat" | "startLng" | "story">(k: K) =>
     keep[k] == null && drop[k] != null ? drop[k] : undefined;
   const json = (k: "trackPoints" | "weather") => (keep[k] == null && drop[k] != null ? (drop[k] as Prisma.InputJsonValue) : undefined);
   const data: Prisma.ActivityUpdateInput = {
-    notes: fill("notes"), feeling: fill("feeling"), elapsedTimeS: fill("elapsedTimeS"), calories: fill("calories"),
+    notes: fill("notes"), feeling: fill("feeling"), rpe: fill("rpe"), elapsedTimeS: fill("elapsedTimeS"), calories: fill("calories"),
     avgHr: fill("avgHr"), maxHr: fill("maxHr"), avgPower: fill("avgPower"), maxPower: fill("maxPower"),
     polyline: fill("polyline"), startLat: fill("startLat"), startLng: fill("startLng"), story: fill("story"),
     trackPoints: json("trackPoints"), weather: json("weather"),
@@ -175,7 +176,7 @@ export type ProcessResult = {
 };
 
 /**
- * Traitement commun après chaque création d'activité, quelle que soit la source : doublons, records, badges, anecdote.
+ * Traitement commun après chaque création d'activité, quelle que soit la source : doublons, charge d'entraînement, records, badges, anecdote.
  * Chaque étape est isolée : une erreur est journalisée et renvoyée, jamais levée, pour ne pas bloquer l'import.
  * `hint.points` : trace complète si l'appelant l'a encore en mémoire (plus précise pour les records que la trace compactée en base).
  */
@@ -194,6 +195,10 @@ export async function processActivity(activityId: string, hint?: { points?: Pt[]
   let a: Full | null = null;
   try { a = await loadFull(res.activityId); } catch (e) { fail("lecture", e); }
   if (!a) return res;
+
+  // Après la fusion : l'activité conservée a pu récupérer une série, une FC ou un ressenti.
+  try { await refreshLoad(a.id); }
+  catch (e) { fail("charge", e); }
 
   try { res.records = await updateRecords(a, res.activityId === activityId ? hint?.points : undefined); }
   catch (e) { fail("records", e); }

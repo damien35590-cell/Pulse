@@ -20,7 +20,7 @@ export async function getDashboard(userId: string) {
     prisma.goal.findMany({ where: { userId, active: true, metric: "DISTANCE", period: "WEEK" }, orderBy: { createdAt: "asc" } }),
     prisma.goal.count({ where: { userId, active: true } }),
     prisma.activity.findMany({ where: { userId }, select: { distanceM: true, elevationGainM: true, movingTimeS: true, type: true } }),
-    prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true } }),
+    prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true } }),
     prisma.raceEvent.findMany({ where: { userId, date: { gte: new Date(+now - 864e5) } }, orderBy: { date: "asc" }, take: 5 }),
   ]);
 

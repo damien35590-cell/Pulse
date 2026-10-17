@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 import { StoryReveal } from "@/components/record/story-reveal";
 import { defaultGear, GEAR_KINDS, selectableGear, type WearLevel } from "@/lib/gear";
+import { RpePicker } from "@/components/activity/rpe-picker";
 
 const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
 const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
@@ -24,7 +25,7 @@ export default function RecordPage() {
   const router = useRouter();
   const [type, setType] = useState<(typeof SPORT_KEYS)[number]>("RUN");
   const [f, setF] = useState({ title: "", when: localNow(), km: "", h: "", min: "", elev: "", notes: "" });
-  const [feeling, setFeeling] = useState<string | null>(null);
+  const [feeling, setFeeling] = useState<string | null>(null), [rpe, setRpe] = useState<number | null>(null);
   const [exs, setExs] = useState<Ex[]>([blank(1)]), [nextId, setNextId] = useState(2);
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const [res, setRes] = useState<{ story: string; record: boolean; id: string; gearAlerts?: WornGear[] } | null>(null);
@@ -54,7 +55,7 @@ export default function RecordPage() {
     const hour = new Date(f.when).getHours();
     const title = f.title.trim() || `${SPORTS[type].label} ${hour < 12 ? "du matin" : hour < 18 ? "de l’après-midi" : "du soir"}`;
     const r = await fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      type, title, startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, notes: f.notes || null, exercises, gearIds: gearId ? [gearId] : [] }) });
+      type, title, startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, rpe, notes: f.notes || null, exercises, gearIds: gearId ? [gearId] : [] }) });
     setBusy(false);
     if (!r.ok) return setErr("Impossible d’enregistrer. Vérifiez votre connexion et réessayez.");
     const j = await r.json(); setRes({ story: j.story, record: j.record, id: j.id, gearAlerts: j.gearAlerts });
@@ -119,6 +120,7 @@ export default function RecordPage() {
       <div role="radiogroup" aria-label="Ressenti" className="flex flex-wrap gap-2">
         {FEELINGS.map(([k, l]) => <button type="button" key={k} role="radio" aria-checked={feeling === k} onClick={() => { tap(); setFeeling(feeling === k ? null : k); }} className={cn("min-h-12 rounded-full px-4 font-medium", feeling === k ? "bg-brand text-brand-ink" : "bg-surface-2")}>{l}</button>)}
       </div>
+      <RpePicker value={rpe} onChange={setRpe} />
       <label className="block text-sm text-ink-soft">Notes<textarea value={f.notes} onChange={set("notes")} rows={3} className="mt-1 w-full rounded-xl border border-line bg-surface p-4 text-base" /></label>
       {err && <p role="alert" className="text-sm font-medium text-brand">{err}</p>}
       <button disabled={busy} className="min-h-14 w-full rounded-xl bg-brand font-display text-xl font-semibold text-brand-ink disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer la sortie"}</button>

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Check, Frown, Laugh, Meh, Smile, Zap, type LucideIcon } from "lucide-react";
 import { tap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { RpePicker } from "./rpe-picker";
 
 // Même libellés que l'écran d'enregistrement ; couleurs alignées sur les zones.
 const FEELS: { v: number; Icon: LucideIcon; label: string; color: string }[] = [
@@ -17,15 +18,17 @@ type Props = {
   activityId: string;
   initialFeel: number | null;
   initialComment: string | null;
+  initialRpe?: number | null;
 };
 
-export function FeelNote({ activityId, initialFeel, initialComment }: Props) {
+export function FeelNote({ activityId, initialFeel, initialComment, initialRpe = null }: Props) {
   const [feel, setFeel] = useState(initialFeel);
   const [comment, setComment] = useState(initialComment ?? "");
+  const [rpe, setRpe] = useState(initialRpe);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
-  async function save(body: { feel?: number | null; comment?: string | null }) {
+  async function save(body: { feel?: number | null; comment?: string | null; rpe?: number | null }) {
     setStatus("saving");
     try {
       const r = await fetch(`/api/activities/${activityId}/note`, {
@@ -44,6 +47,11 @@ export function FeelNote({ activityId, initialFeel, initialComment }: Props) {
     tap(10);
     setFeel(next);
     save({ feel: next });
+  }
+
+  function pickRpe(v: number | null) {
+    setRpe(v);
+    save({ rpe: v });
   }
 
   function onComment(text: string) {
@@ -106,6 +114,8 @@ export function FeelNote({ activityId, initialFeel, initialComment }: Props) {
             );
           })}
         </div>
+
+        <RpePicker value={rpe} onChange={pickRpe} />
 
         <textarea
           value={comment}

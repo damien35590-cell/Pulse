@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       }).filter((e: { name: string; sets: number; reps: number }) => e.name && e.sets > 0 && e.reps > 0)
     : [];
   if (isWorkout) { b.distanceM = 0; b.elevationGainM = 0; }
+  const rpe = Number.isInteger(b.rpe) && b.rpe >= 1 && b.rpe <= 10 ? (b.rpe as number) : null;
 
   const pts: Pt[] = Array.isArray(b.trackPoints) ? b.trackPoints.slice(0, 20000) : [];
   const startLat = b.startLat ?? pts[0]?.lat ?? null, startLng = b.startLng ?? pts[0]?.lng ?? null;
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   try {
     const a = await prisma.activity.create({
       data: {
-        userId: uid, type: b.type, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, startedAt,
+        userId: uid, type: b.type, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
         distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined,
         exercises: exercises.length ? { create: exercises } : undefined,
