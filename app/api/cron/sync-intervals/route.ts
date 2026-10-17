@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncIntervals } from "@/lib/sync/intervals";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
+import { matchRaceActivities } from "@/lib/races/link";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -28,9 +29,20 @@ export async function GET(req: Request) {
         ? { ok: true, result: r.value }
         : { ok: false, error: r.reason instanceof Error ? r.reason.message : String(r.reason) };
 
+    // Rattachement des activités du jour J aux courses : après les synchros, sans jamais les faire échouer.
+    let races: { ok: boolean; linked?: number; error?: string };
+    try {
+      const linked = await matchRaceActivities(user.id);
+      console.log(`[cron] courses rattachées : ${linked}`);
+      races = { ok: true, linked };
+    } catch (e) {
+      console.error("[cron] rattachement des courses", e);
+      races = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
     const failed = intervals.status === "rejected" || googleFit.status === "rejected";
     return NextResponse.json(
-      { intervals: report(intervals), googleFit: report(googleFit) },
+      { intervals: report(intervals), googleFit: report(googleFit), races },
       { status: failed ? 502 : 200 }
     );
   } catch (e) {

@@ -139,6 +139,41 @@ export async function saveRaceResult(id: string, r: { resultTimeS?: number; rank
   return { ok: true };
 }
 
+/** Lie à la main une activité à la course (une activité ne sert qu'à une course) ; une course « Inscrit » passe en « Terminée ». */
+export async function linkRaceActivity(id: string, activityId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await uid();
+  const [e, a] = await Promise.all([
+    prisma.raceEvent.findFirst({ where: { id, userId }, select: { status: true } }),
+    prisma.activity.findFirst({ where: { id: activityId, userId }, select: { raceEvent: { select: { id: true } } } }),
+  ]);
+  if (!e || !a) return { ok: false, error: "Introuvable." };
+  if (a.raceEvent && a.raceEvent.id !== id) return { ok: false, error: "Cette sortie est déjà liée à une autre course." };
+  await prisma.raceEvent.update({ where: { id }, data: { activityId, ...(e.status === "REGISTERED" ? { status: "COMPLETED" as const } : {}) } });
+  racePaths(id); revalidatePath(`/activities/${activityId}`);
+  return { ok: true };
+}
+
+/** Délie l'activité (mauvaise correspondance). Le statut est conservé : le rattachement auto ne ressaisit que les courses « Inscrit ». */
+export async function unlinkRaceActivity(id: string): Promise<{ ok: boolean }> {
+  const userId = await uid();
+  const e = await prisma.raceEvent.findFirst({ where: { id, userId }, select: { activityId: true } });
+  if (!e) return { ok: false };
+  await prisma.raceEvent.update({ where: { id }, data: { activityId: null } });
+  racePaths(id); if (e.activityId) revalidatePath(`/activities/${e.activityId}`);
+  return { ok: true };
+}
+
+/** Recopie le temps de la montre (durée de l'activité liée) comme temps officiel, sans écraser un résultat déjà saisi. */
+export async function adoptWatchTime(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await uid();
+  const e = await prisma.raceEvent.findFirst({ where: { id, userId }, select: { resultTimeS: true, status: true, activity: { select: { movingTimeS: true } } } });
+  if (!e?.activity?.movingTimeS) return { ok: false, error: "Aucun temps à recopier." };
+  if (e.resultTimeS) return { ok: false, error: "Un temps officiel est déjà saisi." };
+  await prisma.raceEvent.update({ where: { id }, data: { resultTimeS: e.activity.movingTimeS, ...(e.status === "REGISTERED" ? { status: "COMPLETED" as const } : {}) } });
+  racePaths(id);
+  return { ok: true };
+}
+
 /** Objectif de temps saisi depuis la section « Préparation ». */
 export async function setRaceGoalTime(id: string, goalTimeS: number): Promise<{ ok: boolean }> {
   const userId = await uid();

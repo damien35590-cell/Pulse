@@ -4,13 +4,17 @@ import { ExternalLink, ChevronDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SPORTS } from "@/lib/sports";
-import { getCountdown } from "@/lib/races/time";
+import { getCountdown, getRaceStartDate, raceDayKey } from "@/lib/races/time";
+import { shiftDay } from "@/lib/dates";
+import { pickPrevious, raceBilan } from "@/lib/races/bilan";
 import { fmtGoalPace, fmtHms, fmtPrice, fmtRaceDay, fmtRaceDistance, fmtRank, PLATFORM_LABEL } from "@/lib/races/format";
 import { EditRace } from "@/components/events/edit-race";
 import { RaceCountdown } from "@/components/events/race-countdown";
 import { Chip } from "@/components/events/next-race-hero";
 import { DeleteRace, RaceResultForm, RaceStatusPicker } from "@/components/events/race-actions";
 import { RacePrepSection } from "@/components/events/race-prep";
+import { RaceBilan } from "@/components/events/race-bilan";
+import { LinkRaceActivity, RaceActivityCard } from "@/components/events/race-activity";
 import { prepSports, racePrep, weeklyGoalKm } from "@/lib/races/prep";
 import type { ActivityType } from "@prisma/client";
 
@@ -20,7 +24,10 @@ export const metadata = { title: "Course" };
 export default async function RacePage({ params }: { params: { id: string } }) {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const e = await prisma.raceEvent.findFirst({ where: { id: params.id, userId: s.user.id } });
+  const e = await prisma.raceEvent.findFirst({
+    where: { id: params.id, userId: s.user.id },
+    include: { activity: { select: { id: true, title: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgHr: true, polyline: true } } },
+  });
   if (!e) notFound();
   const now = new Date(), c = getCountdown(e, now);
   // Préparation : course à venir dans un sport d'endurance, calculée sur les 100 derniers jours d'activités du même sport.
@@ -35,6 +42,18 @@ export default async function RacePage({ params }: { params: { id: string } }) {
   const pace = e.goalTimeS && e.targetDistance ? fmtGoalPace(e.goalTimeS, e.targetDistance, e.sport) : null;
   const platform = PLATFORM_LABEL[e.platform];
   const showResult = c.isPast || e.status === "COMPLETED" || e.status === "DNF";
+  // Sortie du jour J : liée, ou à choisir parmi les activités de la veille, du jour J et du lendemain (hors sorties déjà liées à une autre course).
+  const showActivity = e.status !== "DNS" && (c.isPast || !!e.activity);
+  const day = raceDayKey(e.date);
+  const candidates = showActivity && !e.activity
+    ? await prisma.activity.findMany({
+        where: { userId: s.user.id, raceEvent: null, startedAt: { gte: getRaceStartDate({ date: shiftDay(day, -1) }), lt: getRaceStartDate({ date: shiftDay(day, 2) }) } },
+        orderBy: { startedAt: "asc" }, select: { id: true, title: true, type: true, startedAt: true, distanceM: true, movingTimeS: true },
+      })
+    : [];
+  // Bilan : comparaison avec la course précédente de distance proche (±15 %).
+  const earlier = e.resultTimeS ? await prisma.raceEvent.findMany({ where: { userId: s.user.id, id: { not: e.id }, sport: e.sport, date: { lt: e.date }, resultTimeS: { not: null } }, select: { name: true, date: true, sport: true, targetDistance: true, resultTimeS: true } }) : [];
+  const bilan = raceBilan(e, pickPrevious(e, earlier));
   const rows: [string, string | null][] = [
     ["Date", `${fmtRaceDay(e.date)}${e.startTime ? `, départ à ${e.startTime.replace(":", "h")}` : ""}`],
     ["Lieu", e.location],
@@ -44,6 +63,13 @@ export default async function RacePage({ params }: { params: { id: string } }) {
     ["Dossard", e.bibNumber],
     ["Notes", e.notes],
   ];
+
+  const resultSection = (
+    <section className="rounded-xl border border-line bg-surface p-4">
+      <h2 className="mb-3 font-display text-lg font-bold">{e.resultTimeS ? "Résultat" : `Comment s’est passée la course ?`}</h2>
+      <RaceResultForm id={e.id} initial={{ resultTimeS: e.resultTimeS, rankOverall: e.rankOverall, rankCategory: e.rankCategory, participants: e.participants }} />
+    </section>
+  );
 
   return (
     <div className="space-y-5">
@@ -67,6 +93,8 @@ export default async function RacePage({ params }: { params: { id: string } }) {
         )}
       </header>
 
+      {bilan && <RaceBilan bilan={bilan} />}
+
       <section aria-label="Statut" className="space-y-2">
         <h2 className="px-1 text-xs font-bold uppercase tracking-wider text-ink-soft">Statut</h2>
         <RaceStatusPicker id={e.id} status={e.status} />
@@ -77,12 +105,11 @@ export default async function RacePage({ params }: { params: { id: string } }) {
           goal={goalKm ? { km: goalKm, sportLabel: (SPORTS[goalType]?.label ?? "").toLowerCase(), active: weekGoal?.target === goalKm * 1000 } : null} />
       )}
 
-      {showResult && (
-        <section className="rounded-xl border border-line bg-surface p-4">
-          <h2 className="mb-3 font-display text-lg font-bold">{e.resultTimeS ? "Résultat" : `Comment s’est passée la course ?`}</h2>
-          <RaceResultForm id={e.id} initial={{ resultTimeS: e.resultTimeS, rankOverall: e.rankOverall, rankCategory: e.rankCategory, participants: e.participants }} />
-        </section>
-      )}
+      {showResult && !e.resultTimeS && resultSection}
+      {showActivity && (e.activity
+        ? <RaceActivityCard raceId={e.id} hasResult={!!e.resultTimeS} activity={{ ...e.activity, startedAt: e.activity.startedAt.toISOString() }} />
+        : <LinkRaceActivity raceId={e.id} candidates={candidates.map((x) => ({ ...x, startedAt: x.startedAt.toISOString() }))} />)}
+      {showResult && e.resultTimeS && resultSection}
 
       <dl className="divide-y divide-line rounded-xl border border-line bg-surface">
         {rows.filter(([, v]) => v).map(([k, v]) => (

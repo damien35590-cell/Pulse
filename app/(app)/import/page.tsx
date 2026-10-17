@@ -7,6 +7,7 @@ import { buildStream } from "@/lib/stream";
 import type { ParsedActivity } from "@/lib/import/types";
 
 const fmtTime = (s: number) => `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
+const racesNote = (n?: number) => (n ? ` 🏁 ${n} course${n > 1 ? "s" : ""} rattachée${n > 1 ? "s" : ""} à ta sortie du jour J.` : "");
 /** Allège les traces (≤ 600 points) pour rester sous la limite de taille des requêtes. */
 const slim = (a: ParsedActivity): ParsedActivity => { const stream = buildStream(a.points) ?? undefined, step = Math.max(1, Math.ceil(a.points.length / 600)); return { ...a, stream, points: a.points.filter((_, i) => i % step === 0 || i === a.points.length - 1) }; };
 
@@ -28,7 +29,7 @@ export default function ImportPage() {
       const r = await fetch("/api/sync/intervals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 7 }) });
       const j = await r.json();
       if (!r.ok) return setSync({ busy: false, err: j.error ?? "Échec de la synchronisation" });
-      setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.backfilled ? `, ${j.backfilled} complétée(s) avec le détail` : ""}${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}` });
+      setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.backfilled ? `, ${j.backfilled} complétée(s) avec le détail` : ""}${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}${racesNote(j.racesLinked)}` });
     } catch { setSync({ busy: false, err: "Connexion impossible, réessayez." }); }
   }
 
@@ -38,7 +39,7 @@ export default function ImportPage() {
       const r = await fetch("/api/sync/google-fit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 7 }) });
       const j = await r.json();
       if (!r.ok) return setSyncFit({ busy: false, err: j.error ?? "Échec de la synchronisation Google Fit" });
-      setSyncFit({ busy: false, msg: j.count === 0 ? "Aucune activité trouvée sur Google Fit ces 7 derniers jours." : j.message });
+      setSyncFit({ busy: false, msg: j.count === 0 ? "Aucune activité trouvée sur Google Fit ces 7 derniers jours." : `${j.message}${racesNote(j.racesLinked)}` });
     } catch { setSyncFit({ busy: false, err: "Connexion impossible, réessayez." }); }
   }
 
