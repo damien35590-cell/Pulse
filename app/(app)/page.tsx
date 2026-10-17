@@ -15,13 +15,15 @@ import { EventTimeline } from "@/components/dashboard/event-timeline";
 import { ActivityCard } from "@/components/dashboard/activity-card";
 import { GearAlert } from "@/components/gear/gear-alert";
 import { gearAlerts } from "@/lib/data/gear";
+import { getRunProgram } from "@/lib/data/training";
+import { ProgramCard, StartProgramCard } from "@/components/training/program-card";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const [d, worn] = await Promise.all([getDashboard(s.user.id), gearAlerts(s.user.id)]);
+  const [d, worn, run] = await Promise.all([getDashboard(s.user.id), gearAlerts(s.user.id), getRunProgram(s.user.id)]);
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" }).format(new Date());
 
   return (
@@ -30,6 +32,8 @@ export default async function DashboardPage() {
         <h1 className="font-display text-3xl font-bold capitalize leading-none">{today}</h1>
         <p className="mt-1 text-sm text-ink-soft">Semaine du {d.range}</p>
       </header>
+
+      {run ? <ProgramCard p={run} /> : <StartProgramCard />}
 
       <InstallPrompt />
       <GearAlert gear={worn.sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))} />

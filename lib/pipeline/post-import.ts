@@ -5,6 +5,7 @@ import { activityStory, workoutStory } from "@/lib/insights/engine";
 import type { Act, Story } from "@/lib/insights/types";
 import { awardBadges } from "@/lib/data/badges";
 import { refreshLoad } from "@/lib/data/load";
+import { linkActivityToPlannedSession } from "@/lib/data/training";
 
 /** Deux activités se recouvrant sur plus de 70 % sont la même sortie, enregistrée par deux sources. */
 export const OVERLAP_RATIO = 0.7;
@@ -74,7 +75,10 @@ async function mergeInto(keep: Full, drop: Full) {
     elevationGainM: keep.elevationGainM <= 0 && drop.elevationGainM > 0 ? drop.elevationGainM : undefined,
     gear: drop.gear.length ? { connect: drop.gear.map((g) => ({ id: g.id })) } : undefined,
   };
+  // Séance de programme réalisée par `drop` : elle passe à `keep` (sinon la fusion consommerait une seconde séance).
+  const keepLinked = await prisma.plannedSession.count({ where: { completedActivityId: keep.id } });
   await prisma.$transaction([
+    ...(keepLinked ? [] : [prisma.plannedSession.updateMany({ where: { completedActivityId: drop.id }, data: { completedActivityId: keep.id } })]),
     ...(keep.stream || !drop.stream ? [] : [prisma.activityStream.update({ where: { activityId: drop.id }, data: { activityId: keep.id } })]),
     prisma.workoutExercise.updateMany({ where: { activityId: drop.id }, data: { activityId: keep.id } }),
     prisma.activityPhoto.updateMany({ where: { activityId: drop.id }, data: { activityId: keep.id } }),
@@ -176,7 +180,8 @@ export type ProcessResult = {
 };
 
 /**
- * Traitement commun après chaque création d'activité, quelle que soit la source : doublons, charge d'entraînement, records, badges, anecdote.
+ * Traitement commun après chaque création d'activité, quelle que soit la source : doublons, charge d'entraînement, records, badges, anecdote,
+ * puis liaison à la prochaine séance du programme RUN actif.
  * Chaque étape est isolée : une erreur est journalisée et renvoyée, jamais levée, pour ne pas bloquer l'import.
  * `hint.points` : trace complète si l'appelant l'a encore en mémoire (plus précise pour les records que la trace compactée en base).
  */
@@ -210,6 +215,9 @@ export async function processActivity(activityId: string, hint?: { points?: Pt[]
 
   try { res.story = await writeStory(a, res.records); }
   catch (e) { fail("anecdote", e); }
+
+  try { await linkActivityToPlannedSession(a); }
+  catch (e) { fail("programme", e); }
 
   return res;
 }

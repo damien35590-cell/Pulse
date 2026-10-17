@@ -10,6 +10,8 @@ import { buildPlan, PLAN_GOALS, type PlanSport } from "@/lib/plan";
 import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
+import { createRunProgram, finishIfDone, saveVmaMetric } from "@/lib/data/training";
+import { DEFAULT_VMA, isValidVma, VMA_MAX, VMA_MIN, vmaFromHalfCooper } from "@/lib/training/vma";
 
 const MY = ["RUN", "RIDE", "HIKE", "WORKOUT"];
 async function uid() { const id = (await auth())?.user?.id; if (!id) throw new Error("unauthorized"); return id; }
@@ -45,6 +47,78 @@ export async function toggleSession(planId: string, key: string) {
   revalidatePath("/plan");
 }
 export async function deletePlan() { const userId = await uid(); await prisma.trainingPlan.deleteMany({ where: { userId } }); revalidatePath("/plan"); }
+
+// ───────── Programmes v2 : running « Reprise & VMA » (mode flexible) ─────────
+type Res = { ok: true } | { ok: false; error: string };
+const programPaths = () => { revalidatePath("/"); revalidatePath("/plan"); };
+const vmaOf = (v: unknown) => { const n = typeof v === "number" ? v : parseFloat(String(v ?? "").replace(",", ".")); return Math.round(n * 10) / 10; };
+
+/** Crée et active le programme ; l'ancien programme RUN actif est abandonné dans la même transaction. */
+export async function createRunProgramAction(o: { sessionsPerWeek: number; vmaKmh: number; estimated: boolean }): Promise<Res> {
+  const userId = await uid(), vma = vmaOf(o.vmaKmh), n = Number(o.sessionsPerWeek);
+  if (n !== 2 && n !== 3) return { ok: false, error: "Choisis 2 ou 3 séances par semaine." };
+  if (!isValidVma(vma)) return { ok: false, error: `La VMA doit être comprise entre ${VMA_MIN} et ${VMA_MAX} km/h.` };
+  const estimated = !!o.estimated;
+  await createRunProgram(userId, { sessionsPerWeek: n, vmaKmh: vma, vmaSource: estimated ? "ESTIMATED" : "MANUAL", vmaNote: estimated && vma === DEFAULT_VMA.vmaKmh ? DEFAULT_VMA.note : undefined });
+  programPaths();
+  return { ok: true };
+}
+
+/** Séance de l'utilisateur, dans un programme RUN en cours. */
+const ownSession = (userId: string, id: string) =>
+  prisma.plannedSession.findFirst({ where: { id, userId, program: { status: { in: ["ACTIVE", "PAUSED"] } } }, select: { id: true, programId: true, status: true } });
+
+/** « Marquer comme faite » sans sortie liée : une sortie importée le même jour viendra la compléter. */
+export async function completePlannedSession(id: string): Promise<Res> {
+  const userId = await uid(), s = await ownSession(userId, id);
+  if (!s) return { ok: false, error: "Séance introuvable." };
+  if (s.status !== "PLANNED") return { ok: true };
+  await prisma.plannedSession.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
+  await finishIfDone(s.programId);
+  programPaths();
+  return { ok: true };
+}
+
+/** « Passer cette séance » : la suivante devient la prochaine, sans rien rattraper. */
+export async function skipPlannedSession(id: string): Promise<Res> {
+  const userId = await uid(), s = await ownSession(userId, id);
+  if (!s) return { ok: false, error: "Séance introuvable." };
+  if (s.status !== "PLANNED") return { ok: true };
+  await prisma.plannedSession.update({ where: { id }, data: { status: "SKIPPED" } });
+  await finishIfDone(s.programId);
+  programPaths();
+  return { ok: true };
+}
+
+/** Pause / reprise. En pause, les sorties importées ne sont plus reliées aux séances. */
+export async function toggleProgramPause(id: string): Promise<Res> {
+  const userId = await uid(), p = await prisma.program.findFirst({ where: { id, userId, status: { in: ["ACTIVE", "PAUSED"] } }, select: { status: true } });
+  if (!p) return { ok: false, error: "Programme introuvable." };
+  await prisma.program.update({ where: { id }, data: p.status === "ACTIVE" ? { status: "PAUSED", pausedAt: new Date() } : { status: "ACTIVE", pausedAt: null } });
+  programPaths();
+  return { ok: true };
+}
+
+/** Résultat du demi-Cooper : VMA = distance en 6 minutes / 100. Toutes les allures suivantes se recalculent. */
+export async function saveVmaTest(sessionId: string, distanceM: number): Promise<{ ok: true; vmaKmh: number } | { ok: false; error: string }> {
+  const userId = await uid(), d = Math.round(Number(distanceM));
+  if (!(d >= 800 && d <= 2500)) return { ok: false, error: "Entre la distance en mètres (entre 800 et 2 500 m en 6 minutes)." };
+  const s = await prisma.plannedSession.findFirst({ where: { id: sessionId, userId, kind: "VMA_TEST" }, select: { completedAt: true, completedActivityId: true } });
+  if (!s) return { ok: false, error: "Séance introuvable." };
+  const vmaKmh = vmaFromHalfCooper(d);
+  await saveVmaMetric(userId, vmaKmh, "TEST", { measuredAt: s.completedAt ?? new Date(), activityId: s.completedActivityId, note: `Demi-Cooper : ${d} m en 6 min` });
+  programPaths();
+  return { ok: true, vmaKmh };
+}
+
+/** « Mettre à jour ma VMA » (valeur connue, saisie à la main). */
+export async function updateVma(vmaKmh: number): Promise<Res> {
+  const userId = await uid(), v = vmaOf(vmaKmh);
+  if (!isValidVma(v)) return { ok: false, error: `La VMA doit être comprise entre ${VMA_MIN} et ${VMA_MAX} km/h.` };
+  await saveVmaMetric(userId, v, "MANUAL");
+  programPaths();
+  return { ok: true };
+}
 
 // ───────── Courses (la saisie manuelle passe par le formulaire d'import) ─────────
 const num = (v: FormDataEntryValue | null) => { const n = parseFloat(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : NaN; };
