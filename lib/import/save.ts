@@ -2,12 +2,11 @@ import { revalidatePath } from "next/cache";
 import { Prisma, type ActivityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encodePolyline } from "@/lib/polyline";
-import { bestEffort, type Pt } from "@/lib/geo";
-import { activityStory } from "@/lib/insights/engine";
-import type { Act } from "@/lib/insights/types";
+import type { Pt } from "@/lib/geo";
 import { buildStream, meanNonZero, sanitizeStream } from "@/lib/stream";
 import { powerCurve } from "@/lib/power";
 import { defaultGear } from "@/lib/gear";
+import { compareRichness, overlapRatio, OVERLAP_RATIO, processActivity } from "@/lib/pipeline/post-import";
 import { compactTrack } from "./track";
 import type { ParsedActivity } from "./types";
 
@@ -25,23 +24,35 @@ function prepStream(a: ParsedActivity) {
   };
 }
 
+const gpsOf = (a: ParsedActivity): Pt[] => (a.points ?? []).filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: p.lat!, lng: p.lng!, t: p.t }));
+
 /**
  * Enregistre des activités déjà lues (FIT/GPX). Même départ à 90 s près = même sortie : jamais en double.
  * Si la séance existe déjà SANS série détaillée, on lui ajoute celle-ci (rattrapage des séances importées avant l'arrivée de la courbe de puissance).
+ * Une activité qui recouvre à plus de 70 % une activité au moins aussi riche est ignorée ; plus riche, elle est créée puis le pipeline fusionne.
+ * Records, badges et anecdote : lib/pipeline/post-import.ts.
  */
 export async function saveActivities(uid: string, raw: ParsedActivity[]) {
   const items = raw.filter((a) => KINDS.includes(a.type) && !isNaN(Date.parse(a.startedAt)) && a.movingTimeS > 0 && Number.isFinite(a.distanceM));
   if (!items.length) return { saved: 0, duplicates: 0, invalid: raw.length, backfilled: 0 };
 
   const times = items.map((a) => Date.parse(a.startedAt));
-  const [user, existing, gear] = await Promise.all([
-    prisma.user.findUnique({ where: { id: uid }, select: { timezone: true } }),
-    prisma.activity.findMany({ where: { userId: uid, startedAt: { gte: new Date(Math.min(...times) - 120e3), lte: new Date(Math.max(...times) + 120e3) } }, select: { id: true, startedAt: true, stream: { select: { activityId: true } } } }),
+  const [existing, gear] = await Promise.all([
+    prisma.activity.findMany({
+      where: { userId: uid, startedAt: { gte: new Date(Math.min(...times) - 864e5), lte: new Date(Math.max(...times) + 864e5) } },
+      select: { id: true, startedAt: true, movingTimeS: true, elapsedTimeS: true, avgPower: true, avgHr: true, polyline: true, distanceM: true, notes: true, feeling: true, source: true, stream: { select: { activityId: true } }, _count: { select: { exercises: true } } },
+    }),
     prisma.gear.findMany({ where: { userId: uid, isDefault: true, retiredAt: null, parentId: null } }),
   ]);
-  const tz = user?.timezone ?? "Europe/Paris";
   const match = (a: ParsedActivity) => existing.find((e) => Math.abs(+e.startedAt - Date.parse(a.startedAt)) <= 90e3);
-  const fresh = items.filter((a) => !match(a));
+  const covered = (a: ParsedActivity) => {
+    const span = { startedAt: new Date(a.startedAt), movingTimeS: a.movingTimeS, elapsedTimeS: a.elapsedTimeS };
+    const mine = { power: !!a.stream || (a.avgPower ?? 0) > 0, hr: (a.avgHr ?? 0) > 0, gps: gpsOf(a).length > 1, distance: a.distanceM > 0, manual: false };
+    return existing.some((e) => overlapRatio(e, span) > OVERLAP_RATIO && compareRichness(
+      { power: !!e.stream || (e.avgPower ?? 0) > 0, hr: (e.avgHr ?? 0) > 0, gps: !!e.polyline, distance: e.distanceM > 0, manual: e._count.exercises > 0 || !!e.notes || !!e.feeling || e.source === "manual" },
+      mine,
+    ) >= 0);
+  };
 
   let backfilled = 0;
   for (const a of items) {
@@ -51,38 +62,38 @@ export async function saveActivities(uid: string, raw: ParsedActivity[]) {
     if (s) { try { await prisma.activityStream.create({ data: { activityId: e.id, ...s } }); backfilled++; } catch { /* déjà rattrapée */ } }
   }
 
-  const asAct = (a: ParsedActivity): Act => ({ id: `${uid}-${Date.parse(a.startedAt)}`, type: a.type, startedAt: new Date(a.startedAt), distanceM: a.distanceM, movingTimeS: a.movingTimeS, elevationGainM: a.elevationGainM, startLat: a.startLat ?? null, startLng: a.startLng ?? null });
-  const acts = fresh.map(asAct), best: Record<string, { v: number; at: Date }> = {};
-  const rows = fresh.map((a, i) => {
-    const gps: Pt[] = (a.points ?? []).filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: p.lat!, lng: p.lng!, t: p.t }));
-    const stride = Math.max(1, Math.ceil(gps.length / 500)), track = compactTrack(a.points ?? [], 900);
-    if (a.type === "RUN") for (const [k, m] of [["BEST_5K", 5000], ["BEST_10K", 10000]] as const) { const t = bestEffort(gps, m); if (t != null && (!best[k] || t < best[k].v)) best[k] = { v: t, at: new Date(a.startedAt) }; }
-    const g = defaultGear(gear, a.type, gps.length < 2); // sans trace GPS : séance en intérieur (home trainer)
-    const hist = acts.filter((o) => o !== acts[i] && +o.startedAt < +acts[i].startedAt && +acts[i].startedAt - +o.startedAt < 30 * 864e5);
-    return {
-      userId: uid, type: a.type as ActivityType, title: String(a.title || "Activité importée").slice(0, 120), startedAt: new Date(a.startedAt),
-      distanceM: a.distanceM, movingTimeS: a.movingTimeS, elapsedTimeS: a.elapsedTimeS ?? null, elevationGainM: a.elevationGainM ?? 0,
-      avgHr: a.avgHr ? Math.round(a.avgHr) : null, maxHr: a.maxHr ? Math.round(a.maxHr) : null, calories: a.calories ? Math.round(a.calories) : null,
-      avgPower: a.avgPower ? Math.round(a.avgPower) : null, maxPower: a.maxPower ? Math.round(a.maxPower) : null,
-      startLat: a.startLat ?? null, startLng: a.startLng ?? null,
-      polyline: gps.length > 1 ? encodePolyline(gps.filter((_, j) => j % stride === 0).map((p) => [p.lat, p.lng])) : null,
-      trackPoints: track.length ? (JSON.parse(JSON.stringify(track)) as Prisma.InputJsonValue) : undefined,
-      gear: g ? { connect: [{ id: g.id }] } : undefined,
-      source: a.source, externalId: a.dedupeKey, dedupeKey: a.dedupeKey, story: activityStory(acts[i], hist, { tz }).text,
-    };
-  });
-
+  const fresh = items.filter((a) => !match(a) && !covered(a));
   let saved = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const s = prepStream(fresh[i]);
-    try { await prisma.activity.create({ data: { ...rows[i], stream: s ? { create: s } : undefined } }); saved++; }
-    catch (e) { if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e; }
+  for (const a of fresh) {
+    const gps = gpsOf(a);
+    const stride = Math.max(1, Math.ceil(gps.length / 500)), track = compactTrack(a.points ?? [], 900);
+    const g = defaultGear(gear, a.type, gps.length < 2); // sans trace GPS : séance en intérieur (home trainer)
+    const s = prepStream(a);
+    let id: string;
+    try {
+      ({ id } = await prisma.activity.create({
+        data: {
+          userId: uid, type: a.type as ActivityType, title: String(a.title || "Activité importée").slice(0, 120), startedAt: new Date(a.startedAt),
+          distanceM: a.distanceM, movingTimeS: a.movingTimeS, elapsedTimeS: a.elapsedTimeS ?? null, elevationGainM: a.elevationGainM ?? 0,
+          avgHr: a.avgHr ? Math.round(a.avgHr) : null, maxHr: a.maxHr ? Math.round(a.maxHr) : null, calories: a.calories ? Math.round(a.calories) : null,
+          avgPower: a.avgPower ? Math.round(a.avgPower) : null, maxPower: a.maxPower ? Math.round(a.maxPower) : null,
+          startLat: a.startLat ?? null, startLng: a.startLng ?? null,
+          polyline: gps.length > 1 ? encodePolyline(gps.filter((_, j) => j % stride === 0).map((p) => [p.lat, p.lng])) : null,
+          trackPoints: track.length ? (JSON.parse(JSON.stringify(track)) as Prisma.InputJsonValue) : undefined,
+          gear: g ? { connect: [{ id: g.id }] } : undefined,
+          source: a.source, externalId: a.dedupeKey, dedupeKey: a.dedupeKey,
+          stream: s ? { create: s } : undefined,
+        },
+        select: { id: true },
+      }));
+      saved++;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") continue;
+      throw e;
+    }
+    await processActivity(id, { points: gps });
   }
-  for (const [kind, b] of Object.entries(best)) {
-    const key = { userId_kind_type: { userId: uid, kind: kind as "BEST_5K" | "BEST_10K", type: "RUN" as const } };
-    const old = await prisma.personalRecord.findUnique({ where: key });
-    if (!old || b.v < old.value) await prisma.personalRecord.upsert({ where: key, update: { value: b.v, achievedAt: b.at }, create: { userId: uid, kind: kind as "BEST_5K" | "BEST_10K", type: "RUN", value: b.v, achievedAt: b.at } });
-  }
+
   revalidatePath("/"); revalidatePath("/activities"); revalidatePath("/profile"); revalidatePath("/analysis"); revalidatePath("/gear");
   return { saved, duplicates: items.length - saved, invalid: raw.length - items.length, backfilled };
 }

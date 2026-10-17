@@ -8,7 +8,7 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 const same = (a: string, b: string) => timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
 
-/** Réception d'un fichier FIT/GPX brut envoyé par le script du PC. Protégé par INGEST_TOKEN (pas de cookie). */
+/** Réception d'un fichier FIT/GPX brut envoyé par le script du PC. Protégé par INGEST_TOKEN (pas de cookie). saveActivities lance le pipeline post-import. */
 export async function POST(req: Request) {
   const token = process.env.INGEST_TOKEN?.trim(), email = process.env.ALLOWED_EMAIL?.trim().toLowerCase();
   const given = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();

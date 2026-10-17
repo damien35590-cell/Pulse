@@ -6,7 +6,7 @@ const day = (d: Date) => d.toISOString().slice(0, 10);
 
 /**
  * Va chercher sur Intervals.icu (API gratuite) les activités récentes qui ont un fichier original (FIT/GPX/TCX),
- * puis les enregistre dans Pulse. Les doublons sont ignorés. Une activité arrivée seulement via Strava n'a pas de fichier : elle est sautée.
+ * puis les enregistre dans Pulse via saveActivities (qui lance processActivity : doublons, records, badges, anecdote). Les doublons sont ignorés. Une activité arrivée seulement via Strava n'a pas de fichier : elle est sautée.
  */
 export async function syncIntervals(uid: string, days = 3) {
   const key = process.env.INTERVALS_API_KEY?.trim();
