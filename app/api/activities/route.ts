@@ -7,6 +7,7 @@ import type { Pt } from "@/lib/geo";
 import { fetchWeather } from "@/lib/weather";
 import { autoGearIds, gearAlerts, ownGearIds } from "@/lib/data/gear";
 import { processActivity } from "@/lib/pipeline/post-import";
+import { exactExerciseIds } from "@/lib/data/exercises-catalog";
 
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
@@ -37,6 +38,11 @@ export async function POST(req: Request) {
       }).filter((e: { name: string; sets: number; reps: number }) => e.name && e.sets > 0 && e.reps > 0)
     : [];
   if (isWorkout) { b.distanceM = 0; b.elevationGainM = 0; }
+  // Rattachement au catalogue quand la correspondance est exacte ; en cas d'échec, la séance s'enregistre quand même en texte libre.
+  if (exercises.length) {
+    const ids = await exactExerciseIds(uid, exercises.map((e: { name: string }) => e.name)).catch(() => new Map<string, string>());
+    for (const e of exercises as { name: string; exerciseId?: string }[]) e.exerciseId = ids.get(e.name);
+  }
   const rpe = Number.isInteger(b.rpe) && b.rpe >= 1 && b.rpe <= 10 ? (b.rpe as number) : null;
 
   const pts: Pt[] = Array.isArray(b.trackPoints) ? b.trackPoints.slice(0, 20000) : [];

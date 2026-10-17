@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import type { ActivityType, GearKind, GoalMetric, GoalPeriod } from "@prisma/client";
+import type { ActivityType, Equipment, GearKind, GoalMetric, GoalPeriod, LoadType } from "@prisma/client";
 import { GEAR_KINDS, GEAR_SPORTS, type GearKindKey } from "@/lib/gear";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +11,8 @@ import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
 import { createRunProgram, finishIfDone, saveVmaMetric } from "@/lib/data/training";
+import { canUseExercise, createCustomExercise, linkExerciseName, syncCatalogAndHistory, type CatalogSyncResult } from "@/lib/data/exercises-catalog";
+import { EQUIPMENT_LABELS, LOAD_TYPE_LABELS } from "@/lib/training/catalog/exercises";
 import { DEFAULT_VMA, isValidVma, VMA_MAX, VMA_MIN, vmaFromHalfCooper } from "@/lib/training/vma";
 
 const MY = ["RUN", "RIDE", "HIKE", "WORKOUT"];
@@ -343,4 +345,32 @@ export async function saveZones(fd: FormData) {
   const data = { ftp: ftp >= 50 && ftp <= 600 ? Math.round(ftp) : null, hrMax: hrMax >= 120 && hrMax <= 230 ? Math.round(hrMax) : null };
   await prisma.userZones.upsert({ where: { userId }, update: data, create: { userId, ...data } });
   revalidatePath("/profile"); revalidatePath("/analysis");
+}
+
+// ───────── Muscu : catalogue d'exercices et rapprochement de l'historique ─────────
+const exercisePaths = () => { revalidatePath("/plan"); revalidatePath("/plan/exercices", "layout"); };
+
+/** Bouton « Mettre à jour le catalogue » : synchro complète, puis rattachement des noms dont la correspondance est exacte. */
+export async function updateExerciseCatalog(): Promise<{ ok: true; result: CatalogSyncResult } | { ok: false; error: string }> {
+  const userId = await uid();
+  try { const result = await syncCatalogAndHistory(userId); exercisePaths(); return { ok: true, result }; }
+  catch (e) { console.error("[exercises] mise à jour du catalogue", e); return { ok: false, error: "Mise à jour impossible, réessaie dans un instant." }; }
+}
+
+export async function linkExerciseNameAction(key: string, exerciseId: string): Promise<Res> {
+  const userId = await uid();
+  if (!key || !(await canUseExercise(userId, exerciseId))) return { ok: false, error: "Exercice introuvable." };
+  if (!(await linkExerciseName(userId, key, exerciseId))) return { ok: false, error: "Aucune séance ne porte ce nom." };
+  exercisePaths();
+  return { ok: true };
+}
+
+export async function createCustomExerciseAction(key: string, o: { name: string; equipment: string; loadType: string }): Promise<Res> {
+  const userId = await uid(), name = String(o.name ?? "").trim().slice(0, 80);
+  if (!name) return { ok: false, error: "Donne un nom à l'exercice." };
+  if (!(o.equipment in EQUIPMENT_LABELS) || !(o.loadType in LOAD_TYPE_LABELS)) return { ok: false, error: "Choisis le matériel et le type de charge." };
+  const ex = await createCustomExercise(userId, key, { name, equipment: o.equipment as Equipment, loadType: o.loadType as LoadType });
+  if (!ex) return { ok: false, error: "Aucune séance ne porte ce nom." };
+  exercisePaths();
+  return { ok: true };
 }

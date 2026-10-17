@@ -21,6 +21,14 @@ function distance(a: string, b: string): number {
   return d[b.length];
 }
 
+/** Faute de frappe tolérée entre une clé tapée et une clé connue (entière ou son début) : 1 lettre dès 4, 2 dès 8. Renvoie l'écart, ou null. */
+export function typoDistance(q: string, key: string): number | null {
+  const tol = q.length >= 8 ? 2 : q.length >= 4 ? 1 : 0;
+  if (!tol) return null;
+  const d = Math.min(distance(q, key), distance(q, key.slice(0, q.length)));
+  return d <= tol ? d : null;
+}
+
 /** Exercices existants proches de ce qui est tapé : exact, puis début, puis contenu, puis faute de frappe ; à égalité, le plus fréquent. */
 export function suggestExercises(typed: string, all: ExerciseHistory[], max = 6): ExerciseHistory[] {
   const q = exerciseKey(typed);
@@ -29,8 +37,7 @@ export function suggestExercises(typed: string, all: ExerciseHistory[], max = 6)
     if (h.key === q) return 0;
     if (h.key.startsWith(q)) return 1;
     if (h.key.includes(q)) return 2;
-    const tol = q.length >= 8 ? 2 : q.length >= 4 ? 1 : 0;
-    return tol && (distance(q, h.key) <= tol || distance(q, h.key.slice(0, q.length)) <= tol) ? 3 : -1;
+    return typoDistance(q, h.key) != null ? 3 : -1;
   };
   return all.map((h) => ({ h, r: rank(h) })).filter((x) => x.r >= 0)
     .sort((a, b) => a.r - b.r || b.h.count - a.h.count).slice(0, max).map((x) => x.h);

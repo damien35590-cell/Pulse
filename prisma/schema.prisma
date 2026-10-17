@@ -473,6 +473,7 @@ enum Equipment {
   PULLUP_BAR
   RINGS
   BENCH
+  ROMAN_CHAIR // chaise romaine : dips, relevés de jambes, extensions lombaires
   OTHER
 }
 enum LoadType {
