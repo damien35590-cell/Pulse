@@ -10,7 +10,8 @@ import { buildPlan, PLAN_GOALS, type PlanSport } from "@/lib/plan";
 import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
-import { createRunProgram, finishIfDone, saveVmaMetric } from "@/lib/data/training";
+import { createRunProgram, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
+import { revokeLostBadges } from "@/lib/data/badges";
 import { recomputeRecords } from "@/lib/pipeline/post-import";
 import { canUseExercise, createCustomExercise, linkExerciseName, syncCatalogAndHistory, type CatalogSyncResult } from "@/lib/data/exercises-catalog";
 import { EQUIPMENT_LABELS, LOAD_TYPE_LABELS } from "@/lib/training/catalog/exercises";
@@ -377,16 +378,23 @@ export async function createCustomExerciseAction(key: string, o: { name: string;
 }
 
 // ───────── Suppression d'une activité ─────────
-/** Supprime une de mes activités (séries, trace, photos suivent) ; la séance de programme qu'elle validait redevient à faire et ses records sont recalculés. */
+/** Supprime une de mes activités (séries, trace, photos suivent) : la séance qu'elle validait redevient à faire (et son programme reprend s'il était terminé), records recalculés, paliers de badges perdus retirés. */
 export async function deleteActivity(id: string): Promise<Res> {
   const userId = await uid();
   if (!(await prisma.activity.findFirst({ where: { id, userId }, select: { id: true } }))) return { ok: false, error: "Activité introuvable." };
-  const held = await prisma.personalRecord.findMany({ where: { userId, activityId: id }, select: { kind: true, type: true } });
+  const [held, session, user] = await Promise.all([
+    prisma.personalRecord.findMany({ where: { userId, activityId: id }, select: { kind: true, type: true } }),
+    prisma.plannedSession.findFirst({ where: { userId, completedActivityId: id, status: "COMPLETED" }, select: { programId: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } }),
+  ]);
   await prisma.$transaction([
     prisma.plannedSession.updateMany({ where: { userId, completedActivityId: id, status: "COMPLETED" }, data: { status: "PLANNED", completedAt: null, complianceScore: null } }),
     prisma.activity.delete({ where: { id } }),
   ]);
+  // Records d'abord : le badge « 5 km » s'appuie sur le record recalculé.
   await recomputeRecords(userId, held).catch((e) => console.error("[activities] recalcul des records", e));
+  await revokeLostBadges(userId, user?.timezone ?? "Europe/Paris").catch((e) => console.error("[activities] badges", e));
+  if (session) await reopenIfNeeded(session.programId).catch((e) => console.error("[activities] programme", e));
   for (const p of ["/", "/activities", "/plan", "/analysis", "/fitness", "/goals", "/events", "/gear", "/plan/exercices"]) revalidatePath(p, p === "/plan/exercices" ? "layout" : "page");
   return { ok: true };
 }

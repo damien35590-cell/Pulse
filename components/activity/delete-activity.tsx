@@ -25,7 +25,7 @@ export function DeleteActivity({ id }: { id: string }) {
   return (
     <div role="alertdialog" aria-labelledby="del-title" className="space-y-3 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
       <p id="del-title" className="font-semibold">Supprimer définitivement cette activité ?</p>
-      <p className="text-sm text-ink-soft">Ses séries, sa trace et ses photos seront effacées. Tes records seront recalculés sans elle. C’est irréversible.</p>
+      <p className="text-sm text-ink-soft">Ses séries, sa trace et ses photos seront effacées. Tes records et tes badges seront recalculés sans elle. C’est irréversible.</p>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" disabled={pending} onClick={() => setConfirming(false)} className={`${btn} border border-line bg-surface`}>Annuler</button>
         <button type="button" disabled={pending} onClick={go} className={`${btn} bg-red-600 text-white`}>{pending ? "Suppression…" : "Supprimer"}</button>

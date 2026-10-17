@@ -23,9 +23,19 @@ export async function loadBadgeStats(userId: string, tz: string) {
  * Enregistre dans UserBadge chaque palier atteint (identifiant « <badge>:<palier> ») pour garder sa date d'obtention.
  * L'affichage reste calculé à la volée par lib/badges.ts ; cette table ne sert que d'historique. Renvoie le nombre de nouveaux paliers.
  */
-export async function awardBadges(userId: string, tz: string) {
+async function reachedTiers(userId: string, tz: string) {
   const { stats } = await loadBadgeStats(userId, tz);
-  const reached = evaluateBadges(stats).flatMap((b) => Array.from({ length: b.tier }, (_, i) => `${b.id}:${i + 1}`));
+  return evaluateBadges(stats).flatMap((b) => Array.from({ length: b.tier }, (_, i) => `${b.id}:${i + 1}`));
+}
+
+/** Après la suppression d'une activité : retire de l'historique les paliers qui ne sont plus atteints. Renvoie le nombre retiré. */
+export async function revokeLostBadges(userId: string, tz: string) {
+  const reached = await reachedTiers(userId, tz);
+  return (await prisma.userBadge.deleteMany({ where: { userId, badgeId: { notIn: reached } } })).count;
+}
+
+export async function awardBadges(userId: string, tz: string) {
+  const reached = await reachedTiers(userId, tz);
   if (!reached.length) return 0;
   await prisma.badge.createMany({
     data: BADGES.flatMap((b) => b.tiers.map((t, i) => ({ id: `${b.id}:${i + 1}`, name: `${b.name} (${TIER_NAMES[i]})`, description: `${b.desc} Palier : ${t} ${b.unit}.`, icon: b.icon }))),

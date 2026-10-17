@@ -82,7 +82,16 @@ export async function finishIfDone(programId: string) {
   return true;
 }
 
-const compliance = (actualS: number, plannedS: number | null) => (plannedS ? Math.min(100, Math.round((actualS / plannedS) * 100)) : null);
+/** Inverse de finishIfDone : une séance redevient à faire (activité supprimée) → le programme terminé reprend, sauf si un autre programme du même sport l'a remplacé. */
+export async function reopenIfNeeded(programId: string) {
+  const p = await prisma.program.findUnique({ where: { id: programId }, select: { userId: true, sport: true, status: true } });
+  if (p?.status !== "COMPLETED" || !(await nextPlanned(programId))) return false;
+  if (await prisma.program.count({ where: { userId: p.userId, sport: p.sport, status: { in: ["ACTIVE", "PAUSED"] }, id: { not: programId } } })) return false;
+  await prisma.program.update({ where: { id: programId }, data: { status: "ACTIVE", completedAt: null } });
+  return true;
+}
+
+const compliance =(actualS: number, plannedS: number | null) => (plannedS ? Math.min(100, Math.round((actualS / plannedS) * 100)) : null);
 
 /**
  * Liaison automatique après l'import d'une sortie RUN : rattachée à la prochaine séance du programme RUN actif.
