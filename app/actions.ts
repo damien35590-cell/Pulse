@@ -8,6 +8,7 @@ import { AGE_BANDS } from "@/lib/bench";
 import { METRICS, PERIODS } from "@/lib/goals";
 import { buildPlan, PLAN_GOALS, type PlanSport } from "@/lib/plan";
 import { importRaceFromUrl } from "@/lib/races/import";
+import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
 
 const MY = ["RUN", "RIDE", "HIKE", "WORKOUT"];
@@ -136,6 +137,33 @@ export async function saveRaceResult(id: string, r: { resultTimeS?: number; rank
   await prisma.raceEvent.update({ where: { id }, data: { ...data, ...(e.status === "REGISTERED" && data.resultTimeS ? { status: "COMPLETED" as const } : {}) } });
   racePaths(id);
   return { ok: true };
+}
+
+/** Objectif de temps saisi depuis la section « Préparation ». */
+export async function setRaceGoalTime(id: string, goalTimeS: number): Promise<{ ok: boolean }> {
+  const userId = await uid();
+  const v = posInt(goalTimeS, 7 * 86400);
+  if (!v) return { ok: false };
+  const res = await prisma.raceEvent.updateMany({ where: { id, userId }, data: { goalTimeS: v } });
+  racePaths(id);
+  return { ok: res.count > 0 };
+}
+
+/**
+ * Objectif hebdo lié à la course : distance par semaine dans le sport de la course (cible de construction).
+ * Réutilise le modèle Goal : met à jour l'objectif hebdo de distance existant pour ce sport plutôt que d'en créer un second.
+ */
+export async function createRaceGoal(id: string): Promise<{ ok: true; km: number; updated: boolean } | { ok: false; error: string }> {
+  const userId = await uid();
+  const e = await prisma.raceEvent.findFirst({ where: { id, userId }, select: { sport: true, targetDistance: true } });
+  const km = weeklyGoalKm(e?.targetDistance ?? null);
+  if (!e || !km) return { ok: false, error: "Renseigne d’abord la distance de la course." };
+  const type = (e.sport === "WALK" ? "HIKE" : e.sport) as ActivityType;
+  const prev = await prisma.goal.findFirst({ where: { userId, active: true, metric: "DISTANCE", period: "WEEK", type } });
+  if (prev) await prisma.goal.update({ where: { id: prev.id }, data: { target: km * 1000 } });
+  else await prisma.goal.create({ data: { userId, metric: "DISTANCE", period: "WEEK", type, target: km * 1000 } });
+  revalidatePath("/goals"); racePaths(id);
+  return { ok: true, km, updated: !!prev };
 }
 
 // ───────── Matériel ─────────

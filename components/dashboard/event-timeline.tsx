@@ -3,31 +3,19 @@ import { ChevronRight, Plus, Trophy } from "lucide-react";
 import { SPORTS } from "@/lib/sports";
 import { fmtRaceDay, fmtRaceDistance } from "@/lib/races/format";
 import { cn } from "@/lib/utils";
+import type { PrepState } from "@/lib/races/prep";
 
 export type EventView = {
   id: string; name: string; date: Date; startTime: string | null; sport: string; targetDistance: number | null; targetElevation: number | null;
-  days: number; label: string; short: string; longestKm: number; dPlus: number; distancePct: number | null; elevationPct: number | null;
+  days: number; label: string; short: string; prep: string; state: PrepState;
 };
 
 const soonText = (d: number) => (d === 0 ? "C’est aujourd’hui 🔥" : d === 1 ? "C’est demain 🔥" : `C’est dans ${d} jours 🔥`);
-
-/** Préparation sur 28 jours, en barre fine (la carte reste compacte). */
-function Bar({ pct, label, hot }: { pct: number; label: string; hot: boolean }) {
-  const done = pct >= 100;
-  return (
-    <div className="min-w-0 flex-1">
-      <div className={cn("h-1.5 overflow-hidden rounded-full", hot ? "bg-white/25" : "bg-surface-2")}>
-        <div className={cn("h-full rounded-full", done ? "bg-[#22C55E]" : hot ? "bg-white" : "bg-brand")} style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-      <p className={cn("mt-1 truncate text-[11px]", hot ? "text-white/80" : "text-ink-soft")}>{label}</p>
-    </div>
-  );
-}
+const DOT: Record<PrepState, string> = { "En avance": "bg-[#22C55E]", "Dans le rythme": "bg-brand", "À relancer": "bg-amber-500" };
 
 export function EventTimeline({ events, pendingResult }: { events: EventView[]; pendingResult: { id: string; name: string } | null }) {
   const [next, ...others] = events;
   const hot = !!next && next.days <= 7;
-  const km = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
   return (
     <section aria-label="Courses" className="space-y-2.5">
       <div className="flex items-baseline justify-between"><h2 className="font-display text-xl font-bold">Prochaine course</h2><Link href="/events" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Toutes<ChevronRight className="h-4 w-4" aria-hidden /></Link></div>
@@ -57,12 +45,9 @@ export function EventTimeline({ events, pendingResult }: { events: EventView[]; 
             </div>
             <p className={cn("shrink-0 font-display text-4xl font-bold leading-none", !hot && "text-brand")}>{next.days === 0 ? "Jour J" : `J-${next.days}`}</p>
           </div>
-          {(next.distancePct != null || next.elevationPct != null) && (
-            <div className="mt-3 flex gap-3">
-              {next.distancePct != null && <Bar hot={hot} pct={next.distancePct} label={`Plus longue sortie 28 j : ${km(next.longestKm)} / ${km(next.targetDistance!)} km`} />}
-              {next.elevationPct != null && <Bar hot={hot} pct={next.elevationPct} label={`D+ 28 j : ${Math.round(next.dPlus)} / ${Math.round(next.targetElevation!)} m`} />}
-            </div>
-          )}
+          <p className={cn("mt-3 flex items-center gap-2 truncate text-[13px] font-semibold", hot ? "text-white/90" : "text-ink-soft")}>
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", hot ? "bg-white" : DOT[next.state])} aria-hidden />{next.prep}
+          </p>
         </Link>
       )}
 

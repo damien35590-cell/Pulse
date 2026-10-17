@@ -3,7 +3,7 @@ import { dayKey, weekKeys } from "@/lib/dates";
 import { weeklyInsights } from "@/lib/insights/engine";
 import { fitnessSeries } from "@/lib/fitness";
 import { level, xpOf } from "@/lib/xp";
-import { readiness } from "@/lib/events";
+import { prepLine, racePrep } from "@/lib/races/prep";
 import { getCountdown, needsResult } from "@/lib/races/time";
 import type { Act } from "@/lib/insights/types";
 
@@ -52,7 +52,10 @@ export async function getDashboard(userId: string) {
     .map((g) => ({ ...g, km: sum(week.filter((a) => !g.sport || a.type === g.sport), (a) => a.distanceM) / 1000 }));
   // Courses : compte à rebours à l'heure de Paris (heure de départ comprise), une course reste « à venir » tout le jour J.
   const events = eventsRaw.map((e) => ({ e, c: getCountdown(e, now) })).filter(({ c }) => !c.isPast)
-    .map(({ e, c }) => ({ id: e.id, name: e.name, date: e.date, startTime: e.startTime, sport: e.sport as string, targetDistance: e.targetDistance, targetElevation: e.targetElevation, days: c.days, label: c.label, short: c.short, ...readiness(e, rows, now) }));
+    .map(({ e, c }) => {
+      const p = racePrep(e, rows, now, tz); // phase + état de préparation (lib/races/prep.ts)
+      return { id: e.id, name: e.name, date: e.date, startTime: e.startTime, sport: e.sport as string, targetDistance: e.targetDistance, targetElevation: e.targetElevation, days: c.days, label: c.label, short: c.short, prep: prepLine(p), state: p.state };
+    });
   const pendingResult = pendingRaw.find((e) => needsResult(e, now)) ?? null;
   return {
     fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },

@@ -10,6 +10,9 @@ import { EditRace } from "@/components/events/edit-race";
 import { RaceCountdown } from "@/components/events/race-countdown";
 import { Chip } from "@/components/events/next-race-hero";
 import { DeleteRace, RaceResultForm, RaceStatusPicker } from "@/components/events/race-actions";
+import { RacePrepSection } from "@/components/events/race-prep";
+import { prepSports, racePrep, weeklyGoalKm } from "@/lib/races/prep";
+import type { ActivityType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Course" };
@@ -20,6 +23,15 @@ export default async function RacePage({ params }: { params: { id: string } }) {
   const e = await prisma.raceEvent.findFirst({ where: { id: params.id, userId: s.user.id } });
   if (!e) notFound();
   const now = new Date(), c = getCountdown(e, now);
+  // Préparation : course à venir dans un sport d'endurance, calculée sur les 100 derniers jours d'activités du même sport.
+  const withPrep = !c.isPast && e.status === "REGISTERED" && ["RUN", "RIDE", "HIKE", "WALK"].includes(e.sport);
+  const goalType = (e.sport === "WALK" ? "HIKE" : e.sport) as ActivityType, goalKm = weeklyGoalKm(e.targetDistance);
+  const [user, acts, weekGoal] = withPrep ? await Promise.all([
+    prisma.user.findUnique({ where: { id: s.user.id }, select: { timezone: true } }),
+    prisma.activity.findMany({ where: { userId: s.user.id, type: { in: prepSports(e.sport) as ActivityType[] }, startedAt: { gte: new Date(+now - 100 * 864e5) } }, select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true } }),
+    prisma.goal.findFirst({ where: { userId: s.user.id, active: true, metric: "DISTANCE", period: "WEEK", type: goalType }, select: { target: true } }),
+  ]) : [null, [], null];
+  const prep = withPrep ? racePrep(e, acts, now, user?.timezone ?? "Europe/Paris") : null;
   const pace = e.goalTimeS && e.targetDistance ? fmtGoalPace(e.goalTimeS, e.targetDistance, e.sport) : null;
   const platform = PLATFORM_LABEL[e.platform];
   const showResult = c.isPast || e.status === "COMPLETED" || e.status === "DNF";
@@ -59,6 +71,11 @@ export default async function RacePage({ params }: { params: { id: string } }) {
         <h2 className="px-1 text-xs font-bold uppercase tracking-wider text-ink-soft">Statut</h2>
         <RaceStatusPicker id={e.id} status={e.status} />
       </section>
+
+      {prep && (
+        <RacePrepSection id={e.id} prep={prep} distanceKm={e.targetDistance} hasGoalTime={!!e.goalTimeS}
+          goal={goalKm ? { km: goalKm, sportLabel: (SPORTS[goalType]?.label ?? "").toLowerCase(), active: weekGoal?.target === goalKm * 1000 } : null} />
+      )}
 
       {showResult && (
         <section className="rounded-xl border border-line bg-surface p-4">
