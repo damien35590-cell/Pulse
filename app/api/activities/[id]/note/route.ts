@@ -25,7 +25,12 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    let { feeling, feel, notes, comment, type, rpe } = body;
+    let { feeling, feel, notes, comment, type, rpe, title } = body;
+    // Renommage : texte non vide, 120 caractères au plus.
+    if (title !== undefined) {
+      title = typeof title === "string" ? title.trim().slice(0, 120) : "";
+      if (!title) return NextResponse.json({ error: "invalid_title" }, { status: 400 });
+    }
 
     const current = await prisma.activity.findFirst({ where: { id, userId: uid }, select: { type: true } });
     if (!current) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -47,6 +52,7 @@ export async function PATCH(
       where: { id },
       data: {
         type: type as ActivityType | undefined,
+        title: title as string | undefined,
         feeling: feeling !== undefined ? (feeling as Feeling | null) : undefined,
         rpe: rpe as number | null | undefined,
         notes: finalNotes !== undefined ? (finalNotes === null ? null : String(finalNotes)) : undefined,
@@ -54,6 +60,7 @@ export async function PATCH(
       select: {
         id: true,
         type: true,
+        title: true,
         feeling: true,
         notes: true,
         rpe: true,

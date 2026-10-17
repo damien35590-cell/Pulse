@@ -1,51 +1,81 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus, Trophy } from "lucide-react";
 import { SPORTS } from "@/lib/sports";
+import { fmtRaceDay, fmtRaceDistance } from "@/lib/races/format";
 import { cn } from "@/lib/utils";
 
-export type EventView = { id: string; name: string; date: Date; sport: string; targetDistance: number | null; targetElevation: number | null; days: number; longestKm: number; dPlus: number; distancePct: number | null; elevationPct: number | null };
+export type EventView = {
+  id: string; name: string; date: Date; startTime: string | null; sport: string; targetDistance: number | null; targetElevation: number | null;
+  days: number; label: string; short: string; longestKm: number; dPlus: number; distancePct: number | null; elevationPct: number | null;
+};
 
-function Ring({ pct, title, sub }: { pct: number | null; title: string; sub: string }) {
-  const r = 30, c = 2 * Math.PI * r, real = pct ?? 0, over = real >= 100;
+const soonText = (d: number) => (d === 0 ? "C’est aujourd’hui 🔥" : d === 1 ? "C’est demain 🔥" : `C’est dans ${d} jours 🔥`);
+
+/** Préparation sur 28 jours, en barre fine (la carte reste compacte). */
+function Bar({ pct, label, hot }: { pct: number; label: string; hot: boolean }) {
+  const done = pct >= 100;
   return (
-    <div className="flex flex-1 flex-col items-center text-center">
-      <div className="relative h-[76px] w-[76px]">
-        <svg viewBox="0 0 76 76" className="-rotate-90" aria-hidden><circle cx="38" cy="38" r={r} fill="none" stroke="rgb(var(--surface-2))" strokeWidth="8" /><circle cx="38" cy="38" r={r} fill="none" stroke={over ? "#22C55E" : "rgb(var(--brand))"} strokeWidth="8" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(100, real) / 100)} /></svg>
-        <span className="absolute inset-0 grid place-items-center font-display text-lg font-bold tabular-nums">{pct == null ? "–" : `${Math.round(real)} %`}</span>
+    <div className="min-w-0 flex-1">
+      <div className={cn("h-1.5 overflow-hidden rounded-full", hot ? "bg-white/25" : "bg-surface-2")}>
+        <div className={cn("h-full rounded-full", done ? "bg-[#22C55E]" : hot ? "bg-white" : "bg-brand")} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
-      <p className="mt-1 text-[13px] font-semibold leading-tight">{title}</p>
-      <p className="text-[11px] leading-tight text-ink-soft">{sub}</p>
+      <p className={cn("mt-1 truncate text-[11px]", hot ? "text-white/80" : "text-ink-soft")}>{label}</p>
     </div>
   );
 }
-const fmtDay = (d: Date) => d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
-const jx = (n: number) => (n === 0 ? "Jour J" : `J-${n}`);
 
-export function EventTimeline({ events }: { events: EventView[] }) {
+export function EventTimeline({ events, pendingResult }: { events: EventView[]; pendingResult: { id: string; name: string } | null }) {
   const [next, ...others] = events;
+  const hot = !!next && next.days <= 7;
+  const km = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
   return (
-    <section aria-label="Prochaines échéances">
-      <div className="mb-3 flex items-baseline justify-between"><h2 className="font-display text-xl font-bold">Prochaines échéances</h2><Link href="/events" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Gérer<ChevronRight className="h-4 w-4" aria-hidden /></Link></div>
+    <section aria-label="Courses" className="space-y-2.5">
+      <div className="flex items-baseline justify-between"><h2 className="font-display text-xl font-bold">Prochaine course</h2><Link href="/events" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Toutes<ChevronRight className="h-4 w-4" aria-hidden /></Link></div>
+
+      {pendingResult && (
+        <Link href={`/events/${pendingResult.id}`} className="flex items-center gap-3 rounded-xl border border-brand/40 bg-brand/5 p-3 active:scale-[.99]">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand"><Trophy className="h-[18px] w-[18px]" aria-hidden /></span>
+          <span className="min-w-0 flex-1 text-sm">Comment s’est passé <b>{pendingResult.name}</b> ? <span className="font-semibold text-brand">Ajoute ton résultat</span></span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-brand" aria-hidden />
+        </Link>
+      )}
+
       {!next ? (
-        <Link href="/events" className="block rounded-xl border border-dashed border-line bg-surface p-4 text-ink-soft">Aucune échéance. <b className="text-brand">Ajoutez une course</b> pour suivre votre préparation.</Link>
+        <Link href="/events?import=1" className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-surface p-4 active:scale-[.99]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand/10 text-brand"><Plus className="h-5 w-5" aria-hidden /></span>
+          <span className="min-w-0 flex-1"><b className="block">Ajoute ta prochaine course</b><span className="text-sm text-ink-soft">Colle un lien NextRun ou Klikego</span></span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden />
+        </Link>
       ) : (
-        <div className="space-y-2.5">
-          <article className="rounded-xl border border-line bg-surface p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><p className="truncate text-lg font-bold leading-tight">{next.name}</p><p className="text-sm capitalize text-ink-soft">{fmtDay(next.date)}</p><p className="text-sm text-ink-soft">{SPORTS[next.sport]?.label}{next.targetDistance ? `, ${next.targetDistance} km` : ""}{next.targetElevation ? `, ${next.targetElevation} m D+` : ""}</p></div>
-              <p className="font-display text-4xl font-bold leading-none text-brand">{jx(next.days)}</p>
+        <Link href={`/events/${next.id}`} className={cn("block rounded-xl p-4 transition active:scale-[.99]", hot ? "bg-brand text-white shadow-md shadow-brand/20" : "border border-line bg-surface hover:border-brand/40")}>
+          {hot && <p className="mb-1 text-sm font-bold">{soonText(next.days)}</p>}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold leading-tight">{next.name}</p>
+              <p className={cn("text-sm first-letter:uppercase", hot ? "text-white/85" : "text-ink-soft")}>{fmtRaceDay(next.date, false)}{next.startTime ? ` · ${next.startTime.replace(":", "h")}` : ""}</p>
+              <p className={cn("text-sm", hot ? "text-white/85" : "text-ink-soft")}>{[next.targetDistance ? fmtRaceDistance(next.targetDistance) : null, next.targetElevation ? `${Math.round(next.targetElevation)} m D+` : null, SPORTS[next.sport]?.label].filter(Boolean).join(" · ")}</p>
             </div>
-            <div className="mt-4 flex gap-3">
-              <Ring pct={next.distancePct} title="Distance" sub={next.targetDistance ? `plus longue sortie 28 j : ${next.longestKm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} / ${next.targetDistance} km` : "distance non renseignée"} />
-              <Ring pct={next.elevationPct} title="Dénivelé" sub={next.targetElevation ? `D+ cumulé 28 j : ${Math.round(next.dPlus)} / ${next.targetElevation} m` : "D+ non renseigné"} />
+            <p className={cn("shrink-0 font-display text-4xl font-bold leading-none", !hot && "text-brand")}>{next.days === 0 ? "Jour J" : `J-${next.days}`}</p>
+          </div>
+          {(next.distancePct != null || next.elevationPct != null) && (
+            <div className="mt-3 flex gap-3">
+              {next.distancePct != null && <Bar hot={hot} pct={next.distancePct} label={`Plus longue sortie 28 j : ${km(next.longestKm)} / ${km(next.targetDistance!)} km`} />}
+              {next.elevationPct != null && <Bar hot={hot} pct={next.elevationPct} label={`D+ 28 j : ${Math.round(next.dPlus)} / ${Math.round(next.targetElevation!)} m`} />}
             </div>
-          </article>
-          {others.length > 0 && (
-            <ul className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4">
-              {others.map((e) => <li key={e.id} className="w-40 shrink-0"><Link href="/events" className={cn("block h-full rounded-xl border border-line bg-surface p-3 transition hover:border-brand/40 active:scale-[.98] active:bg-surface-2")}><p className="font-display text-2xl font-bold text-brand">{jx(e.days)}</p><p className="truncate font-semibold">{e.name}</p><p className="text-xs capitalize text-ink-soft">{fmtDay(e.date)}</p></Link></li>)}
-            </ul>
           )}
-        </div>
+        </Link>
+      )}
+
+      {others.length > 0 && (
+        <ul className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4">
+          {others.map((e) => (
+            <li key={e.id} className="w-40 shrink-0">
+              <Link href={`/events/${e.id}`} className="block h-full rounded-xl border border-line bg-surface p-3 transition hover:border-brand/40 active:scale-[.98] active:bg-surface-2">
+                <p className="font-display text-2xl font-bold text-brand">{e.short}</p><p className="truncate font-semibold">{e.name}</p><p className="text-xs first-letter:uppercase text-ink-soft">{fmtRaceDay(e.date, false)}</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

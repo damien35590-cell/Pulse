@@ -3,7 +3,8 @@ import { dayKey, weekKeys } from "@/lib/dates";
 import { weeklyInsights } from "@/lib/insights/engine";
 import { fitnessSeries } from "@/lib/fitness";
 import { level, xpOf } from "@/lib/xp";
-import { daysUntil, readiness } from "@/lib/events";
+import { readiness } from "@/lib/events";
+import { getCountdown, needsResult } from "@/lib/races/time";
 import type { Act } from "@/lib/insights/types";
 
 const sum = <T,>(a: T[], f: (x: T) => number) => a.reduce((s, x) => s + f(x), 0);
@@ -12,7 +13,7 @@ export async function getDashboard(userId: string) {
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } });
   const tz = user?.timezone ?? "Europe/Paris";
-  const [rows, goalRows, goalCount, allXp, fitActs, eventsRaw] = await Promise.all([
+  const [rows, goalRows, goalCount, allXp, fitActs, eventsRaw, pendingRaw] = await Promise.all([
     prisma.activity.findMany({
       where: { userId, startedAt: { gte: new Date(+now - 100 * 864e5) } }, orderBy: { startedAt: "desc" },
       select: { id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, calories: true, avgHr: true, avgPower: true, polyline: true, startLat: true, startLng: true, weather: true, exercises: { select: { sets: true, reps: true, loadKg: true } } },
@@ -21,7 +22,8 @@ export async function getDashboard(userId: string) {
     prisma.goal.count({ where: { userId, active: true } }),
     prisma.activity.findMany({ where: { userId }, select: { distanceM: true, elevationGainM: true, movingTimeS: true, type: true } }),
     prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true } }),
-    prisma.raceEvent.findMany({ where: { userId, date: { gte: new Date(+now - 864e5) } }, orderBy: { date: "asc" }, take: 5 }),
+    prisma.raceEvent.findMany({ where: { userId, status: { not: "DNS" }, date: { gte: new Date(+now - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 6 }),
+    prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { lt: new Date(+now + 864e5) } }, orderBy: { date: "desc" }, take: 3, select: { id: true, name: true, date: true, startTime: true, status: true } }),
   ]);
 
   const todayKey = dayKey(now, tz), keys = weekKeys(now, tz), keySet = new Set(keys);
@@ -48,9 +50,12 @@ export async function getDashboard(userId: string) {
   // Un objectif par sport (ou « tous sports ») : la distance de la semaine ne compte que le sport concerné. Sans objectif : 30 km, tous sports.
   const goals = (goalRows.length ? goalRows.map((g) => ({ id: g.id, sport: g.type as string | null, goalKm: g.target / 1000 })) : [{ id: "default", sport: null as string | null, goalKm: 30 }])
     .map((g) => ({ ...g, km: sum(week.filter((a) => !g.sport || a.type === g.sport), (a) => a.distanceM) / 1000 }));
-  const events = eventsRaw.map((e) => ({ id: e.id, name: e.name, date: e.date, sport: e.sport as string, targetDistance: e.targetDistance, targetElevation: e.targetElevation, days: daysUntil(e.date, now, tz), ...readiness(e, rows, now) })).filter((e) => e.days >= 0);
+  // Courses : compte à rebours à l'heure de Paris (heure de départ comprise), une course reste « à venir » tout le jour J.
+  const events = eventsRaw.map((e) => ({ e, c: getCountdown(e, now) })).filter(({ c }) => !c.isPast)
+    .map(({ e, c }) => ({ id: e.id, name: e.name, date: e.date, startTime: e.startTime, sport: e.sport as string, targetDistance: e.targetDistance, targetElevation: e.targetElevation, days: c.days, label: c.label, short: c.short, ...readiness(e, rows, now) }));
+  const pendingResult = pendingRaw.find((e) => needsResult(e, now)) ?? null;
   return {
-    fit, xp, weekXp, goalCount, events,
+    fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },
     km: sum(week, (a) => a.distanceM) / 1000, days, streak, insights,
     timeS: sum(week, (a) => a.movingTimeS), elevation: sum(week, (a) => a.elevationGainM), kcal: week.some((a) => a.calories != null) ? sum(week, (a) => a.calories ?? 0) : null,
     goals, recent: rows.slice(0, 5), empty: rows.length === 0,

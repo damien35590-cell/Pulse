@@ -2,41 +2,57 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { addEvent, deleteEvent } from "@/app/actions";
-import { SPORTS, MY_SPORTS } from "@/lib/sports";
+import { getCountdown } from "@/lib/races/time";
+import { toRaceView } from "@/lib/races/view";
+import { ImportRace } from "@/components/events/import-race";
+import { NextRaceHero } from "@/components/events/next-race-hero";
+import { RaceList } from "@/components/events/race-list";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Échéances" };
-const sel = "mt-1 min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-base";
+export const metadata = { title: "Courses" };
 
-export default async function EventsPage() {
+/** Ligne d'arrivée stylisée pour l'état vide. */
+function FinishIllustration() {
+  return (
+    <svg viewBox="0 0 160 96" className="mx-auto h-24 w-40" aria-hidden>
+      <path d="M8 84 Q60 70 152 84" fill="none" stroke="rgb(var(--line))" strokeWidth="3" strokeLinecap="round" />
+      <path d="M24 84 C40 60 54 66 70 48 S104 26 120 30" fill="none" stroke="rgb(var(--brand))" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" />
+      <line x1="120" y1="84" x2="120" y2="14" stroke="rgb(var(--ink-soft))" strokeWidth="3" strokeLinecap="round" />
+      {[0, 1, 2, 3].map((i) => [0, 1].map((j) => <rect key={`${i}${j}`} x={122 + i * 7} y={14 + j * 7} width="7" height="7" fill={(i + j) % 2 ? "rgb(var(--surface))" : "rgb(var(--brand))"} />))}
+      <rect x="122" y="14" width="28" height="14" fill="none" stroke="rgb(var(--brand))" strokeWidth="1.5" />
+      <circle cx="24" cy="84" r="5" fill="rgb(var(--brand))" />
+    </svg>
+  );
+}
+
+export default async function RacesPage({ searchParams }: { searchParams: { import?: string } }) {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const events = await prisma.raceEvent.findMany({ where: { userId: s.user.id }, orderBy: { date: "asc" } });
+  const now = new Date();
+  const races = (await prisma.raceEvent.findMany({ where: { userId: s.user.id }, orderBy: [{ date: "asc" }, { startTime: "asc" }] })).map(toRaceView);
+  // La « prochaine » : première course à venir où l'on est encore inscrit.
+  const next = races.find((r) => r.status === "REGISTERED" && !getCountdown(r, now).isPast);
+  const autoOpen = searchParams.import === "1";
+
   return (
     <div className="space-y-5">
       <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
-      <h1 className="font-display text-3xl font-bold leading-none">Échéances</h1>
-      {events.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-ink-soft">Aucune échéance. Ajoutez une course : l’accueil affichera le compte à rebours et votre préparation.</p>}
-      <ul className="space-y-2.5">
-        {events.map((e) => (
-          <li key={e.id} className="flex items-start justify-between gap-2 rounded-xl border border-line bg-surface p-4">
-            <div><p className="font-bold">{e.name}</p><p className="text-sm text-ink-soft">{e.date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}, {SPORTS[e.sport]?.label}{e.targetDistance ? `, ${e.targetDistance} km` : ""}{e.targetElevation ? `, ${e.targetElevation} m D+` : ""}</p></div>
-            <form action={deleteEvent.bind(null, e.id)}><button className="min-h-11 px-2 text-sm text-ink-soft">Retirer</button></form>
-          </li>
-        ))}
-      </ul>
-      <form action={addEvent} className="rounded-xl border border-line bg-surface p-4">
-        <h2 className="mb-2 font-display text-lg font-bold">Nouvelle échéance</h2>
-        <div className="grid grid-cols-2 gap-3 text-sm text-ink-soft">
-          <label className="col-span-2">Nom<input name="name" required className={sel} placeholder="Ex. Trail des Falaises" /></label>
-          <label>Date<input name="date" type="date" required className={sel} /></label>
-          <label>Sport<select name="sport" className={sel}>{MY_SPORTS.map((k) => <option key={k} value={k}>{SPORTS[k].label}</option>)}</select></label>
-          <label>Distance (km)<input name="distance" inputMode="decimal" className={sel} placeholder="Facultatif" /></label>
-          <label>Dénivelé + (m)<input name="elevation" inputMode="numeric" className={sel} placeholder="Facultatif" /></label>
-        </div>
-        <button className="mt-4 min-h-14 w-full rounded-xl bg-brand font-display text-xl font-semibold text-brand-ink">Ajouter l’échéance</button>
-      </form>
+      <h1 className="font-display text-3xl font-bold leading-none">Courses</h1>
+
+      {races.length === 0 ? (
+        <section className="rounded-2xl border border-line bg-surface p-6 text-center">
+          <FinishIllustration />
+          <h2 className="mt-3 font-display text-xl font-bold">Pas encore de course au programme</h2>
+          <p className="mt-1 text-sm text-ink-soft">Colle le lien NextRun ou Klikego de ta prochaine course : Pulse affichera le compte à rebours et ta préparation.</p>
+          <div className="mt-5"><ImportRace label="Importer une course depuis un lien" primary autoOpen={autoOpen} /></div>
+        </section>
+      ) : (
+        <>
+          {next && <NextRaceHero race={next} now={now.toISOString()} />}
+          <ImportRace autoOpen={autoOpen} />
+          <RaceList races={races} now={now.toISOString()} />
+        </>
+      )}
     </div>
   );
 }

@@ -9,11 +9,14 @@ import { tap } from "@/lib/haptics";
 import { StoryReveal } from "@/components/record/story-reveal";
 import { defaultGear, GEAR_KINDS, selectableGear, type WearLevel } from "@/lib/gear";
 import { RpePicker } from "@/components/activity/rpe-picker";
+import { daysAgo, exerciseKey, suggestExercises, type ExerciseHistory } from "@/lib/exercises";
+import { describe, suggestGoal } from "@/lib/progression";
 
 const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
 const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
-type Ex = { id: number; name: string; sets: string; reps: string; loadKg: string; restS: string; comment: string };
-const blank = (id: number): Ex => ({ id, name: "", sets: "3", reps: "10", loadKg: "", restS: "90", comment: "" });
+type SetRow = { reps: string; load: string; done: boolean };
+type Ex = { id: number; name: string; sets: string; reps: string; loadKg: string; restS: string; comment: string; pk: string; detail: SetRow[] | null };
+const blank = (id: number): Ex => ({ id, name: "", sets: "3", reps: "10", loadKg: "", restS: "90", comment: "", pk: "", detail: null });
 const num = (v: string) => parseFloat(v.replace(",", ".")) || 0;
 const localNow = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const field = "mt-1 min-h-14 w-full rounded-xl border border-line bg-surface px-4 font-display text-2xl font-bold tabular-nums";
@@ -37,7 +40,17 @@ export default function RecordPage() {
   const worn = gear.filter((g) => gearId && (g.id === gearId || g.parentId === gearId) && g.level === "critical");
   const workout = type === "WORKOUT"; // rendu conditionnel : tout le formulaire en dépend
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
-  const upd = (id: number, k: keyof Ex, v: string) => setExs((l) => l.map((e) => (e.id === id ? { ...e, [k]: v } : e)));
+  const patch = (id: number, p: Partial<Ex>) => setExs((l) => l.map((e) => (e.id === id ? { ...e, ...p } : e)));
+  const upd = (id: number, k: keyof Ex, v: string) => patch(id, { [k]: v });
+  // Mes exercices passés (par fréquence) : autocomplétion, préremplissage et objectif du jour.
+  const [hist, setHist] = useState<ExerciseHistory[]>([]), [open, setOpen] = useState<number | null>(null);
+  useEffect(() => { if (workout && !hist.length) fetch("/api/exercises").then((r) => (r.ok ? r.json() : [])).then(setHist).catch(() => {}); }, [workout, hist.length]);
+  const found = (name: string) => hist.find((h) => h.key === exerciseKey(name));
+  /** Reprend le nom canonique et la dernière séance (séries, reps, charge, repos) ; une seule fois par exercice choisi. */
+  const choose = (id: number, h: ExerciseHistory) => { const l = h.sessions[0]; patch(id, { name: h.name, pk: h.key, detail: null, sets: String(l.sets), reps: String(l.reps), loadKg: l.loadKg == null ? "" : String(l.loadKg), restS: l.restS == null ? "" : String(l.restS) }); setOpen(null); };
+  const blurName = (x: Ex) => { setOpen(null); const h = found(x.name); if (h && h.key !== x.pk) choose(x.id, h); };
+  const toggleDetail = (x: Ex) => { tap(); patch(x.id, { detail: x.detail ? null : Array.from({ length: Math.min(30, Math.max(1, Math.round(num(x.sets)))) }, () => ({ reps: x.reps, load: x.loadKg, done: true })) }); };
+  const updRow = (x: Ex, i: number, p: Partial<SetRow>) => patch(x.id, { detail: x.detail!.map((r, j) => (j === i ? { ...r, ...p } : r)) });
   const add = () => { tap(); setExs((l) => [...l, blank(nextId)]); setNextId(nextId + 1); };
   const remove = (id: number) => { tap(); setExs((l) => (l.length > 1 ? l.filter((e) => e.id !== id) : l)); };
 
@@ -47,7 +60,7 @@ export default function RecordPage() {
     if (movingTimeS <= 0) return setErr("Indiquez la durée de la sortie.");
     let exercises: unknown[] | undefined;
     if (workout) {
-      const list = exs.filter((x) => x.name.trim()).map((x) => ({ name: x.name.trim(), sets: Math.round(num(x.sets)), reps: Math.round(num(x.reps)), loadKg: x.loadKg.trim() === "" ? null : num(x.loadKg), restS: x.restS.trim() === "" ? null : Math.round(num(x.restS)), comment: x.comment.trim() || null }));
+      const list = exs.filter((x) => x.name.trim()).map((x) => ({ name: x.name.trim(), sets: Math.round(num(x.sets)), reps: Math.round(num(x.reps)), loadKg: x.loadKg.trim() === "" ? null : num(x.loadKg), restS: x.restS.trim() === "" ? null : Math.round(num(x.restS)), comment: x.comment.trim() || null, setsDetail: x.detail?.map((r) => ({ reps: Math.round(num(r.reps)), loadKg: r.load.trim() === "" ? null : num(r.load), done: r.done })) }));
       if (!list.length || list.some((x) => x.sets < 1 || x.reps < 1)) return setErr("Ajoutez au moins un exercice avec son nom, ses séries et ses répétitions.");
       exercises = list;
     }
@@ -82,21 +95,56 @@ export default function RecordPage() {
       </div>
 
       {workout && (
+        <Link href="/record/session" onClick={() => tap(12)} className="flex min-h-14 w-full items-center justify-center rounded-xl bg-brand font-display text-lg font-semibold text-brand-ink">Mode séance plein écran</Link>
+      )}
+
+      {workout && (
         <section aria-label="Exercices" className="space-y-3">
           <h2 className="font-display text-xl font-bold">Exercices</h2>
           {exs.map((x, i) => (
             <fieldset key={x.id} className="space-y-3 rounded-xl border border-line bg-surface p-3.5">
               <legend className="sr-only">Exercice {i + 1}</legend>
               <div className="flex items-end gap-2">
-                <label className="flex-1 text-sm text-ink-soft">Exercice {i + 1}<input value={x.name} onChange={(e) => upd(x.id, "name", e.target.value)} placeholder="Ex. Développé couché, Pompes…" className="mt-1 min-h-12 w-full rounded-xl border border-line bg-bg px-3 text-base font-semibold" /></label>
+                <div className="relative flex-1">
+                  <label className="text-sm text-ink-soft">Exercice {i + 1}<input value={x.name} onChange={(e) => { upd(x.id, "name", e.target.value); setOpen(x.id); }} onFocus={() => setOpen(x.id)} onBlur={() => blurName(x)} autoComplete="off" role="combobox" aria-expanded={open === x.id} aria-autocomplete="list" placeholder="Ex. Développé couché, Pompes…" className="mt-1 min-h-12 w-full rounded-xl border border-line bg-bg px-3 text-base font-semibold" /></label>
+                  {open === x.id && (() => { const sug = suggestExercises(x.name, hist); return sug.length > 0 && (
+                    <ul role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-auto rounded-xl border border-line bg-surface shadow-lg">
+                      {sug.map((h) => <li key={h.key} role="option" aria-selected={h.key === exerciseKey(x.name)}>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { tap(); choose(x.id, h); }} className="flex min-h-12 w-full items-center justify-between gap-3 px-3 text-left">
+                          <span className="font-semibold">{h.name}</span><span className="text-xs text-ink-soft">{describe(h.sessions[0])}</span>
+                        </button></li>)}
+                    </ul>); })()}
+                </div>
                 {exs.length > 1 && <button type="button" onClick={() => remove(x.id)} aria-label={`Supprimer l’exercice ${i + 1}`} className="grid h-12 w-12 place-items-center rounded-xl bg-surface-2 text-ink-soft"><Trash2 className="h-5 w-5" aria-hidden /></button>}
               </div>
+              {(() => { const h = found(x.name); if (!h) return null; const g = suggestGoal(h.sessions), cur = `${x.sets}|${x.reps}|${x.loadKg}`; return (
+                <div className="space-y-2">
+                  <p className="text-xs text-ink-soft">Dernière fois : {describe(h.sessions[0])}, {daysAgo(h.sessions[0].date)}</p>
+                  {g && cur !== `${g.sets}|${g.reps}|${g.loadKg ?? ""}` && (
+                    <button type="button" onClick={() => { tap(); patch(x.id, { sets: String(g.sets), reps: String(g.reps), loadKg: g.loadKg == null ? "" : String(g.loadKg), detail: null }); }}
+                      className="flex min-h-12 w-full flex-col items-start justify-center rounded-xl bg-brand/10 px-3 py-1.5 text-left text-brand">
+                      <span className="text-sm font-semibold">Objectif du jour : {g.text}</span>
+                      {g.hint && <span className="text-xs">{g.hint}</span>}
+                    </button>)}
+                </div>); })()}
               <div className="grid grid-cols-2 gap-3 text-sm text-ink-soft">
                 <label>Séries<input inputMode="numeric" value={x.sets} onChange={(e) => upd(x.id, "sets", e.target.value)} className={small} /></label>
                 <label>Répétitions<input inputMode="numeric" value={x.reps} onChange={(e) => upd(x.id, "reps", e.target.value)} className={small} /></label>
                 <label>Charge (kg)<input inputMode="decimal" value={x.loadKg} onChange={(e) => upd(x.id, "loadKg", e.target.value)} placeholder="Poids de corps" className={small} /></label>
                 <label>Repos (secondes)<input inputMode="numeric" value={x.restS} onChange={(e) => upd(x.id, "restS", e.target.value)} className={small} /></label>
               </div>
+              {x.detail && (
+                <ul className="space-y-2" aria-label="Séries réalisées">
+                  {x.detail.map((r, j) => (
+                    <li key={j} className="flex items-center gap-2">
+                      <span className="w-6 text-sm text-ink-soft">{j + 1}</span>
+                      <input inputMode="numeric" aria-label={`Série ${j + 1}, répétitions`} value={r.reps} onChange={(e) => updRow(x, j, { reps: e.target.value })} className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-bg px-3 text-center font-display text-xl font-bold tabular-nums" />
+                      <span className="text-ink-soft">×</span>
+                      <input inputMode="decimal" aria-label={`Série ${j + 1}, charge en kilos`} value={r.load} placeholder="kg" onChange={(e) => updRow(x, j, { load: e.target.value })} className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-bg px-3 text-center font-display text-xl font-bold tabular-nums" />
+                      <button type="button" role="switch" aria-checked={r.done} aria-label={`Série ${j + 1} réussie`} onClick={() => { tap(); updRow(x, j, { done: !r.done }); }} className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-xl text-lg font-bold", r.done ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft")}>{r.done ? "✓" : "✗"}</button>
+                    </li>))}
+                </ul>)}
+              <button type="button" onClick={() => toggleDetail(x)} className="min-h-12 w-full rounded-xl bg-surface-2 text-sm font-semibold text-ink-soft">{x.detail ? "Masquer le détail des séries" : "Saisir série par série"}</button>
               <label className="block text-sm text-ink-soft">Commentaire (facultatif)<input value={x.comment} onChange={(e) => upd(x.id, "comment", e.target.value)} className="mt-1 min-h-12 w-full rounded-xl border border-line bg-bg px-3 text-base" /></label>
             </fieldset>
           ))}

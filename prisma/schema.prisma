@@ -55,6 +55,17 @@ enum GearKind {
   TIRE
   OTHER
 }
+enum RacePlatform {
+  NEXTRUN
+  KLIKEGO
+  OTHER
+}
+enum RaceStatus {
+  REGISTERED
+  COMPLETED
+  DNS
+  DNF
+}
 
 // ───────── Auth (NextAuth + PrismaAdapter) ─────────
 model User {
@@ -158,6 +169,7 @@ model Activity {
   exercises WorkoutExercise[]
   stream    ActivityStream?
   gear      Gear[]
+  raceEvent RaceEvent?
 
   @@unique([userId, dedupeKey])
   @@unique([userId, source, externalId])
@@ -249,6 +261,7 @@ model WorkoutExercise {
   loadKg     Float?
   restS      Int?
   comment    String?
+  setsDetail Json?   // [{ reps, loadKg, done }] : le réel série par série ; sets/reps/loadKg restent le prévu
   activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
   @@index([activityId, position])
@@ -281,8 +294,27 @@ model RaceEvent {
   sport           ActivityType
   targetDistance  Float?       // km
   targetElevation Float?       // m de D+
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Inscription (NextRun, Klikego…) : tout est optionnel, les échéances saisies à la main restent valides
+  startTime        String?                       // "HH:mm", heure locale Europe/Paris ; `date` reste la date à midi UTC
+  eventName        String?                       // "Dinard Off Course 2027"
+  platform         RacePlatform @default(OTHER)
+  url              String?                       // page d'inscription ; sert de clé d'import
+  location         String?
+  priceCents       Int?
+  requiredDocument String?                       // "Licence ou PPS"
+  bibNumber        String?
+  goalTimeS        Int?                          // objectif de temps
+  status           RaceStatus   @default(REGISTERED)
+  activityId       String?      @unique          // l'activité du jour J
+  resultTimeS      Int?
+  rankOverall      Int?
+  rankCategory     Int?
+  participants     Int?
+  notes            String?
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, url])
   @@index([userId, date])
 }
 

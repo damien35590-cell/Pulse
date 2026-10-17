@@ -18,6 +18,7 @@ import { ElevationChart } from "@/components/activity/elevation-chart";
 import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
+import { EditableTitle } from "@/components/activity/editable-title";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { getGear } from "@/lib/data/gear";
 import { selectableGear } from "@/lib/gear";
@@ -81,7 +82,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       <Link href="/activities" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="h-5 w-5" aria-hidden />Activités</Link>
       <header>
         <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt)}</p>
-        <h1 className="mt-1 font-display text-3xl font-bold leading-tight">{a.title}</h1>
+        <EditableTitle activityId={a.id} title={a.title} />
         {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
       </header>
       {a.story && <p className="rounded-xl bg-surface-2 px-4 py-3 text-[17px] leading-snug">{a.story}</p>}
@@ -125,6 +126,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
               <li key={e.id} className="px-4 py-3">
                 <p className="font-semibold">{e.name}</p>
                 <p className="text-sm text-ink-soft">{e.sets} × {e.reps}{e.loadKg != null ? ` à ${fmtNum(e.loadKg)} kg` : ""}{e.restS != null ? `, repos ${e.restS} s` : ""}</p>
+                {Array.isArray(e.setsDetail) && <p className="text-sm tabular-nums">Réel : {(e.setsDetail as { reps: number; loadKg: number | null; done: boolean }[]).map((s) => `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`).join(" · ")}</p>}
                 {e.comment && <p className="mt-1 text-sm">{e.comment}</p>}
               </li>
             ))}

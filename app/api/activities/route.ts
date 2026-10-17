@@ -10,6 +10,15 @@ import { processActivity } from "@/lib/pipeline/post-import";
 
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
+/** Réel série par série : [{ reps, loadKg, done }], sinon rien (colonne optionnelle). */
+function cleanDetail(v: unknown): Prisma.InputJsonValue | undefined {
+  if (!Array.isArray(v) || !v.length) return undefined;
+  return v.slice(0, 30).map((s: Record<string, unknown>) => {
+    const load = s?.loadKg == null || s.loadKg === "" ? NaN : Number(s.loadKg);
+    return { reps: Math.max(0, Math.round(Number(s?.reps)) || 0), loadKg: Number.isFinite(load) && load >= 0 ? load : null, done: s?.done !== false };
+  });
+}
+
 export async function POST(req: Request) {
   const uid = (await auth())?.user?.id;
   if (!uid) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -24,7 +33,7 @@ export async function POST(req: Request) {
   const exercises = isWorkout && Array.isArray(b.exercises)
     ? b.exercises.slice(0, 40).map((e: Record<string, unknown>, i: number) => {
         const load = e?.loadKg == null || e.loadKg === "" ? NaN : Number(e.loadKg), rest = e?.restS == null || e.restS === "" ? NaN : Number(e.restS);
-        return { position: i, name: String(e?.name ?? "").trim().slice(0, 80), sets: Math.round(Number(e?.sets)), reps: Math.round(Number(e?.reps)), loadKg: Number.isFinite(load) && load >= 0 ? load : null, restS: Number.isFinite(rest) && rest >= 0 ? Math.round(rest) : null, comment: e?.comment ? String(e.comment).slice(0, 200) : null };
+        return { position: i, name: String(e?.name ?? "").trim().slice(0, 80), sets: Math.round(Number(e?.sets)), reps: Math.round(Number(e?.reps)), loadKg: Number.isFinite(load) && load >= 0 ? load : null, restS: Number.isFinite(rest) && rest >= 0 ? Math.round(rest) : null, comment: e?.comment ? String(e.comment).slice(0, 200) : null, setsDetail: cleanDetail(e?.setsDetail) };
       }).filter((e: { name: string; sets: number; reps: number }) => e.name && e.sets > 0 && e.reps > 0)
     : [];
   if (isWorkout) { b.distanceM = 0; b.elevationGainM = 0; }

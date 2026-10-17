@@ -1,7 +1,3 @@
-import { dayKey } from "./dates";
-
-/** Jours calendaires restants (J-X), dans le fuseau de l'utilisateur. 0 = aujourd'hui. */
-export const daysUntil = (date: Date, now: Date, tz: string) => Math.round((Date.parse(dayKey(date, tz)) - Date.parse(dayKey(now, tz))) / 864e5);
 
 type A = { type: string; startedAt: Date; distanceM: number; elevationGainM: number };
 /** Préparation sur les 28 derniers jours : plus longue sortie du sport vs distance visée, D+ cumulé vs D+ visé. */

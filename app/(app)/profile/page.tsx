@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Wrench, type LucideIcon } from "lucide-react";
+import { ChevronRight, Flag, Wrench, type LucideIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { evaluateBadges } from "@/lib/badges";
 import { loadBadgeStats } from "@/lib/data/badges";
@@ -12,6 +12,8 @@ import { BadgeGrid } from "@/components/profile/badge-grid";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
+import { prisma } from "@/lib/prisma";
+import { getCountdown } from "@/lib/races/time";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Vous" };
@@ -21,7 +23,8 @@ export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const [zones, gear] = await Promise.all([getZones(userId), getGear(userId)]);
+  const [zones, gear, raceRows] = await Promise.all([getZones(userId), getGear(userId), prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 })]);
+  const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
   const { acts, rec, stats } = await loadBadgeStats(userId, TZ);
   const badges = evaluateBadges(stats);
@@ -56,6 +59,11 @@ export default async function ProfilePage() {
       <Link href="/gear" className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 active:bg-surface-2">
         <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand"><Wrench className="h-5 w-5" aria-hidden /></span>
         <span className="min-w-0 flex-1"><b className="block font-display text-lg">Matériel</b><span className={wornGear ? "text-sm font-semibold text-red-600 dark:text-red-400" : "text-sm text-ink-soft"}>{wornGear ? `${wornGear} à remplacer` : activeGear.length ? `${activeGear.length} suivi${activeGear.length > 1 ? "s" : ""}, usure et entretien` : "Vélos, chaussures, chaîne, cassette…"}</span></span>
+        <ChevronRight className="h-5 w-5 text-ink-soft" aria-hidden />
+      </Link>
+      <Link href="/events" className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 active:bg-surface-2">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand"><Flag className="h-5 w-5" aria-hidden /></span>
+        <span className="min-w-0 flex-1"><b className="block font-display text-lg">Mes courses</b><span className="text-sm text-ink-soft">{nextRace ? <><b className="text-brand">{nextRace.c.short}</b> · {nextRace.r.name}</> : "Inscriptions, résultats, compte à rebours"}</span></span>
         <ChevronRight className="h-5 w-5 text-ink-soft" aria-hidden />
       </Link>
       <BadgeGrid badges={badges} />

@@ -56,7 +56,7 @@ export default async function DashboardPage() {
             );
           })()}
           {d.goals.map((g, i) => <GoalCard key={g.id} km={g.km} goalKm={g.goalKm} sport={g.sport} streak={i === 0 ? d.streak : 0} />)}
-          <EventTimeline events={d.events} />
+          <EventTimeline events={d.events} pendingResult={d.pendingResult} />
           <Shortcuts ctl={d.fit.ctl} form={d.fit.form} goals={d.goalCount} />
           <InsightCarousel items={d.insights} />
           <section aria-label="Activités récentes" className="space-y-2.5">
