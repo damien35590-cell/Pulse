@@ -3,11 +3,10 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { encodePolyline } from "@/lib/polyline";
-import { bestEffort, type Pt } from "@/lib/geo";
+import type { Pt } from "@/lib/geo";
 import { fetchWeather } from "@/lib/weather";
-import { activityStory, workoutStory } from "@/lib/insights/engine";
-import type { Act } from "@/lib/insights/types";
 import { autoGearIds, gearAlerts, ownGearIds } from "@/lib/data/gear";
+import { processActivity } from "@/lib/pipeline/post-import";
 
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
@@ -37,49 +36,30 @@ export async function POST(req: Request) {
 
   // Matériel choisi dans la liste déroulante ; à défaut (autres clients), celui par défaut du sport.
   const gearIds = Array.isArray(b.gearIds) ? await ownGearIds(uid, b.gearIds) : await autoGearIds(uid, b.type, startLat == null);
-
-  const [user, hist, life, weather] = await Promise.all([
-    prisma.user.findUnique({ where: { id: uid }, select: { timezone: true } }),
-    prisma.activity.findMany({ where: { userId: uid, startedAt: { gte: new Date(+startedAt - 30 * 864e5), lt: startedAt } }, select: { id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true } }),
-    prisma.activity.aggregate({ where: { userId: uid, startedAt: { lt: startedAt } }, _sum: { distanceM: true } }),
-    startLat != null && startLng != null ? fetchWeather(startLat, startLng, startedAt, b.movingTimeS) : null,
-  ]);
-
-  // Records 10 km / 5 km : on n'annonce un record que s'il y avait un ancien temps à battre.
-  let pr: { label: string } | null = null;
-  if (b.type === "RUN") {
-    for (const [kind, label, m] of [["BEST_10K", "10 km", 10000], ["BEST_5K", "5 km", 5000]] as const) {
-      const t = bestEffort(pts, m);
-      if (t == null) continue;
-      const key = { userId_kind_type: { userId: uid, kind, type: "RUN" as const } };
-      const old = await prisma.personalRecord.findUnique({ where: key });
-      if (!old || t < old.value) {
-        await prisma.personalRecord.upsert({ where: key, update: { value: t, achievedAt: startedAt }, create: { userId: uid, kind, type: "RUN", value: t, achievedAt: startedAt } });
-        if (old && !pr) pr = { label };
-      }
-    }
-  }
-
-  const self: Act = { id: `${uid}-${+startedAt}`, type: b.type, startedAt, distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, startLat, startLng, weather };
-  const volumeKg = exercises.reduce((s: number, e: { sets: number; reps: number; loadKg: number | null }) => s + e.sets * e.reps * (e.loadKg ?? 0), 0);
-  const story = isWorkout && exercises.length
-    ? workoutStory({ volumeKg, exercises: exercises.length, sets: exercises.reduce((s: number, e: { sets: number }) => s + e.sets, 0) }, self.id)
-    : activityStory(self, hist as Act[], { tz: user?.timezone ?? "Europe/Paris", lifetimeKmBefore: (life._sum.distanceM ?? 0) / 1000, pr });
+  const weather = startLat != null && startLng != null ? await fetchWeather(startLat, startLng, startedAt, b.movingTimeS) : null;
 
   try {
     const a = await prisma.activity.create({
       data: {
         userId: uid, type: b.type, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, startedAt,
-        distanceM: self.distanceM, movingTimeS: self.movingTimeS, elevationGainM: self.elevationGainM, calories: b.calories ?? null,
-        polyline, startLat, startLng, weather: weather ?? undefined, story: story.text,
+        distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
+        polyline, startLat, startLng, weather: weather ?? undefined,
         exercises: exercises.length ? { create: exercises } : undefined,
         gear: gearIds.length ? { connect: gearIds.map((id) => ({ id })) } : undefined,
         source: b.source ?? "manual", externalId: b.externalId ?? null, trackPoints: pts.length ? (pts as unknown as Prisma.InputJsonValue) : undefined,
       },
       select: { id: true },
     });
+    // Doublons, records, badges et anecdote : traitement commun à toutes les sources (lib/pipeline/post-import.ts).
+    const post = await processActivity(a.id, { points: pts });
     const worn = gearIds.length ? (await gearAlerts(uid, gearIds)).filter((g) => g.level === "critical").map((g) => ({ name: g.name, kind: g.kind, km: Math.round(g.km), limitKm: g.limitKm })) : [];
-    return NextResponse.json({ id: a.id, story: story.text, tag: story.tag, record: !!pr, gearAlerts: worn }, { status: 201 });
+    const id = post.activityId ?? a.id;
+    // Fusionnée dans une activité qui avait déjà son anecdote : on renvoie celle-ci.
+    const story = post.story?.text ?? (await prisma.activity.findUnique({ where: { id }, select: { story: true } }))?.story ?? "";
+    return NextResponse.json({
+      id, story, tag: post.story?.tag ?? null,
+      record: post.records.some((r) => r.beaten && !!r.label), gearAlerts: worn,
+    }, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return NextResponse.json({ error: "duplicate" }, { status: 409 });
     throw e;

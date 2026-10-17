@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Wrench, type LucideIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { buildBadgeStats, evaluateBadges } from "@/lib/badges";
+import { evaluateBadges } from "@/lib/badges";
+import { loadBadgeStats } from "@/lib/data/badges";
 import { fmtClock, fmtKm, fmtNum } from "@/lib/format";
 import { SPORTS } from "@/lib/sports";
 import { getZones } from "@/lib/data/zones";
@@ -23,20 +23,11 @@ export default async function ProfilePage() {
   const userId = s.user.id;
   const [zones, gear] = await Promise.all([getZones(userId), getGear(userId)]);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
-  const [acts, exercises, records, noted] = await Promise.all([
-    prisma.activity.findMany({
-      where: { userId },
-      select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgPower: true, maxPower: true, weather: true, feeling: true },
-    }),
-    prisma.workoutExercise.findMany({ where: { activity: { userId } }, select: { activityId: true, name: true, sets: true, reps: true, loadKg: true } }),
-    prisma.personalRecord.findMany({ where: { userId, type: "RUN" } }),
-    prisma.activity.count({ where: { userId, AND: [{ notes: { not: null } }, { notes: { not: "" } }] } }),
-  ]);
-  const rec = Object.fromEntries(records.map((r) => [r.kind, r.value]));
-  const stats = buildBadgeStats(acts, exercises, TZ, { noted, best5kSec: rec.BEST_5K ?? null });
+  const { acts, rec, stats } = await loadBadgeStats(userId, TZ);
   const badges = evaluateBadges(stats);
   const st = stats.GLOBAL; // mêmes totaux que les badges, tous sports confondus
-  const longest = acts.reduce<(typeof acts)[number] | null>((best, a) => (a.distanceM > 0 && a.distanceM > (best?.distanceM ?? 0) ? a : best), null);
+  // Record de distance : le vélotaf à assistance électrique (EBIKE) n'en établit pas.
+  const longest = acts.reduce<(typeof acts)[number] | null>((best, a) => (a.type !== "EBIKE" && a.distanceM > 0 && a.distanceM > (best?.distanceM ?? 0) ? a : best), null);
 
   type Row = { label: string; value: string; Icon?: LucideIcon };
   const rows: Row[] = [

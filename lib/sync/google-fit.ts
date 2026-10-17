@@ -1,14 +1,19 @@
+import type { ActivityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { findOverlapping, processActivity } from "@/lib/pipeline/post-import";
+
+/** Source des activités créées par cette synchro (les plus anciennes portent « fit » ; on les reconnaît à leur dedupeKey « gfit-… »). */
+export const GOOGLE_FIT_SOURCE = "google-fit";
 
 const AGGREGATE_URL =
   "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate";
 
 // Traduit les codes d'activité Google Fit vers ton ActivityType Prisma
-function mapFitType(typeId: number) {
+function mapFitType(typeId: number): ActivityType {
   switch (typeId) {
     case 8: return "RUN";      // Course à pied
     case 1:
-    case 17: return "RIDE";    // Vélo classique, Spinning/Home trainer
+    case 17: return "EBIKE";   // Vélo : sur Google Fit, ce sont les vélotafs à assistance électrique
     case 7: return "WALK";     // Marche
     case 76: return "SWIM";    // Natation
     case 97:                   // Musculation/Haltérophilie
@@ -18,10 +23,10 @@ function mapFitType(typeId: number) {
   }
 }
 
-// Activités détectées automatiquement qu'on importe : vélo, marche, course
+// Activités détectées automatiquement qu'on importe : vélo (vélotaf), marche, course
 const AUTO_TYPES = new Set([1, 7, 8]);
 const AUTO_TITLES: Record<string, string> = {
-  RIDE: "Vélo",
+  EBIKE: "Vélotaf",
   WALK: "Marche",
   RUN: "Running",
 };
@@ -227,24 +232,33 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
 
     const typeEnum = mapFitType(session.activityType);
 
+    // Même sortie déjà enregistrée par une autre source (FIT, saisie…) : Google Fit n'apporte rien de plus.
+    if ((await findOverlapping(uid, { startedAt: start, movingTimeS: Math.max(durationS, 0) })).length) {
+      duplicates++;
+      continue;
+    }
+
+    let id: string;
     try {
-      await prisma.activity.create({
+      ({ id } = await prisma.activity.create({
         data: {
           userId: uid,
           dedupeKey: dedupeKey,
           externalId: session.id || dedupeKey,
-          source: "fit",
-          title: session.name || `Activité ${typeEnum}`,
-          type: typeEnum as any,
+          source: GOOGLE_FIT_SOURCE,
+          title: session.name || AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`,
+          type: typeEnum,
           startedAt: start,
           movingTimeS: durationS > 0 ? durationS : 0,
           distanceM: distanceM ?? 0,
         },
-      });
+        select: { id: true },
+      }));
       saved++;
     } catch (e: any) {
       throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
     }
+    await processActivity(id);
   }
 
   // ---------- 2. Activités détectées automatiquement ----------
@@ -270,8 +284,9 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     const existing = await prisma.activity.findFirst({
       where: {
         userId: uid,
-        source: "fit",
-        type: typeEnum as any,
+        dedupeKey: { startsWith: "gfit-" },
+        // Les vélos déjà en base peuvent encore être en RIDE (avant reclassement en EBIKE).
+        type: { in: typeEnum === "EBIKE" ? ["EBIKE", "RIDE"] : [typeEnum] },
         startedAt: {
           gte: new Date(seg.startMs - TOLERANCE_MS),
           lte: new Date(seg.startMs + TOLERANCE_MS),
@@ -294,32 +309,42 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
       continue;
     }
 
+    const dedupeKey = `gfit-seg-${seg.activity}-${seg.startMs}`;
+    const durationS = Math.floor((seg.endMs - seg.startMs) / 1000);
+
+    // Même sortie déjà enregistrée par une autre source : on n'ajoute pas la version Google Fit, plus pauvre.
+    if ((await findOverlapping(uid, { startedAt: new Date(seg.startMs), movingTimeS: Math.max(durationS, 0) })).length) {
+      duplicates++;
+      continue;
+    }
+
     const distanceM = await fetchSessionDistanceM(
       validToken,
       seg.startMs,
       seg.endMs
     );
-    const dedupeKey = `gfit-seg-${seg.activity}-${seg.startMs}`;
-    const durationS = Math.floor((seg.endMs - seg.startMs) / 1000);
 
+    let id: string;
     try {
-      await prisma.activity.create({
+      ({ id } = await prisma.activity.create({
         data: {
           userId: uid,
           dedupeKey: dedupeKey,
           externalId: dedupeKey,
-          source: "fit",
+          source: GOOGLE_FIT_SOURCE,
           title: AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`,
-          type: typeEnum as any,
+          type: typeEnum,
           startedAt: new Date(seg.startMs),
           movingTimeS: durationS > 0 ? durationS : 0,
           distanceM: distanceM ?? 0,
         },
-      });
+        select: { id: true },
+      }));
       auto++;
     } catch (e: any) {
       throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
     }
+    await processActivity(id);
   }
 
   return {
