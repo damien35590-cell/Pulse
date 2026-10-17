@@ -8,6 +8,7 @@ import { PlanForm } from "@/components/plan/plan-form";
 import { PlanView } from "@/components/plan/plan-view";
 import { RunProgramForm } from "@/components/training/run-program-form";
 import { RunProgramView } from "@/components/training/run-program-view";
+import { PlanCalendar } from "@/components/calendar/plan-calendar";
 import { ChevronRight } from "lucide-react";
 import { CatalogUpdateButton } from "@/components/training/exercise-link";
 import { autoSyncExerciseCatalog, getExerciseLinkStats } from "@/lib/data/exercises-catalog";
@@ -29,6 +30,7 @@ export default async function PlanPage() {
       <header><h1 className="font-display text-3xl font-bold leading-none">Programme</h1>
         <p className="mt-2 text-sm text-ink-soft">Ce n’est pas un avis médical : ajustez selon vos sensations.</p></header>
       {run ? <RunProgramView p={run} /> : <RunProgramForm current={vma && { vmaKmh: vma.vmaKmh, label: vma.label, estimated: vma.source === "ESTIMATED" }} />}
+      <PlanCalendar userId={userId} />
       <section aria-labelledby="muscu" className="space-y-3 rounded-xl border border-line bg-surface p-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Muscu</p>
