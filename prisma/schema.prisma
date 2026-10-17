@@ -92,6 +92,12 @@ model User {
   records    PersonalRecord[]
   badges     UserBadge[]
   gear       Gear[]
+
+  // Programmes v2
+  programs        Program[]
+  trainingGoals   TrainingGoal[]
+  plannedSessions PlannedSession[]
+  athleteMetrics  AthleteMetric[]
 }
 
 model Account {
@@ -171,6 +177,10 @@ model Activity {
   gear      Gear[]
   raceEvent RaceEvent?
 
+  // Programmes v2
+  plannedSession PlannedSession? // séance du programme que cette activité réalise
+  athleteMetrics AthleteMetric[] // tests (VMA…) mesurés pendant cette activité
+
   @@unique([userId, dedupeKey])
   @@unique([userId, source, externalId])
   @@index([userId, startedAt(sort: Desc)])
@@ -234,7 +244,7 @@ model UserBadge {
   @@id([userId, badgeId])
 }
 
-// ───────── Programme d'entraînement (un seul actif à la fois) ─────────
+// ───────── Programme d'entraînement — ANCIENNE VERSION (remplacée par Program, à supprimer une fois l'UI migrée) ─────────
 model TrainingPlan {
   id        String       @id @default(cuid())
   userId    String
@@ -261,10 +271,15 @@ model WorkoutExercise {
   loadKg     Float?
   restS      Int?
   comment    String?
-  setsDetail Json?   // [{ reps, loadKg, done }] : le réel série par série ; sets/reps/loadKg restent le prévu
-  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  setsDetail Json?   // [{ reps, loadKg, done, rir?, isWarmup?, durationS? }] : le réel série par série ; sets/reps/loadKg restent le prévu
+  exerciseId String? // Programmes v2 : exercice du catalogue (null = texte libre non rapproché)
+  slotId     String? // Programmes v2 : emplacement du programme suivi
+  activity Activity             @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  exercise Exercise?            @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  slot     ProgramExerciseSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
 
   @@index([activityId, position])
+  @@index([exerciseId])
 }
 
 // ───────── Séries complètes à 1 Hz (puissance, cardio, cadence) : courbe de puissance, zones, intervalles ─────────
@@ -314,6 +329,10 @@ model RaceEvent {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
+  // Programmes v2
+  goals           TrainingGoal[]   // objectifs visant cette course
+  plannedSessions PlannedSession[] // jour de course dans un programme
+
   @@unique([userId, url])
   @@index([userId, date])
 }
@@ -338,4 +357,405 @@ model Gear {
   activities Activity[]
 
   @@index([userId, retiredAt])
+}
+
+// ═════════════════════════════════════════════════════════════════════
+//  PROGRAMMES V2 — objectifs dynamiques, plans périodisés, muscu structurée
+//  Catalogue (modèles de plans, programmes, exercices) : dans le code (lib/training/catalog).
+//  Ici : ton programme instancié et son suivi. Une séance réalisée = une Activity.
+//  Unités : m, s, s/km, km/h, kg. @db.Date = jour local (Europe/Paris).
+//  Règle « 1 programme ACTIVE par sport » : appliquée dans le code à l'activation.
+// ═════════════════════════════════════════════════════════════════════
+
+enum GoalType {
+  RUN_TARGET_TIME      // un chrono sur une distance / une course : semi en 1:44:59
+  RUN_FINISH           // finir une distance
+  RUN_VMA              // atteindre une VMA
+  RUN_BASE             // reprise, foncier
+  STRENGTH_HYPERTROPHY // prise de masse
+  STRENGTH_FORCE       // gagner en force
+  STRENGTH_MAINTENANCE // maintenir avec un volume réduit
+  STRENGTH_LIFT_TARGET // une perf précise : 15 tractions, 100 kg au développé couché
+}
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  MISSED
+  ABANDONED
+}
+enum Feasibility {
+  REALISTIC
+  AMBITIOUS
+  VERY_AMBITIOUS
+  UNKNOWN
+}
+enum TargetUnit {
+  KG
+  REPS
+  SECONDS
+  KMH
+}
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+enum SchedulingMode {
+  FIXED_DAYS // jours fixes (running)
+  FLEXIBLE   // ordre imposé, jours libres (muscu : A → B → A…)
+}
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+enum PhaseType {
+  BASE            // running : foncier
+  BUILD           // développement
+  SPECIFIC        // allure spécifique
+  TAPER           // affûtage
+  POST_RACE       // récupération
+  ACCUMULATION    // muscu : volume
+  INTENSIFICATION // charges
+  DELOAD          // décharge
+  MAINTENANCE
+}
+enum SessionKind {
+  EASY            // endurance fondamentale
+  RECOVERY
+  LONG_RUN
+  THRESHOLD       // seuil / tempo
+  INTERVALS_SHORT // VMA courte
+  INTERVALS_LONG  // fractionné long
+  RACE_PACE       // allure objectif
+  FARTLEK
+  HILLS
+  PROGRESSIVE
+  VMA_TEST
+  RACE
+  CROSS_TRAINING  // vélo / home trainer en remplacement
+  STRENGTH_WORKOUT
+  MOBILITY
+}
+enum SessionStatus {
+  PLANNED
+  COMPLETED
+  PARTIAL
+  SKIPPED
+  MOVED
+}
+enum MetricType {
+  VMA_KMH
+  HR_MAX
+  HR_REST
+  HR_THRESHOLD
+  THRESHOLD_PACE_S_KM
+  FTP_W
+  BODYWEIGHT_KG
+}
+enum MetricSource {
+  TEST
+  RACE
+  ESTIMATED
+  MANUAL
+  INTERVALS
+}
+enum Equipment {
+  BARBELL
+  DUMBBELL
+  KETTLEBELL
+  MACHINE
+  CABLE
+  BAND
+  BODYWEIGHT
+  PULLUP_BAR
+  RINGS
+  BENCH
+  OTHER
+}
+enum LoadType {
+  EXTERNAL            // barre, haltères, machine
+  BODYWEIGHT          // poids du corps (Lafay)
+  WEIGHTED_BODYWEIGHT // tractions / dips lestés
+  ASSISTED            // avec élastique
+  TIMED               // gainage, isométrie
+}
+enum Mechanic {
+  COMPOUND
+  ISOLATION
+}
+enum MuscleGroup {
+  CHEST
+  BACK
+  LATS
+  TRAPS
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  FOREARMS
+  ABS
+  OBLIQUES
+  LOWER_BACK
+  GLUTES
+  QUADS
+  HAMSTRINGS
+  CALVES
+  ADDUCTORS
+  FULL_BODY
+}
+enum SetType {
+  STRAIGHT
+  TOP_SET_BACKOFF
+  PYRAMID
+  DROP_SET
+  REST_PAUSE
+  MYO_REPS
+  AMRAP
+  TIMED
+}
+enum ProgressionRule {
+  DOUBLE_PROGRESSION // haut de fourchette sur toutes les séries → + charge
+  LINEAR_LOAD        // + charge à chaque réussite, deload après X échecs
+  REPS_THEN_VARIANT  // poids du corps : + reps puis variante plus dure
+  RIR_AUTOREGULATED
+  MAINTAIN
+  NONE
+}
+
+/// Historique des métriques (VMA, FC…). La dernière valeur sert à calculer allures et pronostics.
+/// UserZones (ftp, hrMax) reste la valeur courante utilisée ailleurs dans l'app.
+model AthleteMetric {
+  id         String       @id @default(cuid())
+  userId     String
+  type       MetricType
+  value      Float
+  measuredAt DateTime
+  source     MetricSource
+  activityId String?
+  note       String?
+  createdAt  DateTime     @default(now())
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, type, measuredAt(sort: Desc)])
+}
+
+/// Objectif dynamique (remplace les objectifs fixes 5 km / 10 km de l'ancien TrainingPlan).
+/// Les objectifs de volume du dashboard (Goal) restent séparés.
+model TrainingGoal {
+  id                  String       @id @default(cuid())
+  userId              String
+  sport               ActivityType // RUN ou WORKOUT
+  type                GoalType
+  title               String       // « Semi de Rennes en 1:44:59 »
+  status              GoalStatus   @default(ACTIVE)
+  targetDate          DateTime?    @db.Date
+  // Running
+  distanceM           Int?
+  targetTimeS         Int?
+  raceEventId         String?      // course existante (RaceEvent)
+  // Muscu / cible chiffrée
+  exerciseId          String?
+  targetValue         Float?
+  targetUnit          TargetUnit?
+  // Pronostic, recalculé à chaque nouvelle métrique
+  baselineValue       Float?
+  predictedTimeS      Int?
+  requiredVmaKmh      Float?
+  feasibility         Feasibility  @default(UNKNOWN)
+  predictionUpdatedAt DateTime?
+  achievedAt          DateTime?
+  achievedValue       Float?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  raceEvent RaceEvent? @relation(fields: [raceEventId], references: [id], onDelete: SetNull)
+  exercise  Exercise?  @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  programs  Program[]
+
+  @@index([userId, status])
+}
+
+/// Programme instancié depuis le catalogue. Un seul ACTIVE par sport → la Home affiche 1 carte running + 1 carte muscu.
+model Program {
+  id                 String          @id @default(cuid())
+  userId             String
+  sport              ActivityType    // RUN ou WORKOUT
+  goalId             String?
+  name               String          // « Prépa semi 1:45 — 12 semaines »
+  templateKey        String          // clé du catalogue : "run.race-time", "strength.hypertrophy-fb3"
+  templateVersion    Int
+  status             ProgramStatus   @default(DRAFT)
+  schedulingMode     SchedulingMode  @default(FIXED_DAYS)
+  startDate          DateTime        @db.Date
+  endDate            DateTime        @db.Date
+  totalWeeks         Int
+  sessionsPerWeek    Int
+  preferredDays      Int[]           // jours ISO : 1 = lundi … 7 = dimanche
+  keySessionDay      Int?
+  longRunDay         Int?
+  level              ExperienceLevel @default(INTERMEDIATE)
+  generatorInput     Json            // paramètres de génération (VMA, dispos, charges de départ…)
+  revision           Int             @default(1)
+  lastRecalibratedAt DateTime?
+  activatedAt        DateTime?
+  pausedAt           DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal     TrainingGoal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  phases   ProgramPhase[]
+  weeks    ProgramWeek[]
+  sessions PlannedSession[]
+  workouts ProgramWorkout[]
+
+  @@index([userId, sport, status])
+}
+
+/// Bloc de périodisation (foncier → développement → spécifique → affûtage ; ou cycles muscu).
+model ProgramPhase {
+  id        String    @id @default(cuid())
+  programId String
+  order     Int
+  type      PhaseType
+  name      String
+  focus     String?   // phrase courte affichée sur la Home
+  program Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  weeks   ProgramWeek[]
+
+  @@unique([programId, order])
+}
+
+model ProgramWeek {
+  id              String   @id @default(cuid())
+  programId       String
+  phaseId         String
+  number          Int      // 1 … totalWeeks
+  startDate       DateTime @db.Date // lundi
+  isRecovery      Boolean  @default(false) // assimilation / deload
+  targetDistanceM Int?
+  targetLoad      Int?     // même échelle que Activity.load
+  volumeFactor    Float    @default(1) // muscu : séries × facteur
+  intensityFactor Float    @default(1) // muscu : charges × facteur
+  note            String?
+  program  Program          @relation(fields: [programId], references: [id], onDelete: Cascade)
+  phase    ProgramPhase     @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  sessions PlannedSession[]
+
+  @@unique([programId, number])
+}
+
+/// Séance prévue (running ou muscu). Réalisée = reliée à une Activity.
+model PlannedSession {
+  id                  String        @id @default(cuid())
+  programId           String
+  weekId              String
+  userId              String        // dénormalisé : « aujourd'hui » en une requête
+  sport               ActivityType
+  kind                SessionKind
+  date                DateTime      @db.Date
+  orderInWeek         Int
+  title               String        // « 10 × 400 m à VMA »
+  description         String?
+  isKeySession        Boolean       @default(false)
+  structure           Json?         // running : RunWorkoutStructure (types/training.ts), intensités relatives
+  plannedDurationS    Int?
+  plannedDistanceM    Int?
+  plannedLoad         Int?
+  workoutId           String?       // muscu : séance type (Full Body A…)
+  raceEventId         String?       // jour de course
+  status              SessionStatus @default(PLANNED)
+  originalDate        DateTime?     @db.Date
+  completedActivityId String?       @unique
+  complianceScore     Int?          // 0–100 : réalisé vs prévu
+  skipReason          String?
+  completedAt         DateTime?
+  intervalsEventId    String?       // séance envoyée au calendrier Intervals.icu (→ Garmin)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  program           Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  week              ProgramWeek     @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout           ProgramWorkout? @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  raceEvent         RaceEvent?      @relation(fields: [raceEventId], references: [id], onDelete: SetNull)
+  completedActivity Activity?       @relation(fields: [completedActivityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([programId, status, date])
+  @@index([weekId])
+}
+
+/// Bibliothèque d'exercices (seedée depuis le code + exos perso).
+model Exercise {
+  id               String        @id @default(cuid())
+  slug             String        @unique
+  name             String
+  aliases          String[]      // rapproche les saisies libres : « DC », « bench »
+  equipment        Equipment
+  loadType         LoadType
+  mechanic         Mechanic?
+  primaryMuscles   MuscleGroup[]
+  secondaryMuscles MuscleGroup[]
+  difficulty       Int?          // 1–10 : échelle des variantes poids du corps
+  harderVariantId  String?
+  instructions     String?
+  isCustom         Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  harderVariant  Exercise?             @relation("ExerciseVariant", fields: [harderVariantId], references: [id], onDelete: SetNull)
+  easierVariants Exercise[]            @relation("ExerciseVariant")
+  slots          ProgramExerciseSlot[]
+  logs           WorkoutExercise[]
+  goals          TrainingGoal[]
+}
+
+/// Séance type d'un programme muscu : « Full Body A », « Push »…
+model ProgramWorkout {
+  id                   String @id @default(cuid())
+  programId            String
+  key                  String // "A", "B"
+  name                 String
+  order                Int
+  estimatedDurationMin Int?
+  program         Program               @relation(fields: [programId], references: [id], onDelete: Cascade)
+  slots           ProgramExerciseSlot[]
+  plannedSessions PlannedSession[]
+
+  @@unique([programId, key])
+}
+
+/// Un exercice dans une séance type : prescription + règle de progression + état courant.
+model ProgramExerciseSlot {
+  id                String          @id @default(cuid())
+  workoutId         String
+  exerciseId        String          // exercice actuel (change si passage à une variante plus dure)
+  order             Int
+  supersetGroup     String?
+  setType           SetType         @default(STRAIGHT)
+  sets              Int
+  repMin            Int?
+  repMax            Int?
+  durationS         Int?
+  targetRir         Int?
+  tempo             String?
+  restS             Int?
+  warmupSets        Int             @default(0)
+  progressionRule   ProgressionRule
+  loadIncrementKg   Float?
+  repIncrement      Int?
+  deloadAfterStalls Int?
+  deloadPct         Float?
+  currentLoadKg     Float?          // état courant, mis à jour après chaque séance
+  currentRepTarget  Int?
+  stallCount        Int             @default(0)
+  lastProgressedAt  DateTime?
+  notes             String?
+  workout  ProgramWorkout    @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise          @relation(fields: [exerciseId], references: [id])
+  logs     WorkoutExercise[]
+
+  @@unique([workoutId, order])
 }
