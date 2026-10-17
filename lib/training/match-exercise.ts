@@ -29,6 +29,24 @@ export function buildMatcher<E extends MatchEntry>(entries: E[]) {
   };
 }
 
+/** Rang d'une recherche sur un nom et ses alias : 0 exact, 1 début, 2 contenu, 3 faute de frappe, -1 sans rapport. */
+export function searchRank(q: string, names: string[]): number {
+  let best = -1;
+  for (const k of names.map(exerciseKey)) {
+    const r = k === q ? 0 : k.startsWith(q) ? 1 : k.includes(q) ? 2 : typoDistance(q, k) != null ? 3 : -1;
+    if (r >= 0 && (best < 0 || r < best)) best = r;
+  }
+  return best;
+}
+
+/** Saisie d'une séance : exercices du catalogue proches de ce qui est tapé (tout le catalogue si rien n'est tapé), hors ceux déjà dans mon historique. */
+export function suggestCatalog(typed: string, historyKeys: string[] = []) {
+  const q = exerciseKey(typed), mine = new Set(historyKeys);
+  const fresh = EXERCISE_CATALOG.filter((e) => ![e.name, ...(e.aliases ?? [])].some((n) => mine.has(exerciseKey(n))));
+  if (!q) return fresh;
+  return fresh.map((e) => ({ e, r: searchRank(q, [e.name, ...(e.aliases ?? [])]) })).filter((x) => x.r >= 0).sort((a, b) => a.r - b.r).map((x) => x.e);
+}
+
 const catalogMatcher = buildMatcher(EXERCISE_CATALOG);
 /** Correspondance exacte d'abord, puis tolérance aux fautes de frappe (même règle que suggestExercises). */
 export const matchExercise = (name: string) => catalogMatcher(name);

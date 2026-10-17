@@ -6,7 +6,8 @@ import { Link2, Plus, RefreshCw, Search } from "lucide-react";
 import type { Equipment, LoadType } from "@prisma/client";
 import { createCustomExerciseAction, linkExerciseNameAction, updateExerciseCatalog } from "@/app/actions";
 import type { CatalogSyncResult, ExerciseOption, UnlinkedName } from "@/lib/data/exercises-catalog";
-import { exerciseKey, typoDistance } from "@/lib/exercises";
+import { exerciseKey } from "@/lib/exercises";
+import { searchRank } from "@/lib/training/match-exercise";
 import { EQUIPMENT_LABELS, LOAD_TYPE_LABELS } from "@/lib/training/catalog/exercises";
 import { celebrate, tap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -47,15 +48,7 @@ export function CatalogUpdateButton() {
 function filterOptions(options: ExerciseOption[], query: string) {
   const q = exerciseKey(query);
   if (!q) return options;
-  const rank = (o: ExerciseOption) => {
-    let best = -1;
-    for (const k of [o.name, ...o.aliases].map(exerciseKey)) {
-      const r = k === q ? 0 : k.startsWith(q) ? 1 : k.includes(q) ? 2 : typoDistance(q, k) != null ? 3 : -1;
-      if (r >= 0 && (best < 0 || r < best)) best = r;
-    }
-    return best;
-  };
-  return options.map((o) => ({ o, r: rank(o) })).filter((x) => x.r >= 0).sort((a, b) => a.r - b.r).map((x) => x.o);
+  return options.map((o) => ({ o, r: searchRank(q, [o.name, ...o.aliases]) })).filter((x) => x.r >= 0).sort((a, b) => a.r - b.r).map((x) => x.o);
 }
 
 function UnlinkedRow({ item, options }: { item: UnlinkedName; options: ExerciseOption[] }) {

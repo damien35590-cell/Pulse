@@ -11,6 +11,8 @@ import { defaultGear, GEAR_KINDS, selectableGear, type WearLevel } from "@/lib/g
 import { RpePicker } from "@/components/activity/rpe-picker";
 import { daysAgo, exerciseKey, suggestExercises, type ExerciseHistory } from "@/lib/exercises";
 import { describe, suggestGoal } from "@/lib/progression";
+import { suggestCatalog } from "@/lib/training/match-exercise";
+import { EQUIPMENT_LABELS } from "@/lib/training/catalog/exercises";
 
 const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
 const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
@@ -107,11 +109,16 @@ export default function RecordPage() {
               <div className="flex items-end gap-2">
                 <div className="relative flex-1">
                   <label className="text-sm text-ink-soft">Exercice {i + 1}<input value={x.name} onChange={(e) => { upd(x.id, "name", e.target.value); setOpen(x.id); }} onFocus={() => setOpen(x.id)} onBlur={() => blurName(x)} autoComplete="off" role="combobox" aria-expanded={open === x.id} aria-autocomplete="list" placeholder="Ex. Développé couché, Pompes…" className="mt-1 min-h-12 w-full rounded-xl border border-line bg-bg px-3 text-base font-semibold" /></label>
-                  {open === x.id && (() => { const sug = suggestExercises(x.name, hist); return sug.length > 0 && (
-                    <ul role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-auto rounded-xl border border-line bg-surface shadow-lg">
+                  {open === x.id && (() => { const sug = suggestExercises(x.name, hist, 50), cat = suggestCatalog(x.name, hist.map((h) => h.key)); return sug.length + cat.length > 0 && (
+                    <ul role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-line bg-surface shadow-lg">
                       {sug.map((h) => <li key={h.key} role="option" aria-selected={h.key === exerciseKey(x.name)}>
                         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { tap(); choose(x.id, h); }} className="flex min-h-12 w-full items-center justify-between gap-3 px-3 text-left">
                           <span className="font-semibold">{h.name}</span><span className="text-xs text-ink-soft">{describe(h.sessions[0])}</span>
+                        </button></li>)}
+                      {cat.length > 0 && <li role="presentation" className="sticky top-0 bg-surface-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">Catalogue</li>}
+                      {cat.map((c) => <li key={c.slug} role="option" aria-selected={false}>
+                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { tap(); patch(x.id, { name: c.name, pk: exerciseKey(c.name), detail: null }); setOpen(null); }} className="flex min-h-12 w-full items-center justify-between gap-3 px-3 text-left">
+                          <span className="font-semibold">{c.name}</span><span className="shrink-0 text-xs text-ink-soft">{EQUIPMENT_LABELS[c.equipment]}{c.difficulty ? ` · ${c.difficulty}/10` : ""}</span>
                         </button></li>)}
                     </ul>); })()}
                 </div>

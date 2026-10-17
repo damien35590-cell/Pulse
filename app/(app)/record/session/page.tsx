@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, Check, Minus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { beep, restOver, tap } from "@/lib/haptics";
 import { daysAgo, exerciseKey, suggestExercises, type ExerciseHistory, type SetDetail } from "@/lib/exercises";
+import { suggestCatalog } from "@/lib/training/match-exercise";
+import { EQUIPMENT_LABELS } from "@/lib/training/catalog/exercises";
 import { describe, suggestGoal } from "@/lib/progression";
 import { StoryReveal } from "@/components/record/story-reveal";
 import { RpePicker } from "@/components/activity/rpe-picker";
@@ -87,7 +89,7 @@ export default function SessionPage() {
 
   // ─────────── Préparation : choisir les exercices ───────────
   if (s.phase === "setup") {
-    const sug = suggestExercises(q, hist, 5), exact = hist.find((h) => h.key === exerciseKey(q));
+    const sug = suggestExercises(q, hist, 50), exact = hist.find((h) => h.key === exerciseKey(q)), cat = suggestCatalog(q, hist.map((h) => h.key));
     return (
       <div className={shell}>
         <header className="flex items-center justify-between"><h1 className="font-display text-2xl font-bold">Séance de muscu</h1>
@@ -106,8 +108,10 @@ export default function SessionPage() {
         </section>
         <section className="mt-4">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ajouter un exercice…" autoComplete="off" className="min-h-14 w-full rounded-xl border border-line bg-surface px-4 text-lg font-semibold" />
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-2 max-h-[22rem] space-y-2 overflow-auto">
             {sug.map((h) => <li key={h.key}><button type="button" onClick={() => { tap(); addExercise(q, h); }} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl bg-surface-2 px-4 text-left"><span className="font-semibold">{h.name}</span><span className="text-xs text-ink-soft">{describe(h.sessions[0])}</span></button></li>)}
+            {cat.length > 0 && <li className="pt-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">Catalogue</li>}
+            {cat.map((c) => <li key={c.slug}><button type="button" onClick={() => { tap(); addExercise(c.name); }} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 text-left"><span className="font-semibold">{c.name}</span><span className="shrink-0 text-xs text-ink-soft">{EQUIPMENT_LABELS[c.equipment]}{c.difficulty ? ` · ${c.difficulty}/10` : ""}</span></button></li>)}
             {q.trim() && !exact && <li><button type="button" onClick={() => { tap(); addExercise(q); }} className="min-h-14 w-full rounded-xl border border-dashed border-brand px-4 text-left font-semibold text-brand">Nouvel exercice : « {q.trim()} »</button></li>}
           </ul>
         </section>
