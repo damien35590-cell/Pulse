@@ -1,4 +1,4 @@
-import type { Prisma, RecordKind } from "@prisma/client";
+import type { ActivityType, Prisma, RecordKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { bestEffort, type Pt } from "@/lib/geo";
 import { activityStory, workoutStory } from "@/lib/insights/engine";
@@ -220,4 +220,34 @@ export async function processActivity(activityId: string, hint?: { points?: Pt[]
   catch (e) { fail("programme", e); }
 
   return res;
+}
+
+const EFFORT_M: Partial<Record<RecordKind, number>> = { BEST_5K: 5000, BEST_10K: 10000, BEST_HALF: 21097.5 };
+
+/** Après suppression d'une activité : recalcule, à partir des sorties restantes, les records qu'elle détenait (ou les retire). */
+export async function recomputeRecords(userId: string, held: { kind: RecordKind; type: ActivityType }[]) {
+  for (const { kind, type } of held) {
+    let best: { value: number; at: Date; id: string } | null = null;
+    const m = EFFORT_M[kind];
+    if (m) {
+      // Meilleur temps sur la distance : on relit les traces par paquets pour ne pas tout charger d'un coup.
+      for (let cursor: string | undefined; ;) {
+        const runs = await prisma.activity.findMany({
+          where: { userId, type, distanceM: { gte: m } }, orderBy: { id: "asc" }, take: 20,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}), select: { id: true, startedAt: true, trackPoints: true },
+        });
+        for (const r of runs) { const v = bestEffort(toPts(r.trackPoints), m); if (v != null && (!best || v < best.value)) best = { value: v, at: r.startedAt, id: r.id }; }
+        if (runs.length < 20) break;
+        cursor = runs[runs.length - 1].id;
+      }
+    } else {
+      const pick = (a: { distanceM: number; movingTimeS: number; elevationGainM: number }) => kind === "LONGEST_DISTANCE" ? a.distanceM : kind === "LONGEST_TIME" ? a.movingTimeS : a.elevationGainM;
+      const orderBy = kind === "LONGEST_DISTANCE" ? { distanceM: "desc" as const } : kind === "LONGEST_TIME" ? { movingTimeS: "desc" as const } : { elevationGainM: "desc" as const };
+      const a = await prisma.activity.findFirst({ where: { userId, type }, orderBy, select: { id: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true } });
+      if (a && pick(a) > 0) best = { value: pick(a), at: a.startedAt, id: a.id };
+    }
+    const key = { userId_kind_type: { userId, kind, type } };
+    if (best) await prisma.personalRecord.update({ where: key, data: { value: best.value, achievedAt: best.at, activityId: best.id } });
+    else await prisma.personalRecord.delete({ where: key });
+  }
 }

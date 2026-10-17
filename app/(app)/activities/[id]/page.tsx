@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, CloudRain, Thermometer } from "lucide-react";
+import { DeleteActivity } from "@/components/activity/delete-activity";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodePolyline } from "@/lib/polyline";
@@ -144,6 +145,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         initialRpe={a.rpe}
       />
 
+      <div className="pt-4"><DeleteActivity id={a.id} /></div>
     </article>
   );
 }

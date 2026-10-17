@@ -11,6 +11,7 @@ import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
 import { createRunProgram, finishIfDone, saveVmaMetric } from "@/lib/data/training";
+import { recomputeRecords } from "@/lib/pipeline/post-import";
 import { canUseExercise, createCustomExercise, linkExerciseName, syncCatalogAndHistory, type CatalogSyncResult } from "@/lib/data/exercises-catalog";
 import { EQUIPMENT_LABELS, LOAD_TYPE_LABELS } from "@/lib/training/catalog/exercises";
 import { DEFAULT_VMA, isValidVma, VMA_MAX, VMA_MIN, vmaFromHalfCooper } from "@/lib/training/vma";
@@ -372,5 +373,20 @@ export async function createCustomExerciseAction(key: string, o: { name: string;
   const ex = await createCustomExercise(userId, key, { name, equipment: o.equipment as Equipment, loadType: o.loadType as LoadType });
   if (!ex) return { ok: false, error: "Aucune séance ne porte ce nom." };
   exercisePaths();
+  return { ok: true };
+}
+
+// ───────── Suppression d'une activité ─────────
+/** Supprime une de mes activités (séries, trace, photos suivent) ; la séance de programme qu'elle validait redevient à faire et ses records sont recalculés. */
+export async function deleteActivity(id: string): Promise<Res> {
+  const userId = await uid();
+  if (!(await prisma.activity.findFirst({ where: { id, userId }, select: { id: true } }))) return { ok: false, error: "Activité introuvable." };
+  const held = await prisma.personalRecord.findMany({ where: { userId, activityId: id }, select: { kind: true, type: true } });
+  await prisma.$transaction([
+    prisma.plannedSession.updateMany({ where: { userId, completedActivityId: id, status: "COMPLETED" }, data: { status: "PLANNED", completedAt: null, complianceScore: null } }),
+    prisma.activity.delete({ where: { id } }),
+  ]);
+  await recomputeRecords(userId, held).catch((e) => console.error("[activities] recalcul des records", e));
+  for (const p of ["/", "/activities", "/plan", "/analysis", "/fitness", "/goals", "/events", "/gear", "/plan/exercices"]) revalidatePath(p, p === "/plan/exercices" ? "layout" : "page");
   return { ok: true };
 }
