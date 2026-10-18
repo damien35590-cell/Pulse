@@ -9,6 +9,8 @@ import { SPORTS } from "@/lib/sports";
 import { getZones } from "@/lib/data/zones";
 import { ZonesForm } from "@/components/profile/zones-form";
 import { BadgeGrid } from "@/components/profile/badge-grid";
+import { Section } from "@/components/ui/section";
+import { ThemePicker } from "@/components/profile/theme-picker";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
@@ -75,6 +77,7 @@ export default async function ProfilePage() {
       </a>
       <div id="badges" className="scroll-mt-20"><BadgeGrid badges={badges} /></div>
       <ZonesForm zones={zones} />
+      <Section title="Réglages"><ThemePicker /></Section>
       <InstallPrompt variant="card" />
       <SignOut />
     </div>

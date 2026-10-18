@@ -4,6 +4,7 @@ import { Dumbbell, Ellipsis, HeartPulse, RefreshCw, Sparkles, Target, Upload } f
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
+import { setTheme } from "@/lib/theme";
 import { HR_MAX, fitness, goal, hrBands, liftSession, recent, runs, today, week, workout } from "@/lib/mock/ui-kit";
 import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
@@ -248,7 +249,7 @@ function LiftDetail({ back }: { back: () => void }) {
 
 /* ─────────────── Tokens : la référence visuelle du système ─────────────── */
 function Tokens() {
-  const [theme, setTheme] = useState<"dark" | "light">(() =>
+  const [theme, setThemeState] = useState<"dark" | "light">(() =>
     typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark",
   );
   const swatch = (name: string, cls: string, note?: string) => (
@@ -266,10 +267,8 @@ function Tokens() {
         options={[{ value: "dark", label: "Thème sombre" }, { value: "light", label: "Thème clair" }]}
         value={theme}
         onChange={(t) => {
+          setThemeState(t);
           setTheme(t);
-          // Le thème clair est opt-in : un attribut sur <html> suffit, tous les tokens basculent.
-          if (t === "light") document.documentElement.setAttribute("data-theme", "light");
-          else document.documentElement.removeAttribute("data-theme");
         }}
       />
       <div className="space-y-8">

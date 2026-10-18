@@ -23,13 +23,22 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover", // contenu sous la barre d'état / la barre de gestes du Pixel : les safe areas sont gérées en CSS
   interactiveWidget: "resizes-content", // le clavier Android réduit la page : les boutons du bas restent au-dessus du clavier
-  themeColor: "#0A0A0C",
-  colorScheme: "dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F7FA" },
+    { media: "(prefers-color-scheme: dark)", color: "#0A0A0C" },
+  ],
+  colorScheme: "light dark",
 };
+
+// Exécuté avant l'affichage : applique le thème forcé sans flash.
+const THEME_SCRIPT = `try{var t=localStorage.getItem("pulse-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${body.variable} ${num.variable}`}>
+    <html lang="fr" className={`${body.variable} ${num.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="font-sans">
         <NativeFeel />
         {children}

@@ -26,6 +26,16 @@
     --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
     color-scheme: light;
   }
+  /* Mode automatique : mêmes valeurs claires quand le téléphone est en clair, sauf si le sombre est forcé. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: 247 247 250; --surface: 255 255 255; --surface-2: 240 240 245; --surface-3: 228 228 235;
+      --ink: 36 36 40; --ink-soft: 99 99 110; --ink-mute: 117 117 128; --line: 223 223 232;
+      --brand: 217 61 0; --brand-ink: 255 255 255;
+      --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
+      color-scheme: light;
+    }
+  }
 
   html {
     -webkit-tap-highlight-color: transparent; /* pas de rectangle bleu au tap */

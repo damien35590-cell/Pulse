@@ -6,8 +6,11 @@ const c = (v: string) => `rgb(var(--${v}) / <alpha-value>)`;
 const config: Config = {
   // lib/ inclus : les recettes de classes (lib/ui.ts) doivent être scannées.
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
-  // Sombre par défaut ; clair seulement si <html data-theme="light">. Les variantes dark: suivent ce choix, plus le réglage système.
-  darkMode: ["selector", ':root:not([data-theme="light"])'],
+  // Automatique (réglage du téléphone) par défaut ; <html data-theme="light|dark"> force un thème. Les variantes dark: suivent ce choix.
+  darkMode: ["variant", [
+    "@media (prefers-color-scheme: dark) { &:where(:root:not([data-theme=light]), :root:not([data-theme=light]) *) }",
+    "&:where([data-theme=dark], [data-theme=dark] *)",
+  ]],
   // Les hover: ne s'appliquent qu'aux appareils qui survolent vraiment : plus d'état « collé » après un tap sur mobile.
   future: { hoverOnlyWhenSupported: true },
   theme: {
