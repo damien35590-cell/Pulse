@@ -7,6 +7,7 @@ import { level, xpOf } from "@/lib/xp";
 import { prepLine, racePrep } from "@/lib/races/prep";
 import { getCountdown, needsResult } from "@/lib/races/time";
 import { uniqueById } from "@/lib/utils";
+import { isSoft } from "@/lib/sports";
 import type { Act } from "@/lib/insights/types";
 
 const sum = <T,>(a: T[], f: (x: T) => number) => a.reduce((s, x) => s + f(x), 0);
@@ -39,14 +40,14 @@ export async function getDashboard(userId: string) {
     const min = (list: typeof d) => Math.round(sum(list, (a) => a.movingTimeS) / 60);
     return {
       key, label: "LMMJVSD"[i], km: sum(d, (a) => a.distanceM) / 1000, type: top?.type ?? null, today: key === todayKey,
-      run: min(d.filter((a) => a.type !== "WORKOUT")), lift: min(d.filter((a) => a.type === "WORKOUT")), planned: plannedKeys.includes(key),
+      run: min(d.filter((a) => a.type !== "WORKOUT" && !isSoft(a.type))), lift: min(d.filter((a) => a.type === "WORKOUT")), planned: plannedKeys.includes(key),
     };
   });
   const runKm = sum(week.filter((a) => a.type === "RUN"), (a) => a.distanceM) / 1000;
   const liftT = sum(week.filter((a) => a.type === "WORKOUT"), (a) => sum(a.exercises, (e) => e.sets * e.reps * (e.loadKg ?? 0))) / 1000;
 
   // Série : semaines d'affilée avec au moins 2 jours actifs. La semaine en cours ne casse jamais la série.
-  const active = new Set(rows.map((a) => dayKey(a.startedAt, tz)));
+  const active = new Set(rows.filter((a) => !isSoft(a.type)).map((a) => dayKey(a.startedAt, tz)));
   let streak = 0;
   for (let k = 0; k < 14; k++) {
     const ok = weekKeys(now, tz, -k).filter((d) => active.has(d)).length >= 2;
@@ -72,10 +73,10 @@ export async function getDashboard(userId: string) {
   const form = { ctl, delta: ctl - Math.round(series.at(-8)?.ctl ?? fit.ctl), spark: series.slice(-14).map((f) => f.ctl), label: zone(fit.form).label };
   const muscles = (a: (typeof rows)[number]) => [...new Set(a.exercises.flatMap((e) => e.exercise?.primaryMuscles ?? []))].map((m) => MUSCLE_LABELS[m]);
   return {
-    form, runKm, weekCount: week.length, liftT, plannedCount: plannedKeys.length, fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },
+    form, runKm, weekCount: week.filter((a) => !isSoft(a.type)).length, liftT, plannedCount: plannedKeys.length, fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },
     km: sum(week, (a) => a.distanceM) / 1000, days, streak, insights,
     timeS: sum(week, (a) => a.movingTimeS), elevation: sum(week, (a) => a.elevationGainM), kcal: week.some((a) => a.calories != null) ? sum(week, (a) => a.calories ?? 0) : null,
-    goals, recent: uniqueById(rows).slice(0, 3).map((a) => ({ ...a, muscles: muscles(a) })), empty: rows.length === 0,
+    goals, recent: uniqueById(rows.filter((a) => !isSoft(a.type))).slice(0, 3).map((a) => ({ ...a, muscles: muscles(a) })), empty: rows.length === 0,
     range: new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).formatRange(new Date(keys[0]), new Date(keys[6])),
   };
 }
