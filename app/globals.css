@@ -3,25 +3,49 @@
 @tailwind utilities;
 
 @layer base {
+  /* Thème sombre par défaut, pensé pour l'écran OLED du Pixel : fond quasi noir (pas #000, qui « bave » au défilement). */
   :root {
-    --bg: 247 247 250; --surface: 255 255 255; --surface-2: 240 240 245;
-    --ink: 36 36 40; --ink-soft: 109 109 120; --line: 223 223 232;
-    --brand: 242 74 0; --brand-ink: 255 255 255;
-    --sport-run: 242 74 0; --sport-ride: 242 74 0; --sport-swim: 242 74 0;
-    --sport-hike: 242 74 0; --sport-workout: 242 74 0; --sport-other: 242 74 0;
+    --bg: 10 10 12; --surface: 20 20 23; --surface-2: 30 30 34; --surface-3: 42 42 48;
+    --ink: 245 245 247; --ink-soft: 161 161 170; --ink-mute: 138 138 149; --line: 38 38 43;
+    --brand: 252 76 2; --brand-ink: 10 10 12;
+    --good: 34 197 94; --warn: 245 158 11; --bad: 239 68 68;
+    /* Zones (cardio et puissance) : mêmes teintes qu'avant, désormais en tokens (bg-z4, text-z2…). */
+    --z1: 138 138 149; --z2: 59 130 246; --z3: 34 197 94; --z4: 234 179 8; --z5: 239 68 68; --z6: 139 92 246;
+    --sport-run: var(--brand); --sport-ride: var(--brand); --sport-swim: var(--brand);
+    --sport-hike: var(--brand); --sport-workout: var(--brand); --sport-other: var(--brand);
+    /* En sombre, une ombre portée ne se voit pas : on simule la lumière par un liseré clair en haut de la carte. */
+    --shadow-card: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
     --font-display: var(--font-body);
+    color-scheme: dark;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: 16 16 18; --surface: 27 27 31; --surface-2: 38 38 43;
-      --ink: 245 245 247; --ink-soft: 160 160 171; --line: 46 46 52;
-      --brand: 255 90 20;
-      --sport-run: 255 90 20; --sport-ride: 255 90 20; --sport-swim: 255 90 20;
-      --sport-hike: 255 90 20; --sport-workout: 255 90 20; --sport-other: 255 90 20;
-    }
+  /* Thème clair, optionnel : <html data-theme="light">. */
+  :root[data-theme="light"] {
+    --bg: 247 247 250; --surface: 255 255 255; --surface-2: 240 240 245; --surface-3: 228 228 235;
+    --ink: 36 36 40; --ink-soft: 99 99 110; --ink-mute: 117 117 128; --line: 223 223 232;
+    --brand: 217 61 0; --brand-ink: 255 255 255;
+    --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
+    color-scheme: light;
   }
-  html { color-scheme: light dark; -webkit-tap-highlight-color: transparent; height: 100%; }
-  body { @apply bg-bg text-ink antialiased; min-height: 100%; overscroll-behavior-y: contain; touch-action: manipulation; }
+
+  html {
+    -webkit-tap-highlight-color: transparent; /* pas de rectangle bleu au tap */
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    overscroll-behavior-y: contain; /* pas de « tirer pour rafraîchir » qui recharge la page en pleine saisie */
+    height: 100%;
+  }
+  body {
+    @apply bg-bg text-ink antialiased;
+    min-height: 100%;
+    overscroll-behavior-y: contain;
+    touch-action: manipulation; /* pas de zoom au double tap, pas de délai de 300 ms */
+  }
+  /* Éléments tactiles : pas de sélection de texte ni de loupe au long-press. */
+  a, button, [role="button"], [role="tab"], [role="radio"], [role="switch"], summary, label {
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
+  img, svg { -webkit-user-drag: none; }
+
   :focus-visible { @apply outline-2 outline-offset-2 outline-brand; }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 }

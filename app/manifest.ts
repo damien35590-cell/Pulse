@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "Pulse — Suivi sportif",
     short_name: "Pulse",
-    description: "Running, vélo, natation, rando : suivez chaque sortie. Gratuit, sans pub.",
+    description: "Course, vélo, rando et musculation : chaque séance suivie. Gratuit, sans pub.",
     lang: "fr",
     dir: "ltr",
     start_url: "/?source=pwa",
@@ -13,8 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     orientation: "portrait",
-    background_color: "#F7F7FA",
-    theme_color: "#FC4C02",
+    background_color: "#0A0A0C", // écran de lancement sombre : pas de flash blanc à l'ouverture
+    theme_color: "#0A0A0C",
     categories: ["health", "fitness", "sports"],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
