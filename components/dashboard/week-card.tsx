@@ -4,7 +4,7 @@ import { fmtNum } from "@/lib/format";
 import { Metric } from "@/components/ui/metric";
 
 type Day = { label: string; run: number; lift: number; planned: boolean; today?: boolean };
-type Props = { done: number; planned: number; runKm: number; liftT: number; days: Day[] };
+type Props = { done: number; planned?: number; runKm: number; liftT: number; days: Day[] };
 
 const hm = (min: number) => `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
 
@@ -18,7 +18,7 @@ export function WeekCard({ done, planned, runKm, liftT, days }: Props) {
   return (
     <div className={cn(ui.card, "p-4")}>
       <dl className="grid grid-cols-3 gap-3">
-        <Metric size="xl" label="Séances" value={done} unit={`/ ${planned}`} />
+        <Metric size="xl" label="Séances" value={done} unit={planned ? `/ ${planned}` : undefined} />
         <Metric size="xl" label="Course" value={fmtNum(runKm, 1)} unit="km" />
         <Metric size="xl" label="Muscu" value={fmtNum(liftT, 1)} unit="t" />
       </dl>

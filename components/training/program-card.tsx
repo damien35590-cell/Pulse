@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ChevronRight, Footprints, Pause, Rocket } from "lucide-react";
+import { ChevronRight, Pause, Rocket } from "lucide-react";
 import type { RunProgramView, SessionView } from "@/lib/data/training";
-import { fmtDuration, fmtNum } from "@/lib/format";
+import { fmtDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ui } from "@/lib/ui";
 import { PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
 
 /** « Bloc 1 · Semaine 2/4 — Base » */
@@ -51,37 +52,43 @@ export function NextSession({ s, paused }: { s: SessionView; paused?: boolean })
   );
 }
 
-/** Carte « Programme course » en haut de la Home. */
+/** Carte « Programme course » en tête de l'accueil : la prochaine séance en grand, un seul bouton principal. */
 export function ProgramCard({ p }: { p: RunProgramView }) {
   const week = p.weeks.find((w) => w.number === p.current.number);
-  const paused = p.status === "PAUSED", msg = cheer(p.weekDone, p.sessionsPerWeek);
+  const paused = p.status === "PAUSED", msg = cheer(p.weekDone, p.sessionsPerWeek), n = p.next;
   return (
-    <section aria-label="Programme course" className="space-y-3 rounded-xl border border-line bg-surface p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft"><Footprints className="h-3.5 w-3.5" aria-hidden />Programme course</p>
-        <Link href="/plan" className="-my-2 inline-flex min-h-11 items-center text-xs font-semibold text-brand">Voir le programme<ChevronRight className="h-4 w-4" aria-hidden /></Link>
+    <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4")}>
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/20 blur-3xl" />
+      <div className="relative flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"} · {p.name}</p>
+        <Link href="/plan" className="shrink-0 text-sm font-semibold text-brand active:opacity-60">Programme</Link>
       </div>
-      <div>
-        <h2 className="font-display text-2xl font-bold leading-none">{p.name}</h2>
-        <p className="mt-1.5 text-sm text-ink-soft">{weekLabel(p)}</p>
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        {week && <WeekDots sessions={week.sessions} />}
-        <p className="text-sm"><b className="font-display text-lg tabular-nums">{p.weekDone}/{p.sessionsPerWeek}</b> <span className="text-ink-soft">cette semaine</span></p>
-      </div>
-      {msg && <p className="text-sm font-semibold text-brand">{msg}</p>}
-
-      {p.pendingTest && <VmaTestPrompt sessionId={p.pendingTest.sessionId} />}
-
       {paused ? (
-        <div className="space-y-3 rounded-xl bg-surface-2 p-3">
-          <p className="flex items-center gap-2 text-sm"><Pause className="h-4 w-4 text-ink-soft" aria-hidden />Programme en pause. Il t’attend, reprends quand tu veux.</p>
+        <div className="relative mt-3 space-y-3">
+          <p className="flex items-center gap-2 text-[15px] text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />Il t’attend, reprends quand tu veux.</p>
           <PauseToggle id={p.id} paused full />
         </div>
-      ) : p.next ? (
-        <NextSession s={p.next} />
-      ) : null}
-      <p className="text-xs text-ink-soft">Allures calculées pour une VMA de {fmtNum(p.vma.vmaKmh)} km/h</p>
+      ) : n ? (
+        <>
+          <h2 className="relative mt-1.5 text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
+          <p className="relative mt-1 font-num text-base tabular-nums text-ink-soft">≈ {fmtDuration(n.durationS)}{n.isKeySession ? " · séance clé" : ""}</p>
+          {n.summary && <p className="relative mt-2 text-[15px] leading-snug text-ink-soft">{n.summary}</p>}
+          <div className="relative mt-5"><SessionActions id={n.id} variant="card" /></div>
+        </>
+      ) : (
+        <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>
+      )}
+      {p.pendingTest && <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div>}
+      <div className="relative mt-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs text-ink-mute">{weekLabel(p)}</p>
+          {msg && <p className="mt-0.5 text-xs font-semibold text-brand">{msg}</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {week && <WeekDots sessions={week.sessions} />}
+          <p className="font-num text-sm tabular-nums text-ink-soft">{p.weekDone}/{p.sessionsPerWeek}</p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -89,10 +96,10 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
 /** Sans programme actif. */
 export function StartProgramCard() {
   return (
-    <Link href="/plan" className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-surface p-4 active:scale-[.99]">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand/10 text-brand"><Rocket className="h-5 w-5" aria-hidden /></span>
-      <span className="min-w-0 flex-1"><b className="block">Lance ton programme course</b><span className="text-sm text-ink-soft">Reprise & VMA : 12 semaines, 2 ou 3 séances, à ton rythme</span></span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden />
+    <Link href="/plan" className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-4")}>
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><Rocket className="size-5" aria-hidden /></span>
+      <span className="min-w-0 flex-1"><b className="block text-[15px] font-semibold">Lance ton programme course</b><span className="text-sm text-ink-soft">Reprise & VMA : 12 semaines, 2 ou 3 séances, à ton rythme</span></span>
+      <ChevronRight className="size-4 shrink-0 text-ink-mute" aria-hidden />
     </Link>
   );
 }

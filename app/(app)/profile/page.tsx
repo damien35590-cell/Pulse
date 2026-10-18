@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Flag, Wrench, type LucideIcon } from "lucide-react";
+import { ChevronRight, Flag, Trophy, Wrench, type LucideIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { evaluateBadges } from "@/lib/badges";
 import { loadBadgeStats } from "@/lib/data/badges";
@@ -13,6 +13,7 @@ import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
 import { prisma } from "@/lib/prisma";
+import { level, rank, xpOf } from "@/lib/xp";
 import { getCountdown } from "@/lib/races/time";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function ProfilePage() {
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
   const { acts, rec, stats } = await loadBadgeStats(userId, TZ);
   const badges = evaluateBadges(stats);
+  const lvl = level(acts.reduce((t, a) => t + xpOf(a), 0));
   const st = stats.GLOBAL; // mêmes totaux que les badges, tous sports confondus
   // Record de distance : le vélotaf à assistance électrique (EBIKE) n'en établit pas.
   const longest = acts.reduce<(typeof acts)[number] | null>((best, a) => (a.type !== "EBIKE" && a.distanceM > 0 && a.distanceM > (best?.distanceM ?? 0) ? a : best), null);
@@ -66,7 +68,12 @@ export default async function ProfilePage() {
         <span className="min-w-0 flex-1"><b className="block font-display text-lg">Mes courses</b><span className="text-sm text-ink-soft">{nextRace ? <><b className="text-brand">{nextRace.c.short}</b> · {nextRace.r.name}</> : "Inscriptions, résultats, compte à rebours"}</span></span>
         <ChevronRight className="h-5 w-5 text-ink-soft" aria-hidden />
       </Link>
-      <BadgeGrid badges={badges} />
+      <a href="#badges" className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 active:bg-surface-2">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand"><Trophy className="h-5 w-5" aria-hidden /></span>
+        <span className="min-w-0 flex-1"><b className="block font-display text-lg">Badges et niveau</b><span className="text-sm text-ink-soft">Niveau {lvl.n} · {rank(lvl.n)}</span></span>
+        <ChevronRight className="h-5 w-5 text-ink-soft" aria-hidden />
+      </a>
+      <div id="badges" className="scroll-mt-20"><BadgeGrid badges={badges} /></div>
       <ZonesForm zones={zones} />
       <InstallPrompt variant="card" />
       <SignOut />

@@ -9,10 +9,10 @@ type A = {
   id: string; type: string; title: string; story: string | null; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; polyline: string | null;
   avgHr?: number | null; avgPower?: number | null; exercises?: { sets: number; reps: number; loadKg: number | null }[];
 };
-type Cell = { l: string; v: string; u?: string };
+export type Cell = { l: string; v: string; u?: string };
 
 /** Les 4 chiffres les plus utiles selon le sport : D+ pour le trail, puissance pour le vélo, volume pour la muscu… */
-function cells(a: A): Cell[] {
+export function cells(a: A): Cell[] {
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const dist: Cell = { l: "Distance", v: fmtKm(a.distanceM), u: "km" }, dur: Cell = { l: "Durée", v: fmtDuration(a.movingTimeS) };
   const dplus = a.elevationGainM > 0 ? { l: "D+", v: fmtNum(a.elevationGainM, 0), u: "m" } : null;
