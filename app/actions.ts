@@ -398,3 +398,21 @@ export async function deleteActivity(id: string): Promise<Res> {
   for (const p of ["/", "/activities", "/plan", "/analysis", "/fitness", "/goals", "/events", "/gear", "/plan/exercices"]) revalidatePath(p, p === "/plan/exercices" ? "layout" : "page");
   return { ok: true };
 }
+
+// ───────── Itinéraires ─────────
+/** Domicile = départ par défaut des boucles. */
+export async function setHome(lat: number, lng: number) {
+  const userId = await uid();
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false };
+  await prisma.user.update({ where: { id: userId }, data: { homeLat: Math.round(lat * 1e5) / 1e5, homeLng: Math.round(lng * 1e5) / 1e5 } });
+  revalidatePath("/itineraires");
+  return { ok: true };
+}
+
+export async function setRouteSaved(id: string, saved: boolean) {
+  const userId = await uid();
+  await prisma.suggestedRoute.updateMany({ where: { id, userId }, data: { saved } });
+  revalidatePath("/itineraires");
+  revalidatePath(`/itineraires/${id}`);
+  return { ok: true };
+}

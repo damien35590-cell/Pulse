@@ -69,6 +69,9 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `ZoneBar` | `components/activity/zone-bar.tsx` | temps par zone (`compact` pour une carte) |
 | `Splits` | `components/activity/splits.tsx` | allure par km |
 | `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours |
+| `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
+| `RouteCard` | `components/routes/route-card.tsx` | boucle proposée (Itinéraires) : nom, temps / km / D+, vignette, phrase « pourquoi » |
+| `PoiIcon` | `components/routes/poi-icon.tsx` | pastille d'un point d'intérêt (liste ou repère de carte) |
 
 ## Comportement « appli native » (déjà global)
 

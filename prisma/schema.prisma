@@ -80,6 +80,8 @@ model User {
   timezone      String    @default("Europe/Paris")
   ageBand       String?   // "30-39" : sert aux repères de comparaison
   sex           String?   // "H" | "F"
+  homeLat       Float?    // domicile : départ par défaut des itinéraires
+  homeLng       Float?
   createdAt     DateTime  @default(now())
 
   accounts   Account[]
@@ -98,6 +100,8 @@ model User {
   trainingGoals   TrainingGoal[]
   plannedSessions PlannedSession[]
   athleteMetrics  AthleteMetric[]
+
+  suggestedRoutes SuggestedRoute[]
 }
 
 model Account {
@@ -289,6 +293,38 @@ model ActivityStream {
   curve      Json?  // meilleure puissance moyenne sur 5 s, 30 s, 1 min, 5 min, 20 min, 1 h
   avgCad     Int?
   activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+// ───────── Itinéraires : boucles proposées (ORS) et notées avec OpenStreetMap (Overpass) ─────────
+model SuggestedRoute {
+  id         String       @id @default(cuid())
+  userId     String
+  sport      ActivityType // RUN ou RIDE
+  variant    String?      // vélo : "road" | "trail"
+  minutes    Int          // temps visé
+  startLat   Float
+  startLng   Float
+  polyline   String       @db.Text // trace encodée (lib/polyline.ts)
+  elevation  Json         // altitude (m, entiers), un point par point de la trace
+  distanceM  Float
+  ascentM    Float
+  estMinutes Int
+  label      String       // « La nature », « Les curiosités », « L'équilibrée »
+  why        String       // « 72 % en forêt ou au bord de l'eau · 3 points de vue · 1 point d'eau »
+  scores     Json         // lib/routes/score.ts : RouteScores
+  pois       Json         // [{ id, name, type, lat, lng, km }]
+  saved      Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, saved, createdAt(sort: Desc)])
+}
+
+/// Réponses Overpass découpées par tuile (lib/routes/overpass.ts), gardées 30 jours.
+model OverpassCache {
+  key       String   @id
+  data      Json
+  fetchedAt DateTime @default(now())
 }
 
 // ───────── Seuils personnels (vides = estimés automatiquement) ─────────

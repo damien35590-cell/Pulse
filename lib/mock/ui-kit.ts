@@ -9,6 +9,8 @@ import type { Split } from "@/components/activity/splits";
 import type { Band } from "@/components/activity/trace-chart";
 import type { LiftExercise } from "@/components/workout/set-logger";
 import type { ActivitySummaryData } from "@/components/dashboard/activity-summary";
+import type { RouteView } from "@/lib/data/routes";
+import { encodePolyline } from "@/lib/polyline";
 
 export const HR_MAX = 191;
 const HR_BOUNDS = bounds(HR_MAX, HR_PCT); // [115, 134, 153, 172, 181]
@@ -196,4 +198,15 @@ export const workout: { title: string; program: string; startedMinAgo: number; e
       prev: [{ reps: 15, kg: 0 }, { reps: 14, kg: 0 }, { reps: 12, kg: 0 }], done: [],
     },
   ],
+};
+
+/** Boucle proposée (Itinéraires) : un tour d'environ 9 km tracé en ellipse déformée. */
+const loopPts: [number, number][] = Array.from({ length: 48 }, (_, i) => {
+  const a = (i / 47) * 2 * Math.PI, wob = 1 + 0.18 * Math.sin(3 * a);
+  return [48.1535 + 0.012 * wob * Math.sin(a), -1.8265 + 0.02 * wob * (1 - Math.cos(a))];
+});
+export const routeSuggestion: RouteView = {
+  id: "demo-route", sport: "RUN", variant: null, label: "La nature", minutes: 60, estMinutes: 58, distanceM: 9400, ascentM: 86,
+  why: "64 % en forêt ou au bord de l'eau · 2 calvaires · 1 point de vue", polyline: encodePolyline(loopPts),
+  elevation: loopPts.map((_, i) => Math.round(60 + 25 * Math.sin((i / 47) * Math.PI * 2))), pois: [], saved: false, createdAt: "2026-10-18T08:00:00.000Z",
 };

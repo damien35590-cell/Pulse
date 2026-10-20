@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
-import { HR_MAX, fitness, goal, hrBands, liftSession, recent, runs, today, week, workout } from "@/lib/mock/ui-kit";
+import { HR_MAX, fitness, goal, hrBands, liftSession, recent, routeSuggestion, runs, today, week, workout } from "@/lib/mock/ui-kit";
 import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
 import { Delta, Metric } from "@/components/ui/metric";
@@ -18,6 +18,7 @@ import { TraceChart } from "@/components/activity/trace-chart";
 import { ZoneBar } from "@/components/activity/zone-bar";
 import { Splits } from "@/components/activity/splits";
 import { SetLogger } from "@/components/workout/set-logger";
+import { RouteCard } from "@/components/routes/route-card";
 
 export type Screen = "home" | "list" | "run" | "lift" | "workout" | "tokens";
 type Go = (s: Screen, runId?: string) => void;
@@ -90,6 +91,9 @@ function Home({ go }: { go: Go }) {
               <ActivitySummary key={a.id} a={a} onSelect={() => (a.type === "WORKOUT" ? go("lift") : go("run", a.id))} />
             ))}
           </div>
+        </Section>
+        <Section title="Itinéraire proposé">
+          <RouteCard r={routeSuggestion} onSelect={() => undefined} />
         </Section>
       </div>
     </>

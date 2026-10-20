@@ -19,6 +19,7 @@ import { cells } from "@/components/dashboard/activity-card";
 import { GearAlert } from "@/components/gear/gear-alert";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ProgramCard, StartProgramCard } from "@/components/training/program-card";
+import { PlanRouteCard } from "@/components/routes/plan-route-card";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,8 @@ export default async function DashboardPage() {
           <GearAlert gear={worn.sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))} />
           <InstallPrompt />
         </div>
+
+        <PlanRouteCard />
 
         {d.empty ? (
           <section className={cn(ui.card, "p-6")}>
