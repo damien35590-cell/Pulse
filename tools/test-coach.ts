@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-coach.ts
 import assert from "node:assert/strict";
-import { bestSlot, coachToday, liftHalf, slotText, type CoachInput } from "../lib/coach/today";
+import { bestSlot, coachToday, duringWork, liftHalf, slotText, type CoachInput } from "../lib/coach/today";
 import type { RideWeather } from "../lib/weather/open-meteo";
 
 const tz = "Europe/Paris";
@@ -68,5 +68,16 @@ const best = bestSlot(at, now, 45, tz)!;
 assert.ok(best.rainPct <= 10, "créneau sec");
 assert.ok(!best.night, "fini avant la nuit");
 assert.match(slotText(best, tz, now), /°C ressentis · sec · vent 10 km\/h$/);
+
+// ── Horaires de travail (9 h – 18 h en semaine) ──
+const paris = (iso: string) => Date.parse(iso); // heures UTC, Paris = UTC+2 en octobre
+assert.equal(duringWork(paris("2026-10-21T14:00:00Z"), 45, tz), true, "mercredi 16 h : au travail");
+assert.equal(duringWork(paris("2026-10-21T16:00:00Z"), 45, tz), false, "mercredi 18 h : libre");
+assert.equal(duringWork(paris("2026-10-21T06:00:00Z"), 45, tz), false, "mercredi 8 h → 8 h 45 : libre");
+assert.equal(duringWork(paris("2026-10-21T06:30:00Z"), 45, tz), true, "mercredi 8 h 30 → 9 h 15 : déborde sur le travail");
+assert.equal(duringWork(paris("2026-10-24T10:00:00Z"), 45, tz), false, "samedi midi : libre");
+// Mercredi 10 h, beau temps toute la journée : rien avant 18 h.
+const evening = bestSlot(() => w(5, 11, Date.parse("2026-10-21T17:30:00Z")), now, 45, tz)!;
+assert.ok(new Date(evening.at).getUTCHours() + 2 >= 18, `créneau après le travail (${slotText(evening, tz, now)})`);
 
 console.log("test-coach : OK");
