@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-strava-import.ts
 import assert from "node:assert/strict";
-import { findDuplicate, mapStravaType, parseCsv, parseNumber, parseStravaDate, readStravaCsv, stravaKey, toParsed, type KnownActivity } from "../lib/import/strava";
+import { findDuplicate, isExcludedType, mapStravaType, parseCsv, parseNumber, parseStravaDate, readStravaCsv, stravaKey, toParsed, type KnownActivity } from "../lib/import/strava";
 import { parseXmlTrack } from "../lib/import/xml-track";
 
 // ── CSV : guillemets, retours à la ligne dans une description, en-têtes répétés (le dernier « Distance » est en mètres) ──
@@ -43,6 +43,9 @@ assert.equal(mapStravaType("Randonnée").kind, "HIKE");
 assert.equal(mapStravaType("Marche").kind, "WALK");
 assert.equal(mapStravaType("Musculation").kind, "WORKOUT");
 assert.deepEqual(mapStravaType("Escalade"), { kind: "OTHER", known: false, commute: false });
+
+assert.ok(isExcludedType("Escalade"));
+assert.ok(!isExcludedType("Vélo"));
 
 // ── Activité sans fichier : CSV seul ──
 const manual = toParsed(rows[1], null);

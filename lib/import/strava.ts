@@ -149,6 +149,10 @@ const TYPES: { kind: ActivityKind; names: string[] }[] = [
   { kind: "SWIM", names: ["natation", "swim"] },
 ];
 
+/** Types que l'on choisit de ne pas importer (signalés dans le rapport). */
+export const EXCLUDED_TYPES = ["escalade", "rock climbing"];
+export const isExcludedType = (type: string) => EXCLUDED_TYPES.includes(norm(type));
+
 export type MappedType = { kind: ActivityKind; known: boolean; commute: boolean };
 
 /**

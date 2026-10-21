@@ -96,11 +96,13 @@ async function main() {
   const already: Row[] = [], noFile: Row[] = [];
   const duplicates: { row: Row; a: Parsed; m: NonNullable<ReturnType<typeof S.findDuplicate>> }[] = [];
   const errors: { row: Row; why: string }[] = [];
+  const excluded: Row[] = [];
   const unknown = new Map<string, number>(), dateGaps: string[] = [];
 
   let n = 0;
   for (const row of rows) {
     if (++n % 50 === 0) process.stderr.write(`\r  lecture ${n}/${rows.length}…`);
+    if (S.isExcludedType(row.type)) { excluded.push(row); continue; }
     const mapped = S.mapStravaType(row.type, row.commute);
     if (!mapped.known) unknown.set(row.type || "(vide)", (unknown.get(row.type || "(vide)") ?? 0) + 1);
     if (imported.has(S.stravaKey(row.id))) { already.push(row); continue; }
@@ -123,6 +125,7 @@ async function main() {
   line(`  déjà importées        ${String(already.length).padStart(5)}   source « strava », relance`);
   line(`  sans fichier          ${String(noFile.length).padStart(5)}   activités manuelles, données du CSV seules`);
   line(`  erreurs               ${String(errors.length).padStart(5)}   non importées`);
+  line(`  types exclus          ${String(excluded.length).padStart(5)}   ${[...new Set(excluded.map((r) => r.type))].join(", ") || "-"}, non importés`);
   line(`  types inconnus        ${String([...unknown.values()].reduce((s, v) => s + v, 0)).padStart(5)}   importés en « autre »`);
 
   const byType = new Map<string, { n: number; km: number }>();
