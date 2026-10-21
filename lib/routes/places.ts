@@ -1,11 +1,13 @@
 /**
  * Recherche de lieux de départ, côté serveur uniquement, gratuite et sans clé :
  * - IGN Géoplateforme (BAN + lieux nommés BD TOPO) : connaît les hameaux et lieux-dits, autocomplétion tolérante aux fautes ;
- * - Photon (OpenStreetMap, komoot) : parkings, forêts, étangs saisis dans OSM.
- * Les deux sont interrogées en parallèle puis fusionnées. Null si aucune ne répond : l'interface propose alors la carte.
+ * - Photon (OpenStreetMap, komoot) : parkings, forêts, étangs saisis dans OSM ;
+ * - Annuaire des entreprises (SIRENE, recherche-entreprises.api.gouv.fr) : une entreprise par son nom, établissements ouverts géolocalisés.
+ * Les trois sont interrogées en parallèle puis fusionnées. Null si aucune ne répond : l'interface propose alors la carte.
  */
 const URL = "https://photon.komoot.io";
 const IGN = "https://data.geopf.fr/geocodage";
+const SIRENE = "https://recherche-entreprises.api.gouv.fr/search";
 const TIMEOUT_MS = 4000;
 const LIMIT = 6;
 
@@ -113,6 +115,41 @@ async function ign(q: string, near?: { lat: number; lng: number }): Promise<Plac
   return [...parseIgnSearch(poi?.features ?? []), ...parseIgnCompletion(comp?.results ?? [])];
 }
 
+export type Etablissement = {
+  adresse?: string; latitude?: string | number | null; longitude?: string | number | null; libelle_commune?: string; code_postal?: string;
+  etat_administratif?: string; statut_diffusion_etablissement?: string; nom_commercial?: string | null; liste_enseignes?: string[] | null; siret?: string;
+};
+export type Entreprise = { nom_complet?: string; siege?: Etablissement; matching_etablissements?: Etablissement[] };
+
+const cap = (s: string) => s.toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (m) => m.toUpperCase());
+
+/**
+ * Conversion pure de l'annuaire des entreprises : établissements ouverts, diffusibles et géolocalisés.
+ * « GEIREC » · « 276 Rue De Chateaugiron, Rennes (35) ». Boîtes postales (CS, BP) retirées de l'adresse.
+ */
+export function parseEntreprises(results: Entreprise[]): Place[] {
+  const out: Place[] = [];
+  for (const e of results) {
+    const list = e.matching_etablissements?.length ? e.matching_etablissements : e.siege ? [e.siege] : [];
+    for (const et of list) {
+      const lat = Number(et.latitude), lng = Number(et.longitude);
+      if (et.etat_administratif !== "A" || et.statut_diffusion_etablissement === "N" || !et.latitude || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const name = cap(et.liste_enseignes?.[0] ?? et.nom_commercial ?? e.nom_complet ?? "").trim();
+      if (!name) continue;
+      const street = (et.adresse ?? "").replace(/\b(CS|BP|TSA)\s*\d+\b/gi, "").replace(/\b\d{5}\b.*$/, "").replace(/\s+/g, " ").trim();
+      const d = dept(et.code_postal), city = et.libelle_commune ? cap(et.libelle_commune) : "";
+      const detail = [street && cap(street), [city, d && `(${d})`].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+      out.push({ id: `siret:${et.siret ?? `${lat},${lng}`}`, name, detail, lat, lng });
+    }
+  }
+  return out;
+}
+
+async function entreprises(q: string): Promise<Place[] | null> {
+  const j = (await getJson(`${SIRENE}?${new URLSearchParams({ q, per_page: "5", etat_administratif: "A" })}`)) as { results?: Entreprise[] } | null;
+  return j ? parseEntreprises(j.results ?? []) : null;
+}
+
 /** Distance en km (haversine). */
 export function km(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
@@ -133,13 +170,13 @@ export function mergePlaces(lists: Place[][], q: string, near?: { lat: number; l
   return all.sort((a, b) => rank(a) - rank(b) || (a.km ?? 0) - (b.km ?? 0)).slice(0, limit);
 }
 
-/** Lieux correspondant à `q` (IGN + Photon), les plus proches de `near` d'abord (domicile ou position). */
+/** Lieux correspondant à `q` (IGN + Photon + entreprises), les plus proches de `near` d'abord (domicile ou position). */
 export async function searchPlaces(q: string, near?: { lat: number; lng: number }) {
   const params = new URLSearchParams({ q, lang: "fr", limit: String(LIMIT) });
   if (near) { params.set("lat", String(near.lat)); params.set("lon", String(near.lng)); }
-  const [fromIgn, f] = await Promise.all([ign(q, near), photon("/api/", params)]);
-  if (!fromIgn && !f) return null;
-  return mergePlaces([fromIgn ?? [], f ? parsePhoton(f) : []], q, near);
+  const [fromIgn, f, firms] = await Promise.all([ign(q, near), photon("/api/", params), entreprises(q)]);
+  if (!fromIgn && !f && !firms) return null;
+  return mergePlaces([fromIgn ?? [], f ? parsePhoton(f) : [], firms ?? []], q, near);
 }
 
 /** Nom du lieu le plus proche d'un point touché sur la carte. */

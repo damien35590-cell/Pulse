@@ -9,7 +9,7 @@ import { parseOverpass, tilesFor, mergeTiles } from "../lib/routes/overpass";
 import { classifyPoi } from "../lib/routes/poi";
 import { indexOsm, overlap, pickThree, sampleRoute, scoreRoute, whyText } from "../lib/routes/score";
 import { gpxFileName, toGpx } from "../lib/routes/gpx";
-import { mergePlaces, parseIgnCompletion, parseIgnSearch, parsePhoton } from "../lib/routes/places";
+import { mergePlaces, parseEntreprises, parseIgnCompletion, parseIgnSearch, parsePhoton } from "../lib/routes/places";
 
 const now = new Date("2026-10-20T10:00:00Z");
 const ago = (days: number, type: string, km: number, min: number, extra: Partial<HistoryActivity> = {}): HistoryActivity =>
@@ -146,6 +146,18 @@ const merged = mergePlaces([ignC, places], "gerec", { lat: 48.11, lng: -1.68 });
 assert.equal(merged[0].name, "Le Gérec", "nom contenant la saisie (sans accents) en premier");
 assert.ok(merged[0].km! < 10, "distance au départ habituel calculée");
 assert.equal(mergePlaces([[places[0]], [{ ...places[0], id: "x", lat: places[0].lat + 0.0005 }]], "foret").length, 1, "doublon à moins de 150 m écarté");
+
+// ── Lieux de départ (entreprises) ──
+const firms = parseEntreprises([
+  { nom_complet: "GEIREC", matching_etablissements: [
+    { adresse: "CS 76308 276 RUE DE CHATEAUGIRON 35000 RENNES", latitude: "48.0919165397561", longitude: "-1.62953879556544", libelle_commune: "RENNES", code_postal: "35000", etat_administratif: "A", statut_diffusion_etablissement: "O", siret: "42892951700020" },
+    { adresse: "2 RUE BERTRAND ROBIDOU 35000 RENNES", latitude: "48.1", longitude: "-1.66", etat_administratif: "F", siret: "1" },
+    { adresse: "1 RUE X 35000 RENNES", latitude: null, longitude: null, etat_administratif: "A", siret: "2" },
+  ] },
+]);
+assert.equal(firms.length, 1, "établissements fermés ou sans coordonnées écartés");
+assert.deepEqual([firms[0].name, firms[0].detail], ["Geirec", "276 Rue De Chateaugiron, Rennes (35)"]);
+assert.equal(mergePlaces([[], [], firms], "geirec", { lat: 48.11, lng: -1.68 })[0].name, "Geirec");
 
 // ── GPX ──
 const gpx = toGpx({ name: "La nature & co", points: [[48.1, -1.6], [48.2, -1.5]], elevation: [50, 60], pois: inForest.pois, time: now });

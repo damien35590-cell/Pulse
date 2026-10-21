@@ -81,7 +81,7 @@ export function PlacePicker({ near, value, onChange }: { near: LatLng | null; va
         <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-ink-mute" aria-hidden />
         <input
           type="search" enterKeyHint="search" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="Ville, adresse, parking, forêt…"
+          placeholder="Ville, adresse, entreprise, forêt…"
           className="h-12 w-full rounded-full bg-surface-2 pl-12 pr-12 text-[15px] text-ink outline-none placeholder:text-ink-mute focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-search-cancel-button]:hidden"
         />
         {q && (
@@ -122,7 +122,7 @@ export function PlacePicker({ near, value, onChange }: { near: LatLng | null; va
         </p>
       )}
       <PickMap center={near} value={value} onPick={pickOnMap} />
-      <p className="px-1 text-xs text-ink-mute">{value ? "Touche la carte pour ajuster le point de départ." : "Ou touche la carte pour placer le départ."} Recherche : IGN Géoplateforme et Photon (OpenStreetMap).</p>
+      <p className="px-1 text-xs text-ink-mute">{value ? "Touche la carte pour ajuster le point de départ." : "Ou touche la carte pour placer le départ."} Recherche : IGN, OpenStreetMap et annuaire des entreprises.</p>
     </div>
   );
 }
