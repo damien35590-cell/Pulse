@@ -30,6 +30,8 @@ type Props = {
   habits: { RUN: HabitSummary; RIDE: HabitSummary };
   run: { paceSKm: number; samples: number };
   ride: { speedKmh: number; samples: number };
+  /** Recherche pré-remplie (lien du coach du jour) : remplace la dernière recherche gardée. */
+  preset?: { sport: Sport; minutes: number } | null;
   /** Sections de la page affichées sous les résultats, avant l'espace réservé au bouton du bas. */
   children?: React.ReactNode;
 };
@@ -76,7 +78,7 @@ const HABIT_HINT: Record<Habit, string> = {
   discover: "Des chemins où tu n'es jamais passé autour de ton départ.",
 };
 
-export function RoutePlanner({ home: initialHome, run, ride, habits, children }: Props) {
+export function RoutePlanner({ home: initialHome, run, ride, habits, preset, children }: Props) {
   const [sport, setSport] = useState<Sport>("RUN");
   const [variant, setVariant] = useState<Variant>("road");
   const [minutes, setMinutes] = useState(60);
@@ -103,6 +105,10 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, children }:
   const departure = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (preset) {
+      setSport(preset.sport); setMinutes(preset.minutes); setCustom(!(PRESETS as readonly number[]).includes(preset.minutes));
+      return;
+    }
     const s = load();
     if (!s) return;
     setSport(s.sport); setVariant(s.variant); setMinutes(s.minutes); setCustom(s.custom); setRoutes(s.routes); setNote(s.note ?? null);

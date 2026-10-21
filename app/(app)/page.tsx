@@ -20,6 +20,8 @@ import { GearAlert } from "@/components/gear/gear-alert";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ProgramCard, StartProgramCard } from "@/components/training/program-card";
 import { PlanRouteCard } from "@/components/routes/plan-route-card";
+import { CoachCard } from "@/components/dashboard/coach-card";
+import { getCoach } from "@/lib/coach/load";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,8 @@ export default async function DashboardPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const [d, worn, run] = await Promise.all([getDashboard(s.user.id), gearAlerts(s.user.id), getRunProgram(s.user.id)]);
+  // Le coach ne bloque jamais l'accueil : en cas de souci, la carte n'apparaît pas.
+  const coach = await getCoach(s.user.id, run).catch((e) => { console.error("[coach]", e); return null; });
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: TZ }).format(new Date());
   const goal = d.goals[0];
   const recent = d.recent.map((a) => {
@@ -51,6 +55,7 @@ export default async function DashboardPage() {
         actions={<Link href="/import" aria-label="Importer un fichier" className={ui.iconBtn}><Upload className="size-5" aria-hidden /></Link>}
       />
       <div className="space-y-8">
+        {coach && !d.empty && <CoachCard c={coach} />}
         {run ? <ProgramCard p={run} /> : <StartProgramCard />}
 
         <div className="space-y-3 empty:hidden">

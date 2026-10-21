@@ -12,11 +12,17 @@ import Link from "next/link";
 import { ChevronRight, Footprints } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+/** Lien du coach du jour : /itineraires?sport=RUN&minutes=45 pré-remplit la recherche. */
+function preset(q: { sport?: string; minutes?: string }) {
+  const minutes = Number(q.minutes), sport = q.sport === "RIDE" ? "RIDE" : q.sport === "RUN" ? "RUN" : null;
+  return sport && minutes >= 15 && minutes <= 300 ? { sport, minutes: Math.round(minutes) } as const : null;
+}
 export const metadata = { title: "Itinéraires" };
 
 const date = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }).format(new Date(iso));
 
-export default async function RoutesPage() {
+export default async function RoutesPage({ searchParams }: { searchParams: { sport?: string; minutes?: string } }) {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const d = await getRoutePlanner(s.user.id);
@@ -25,7 +31,7 @@ export default async function RoutesPage() {
     <>
       <TopBar title="Itinéraires" back="/" subtitle="3 boucles depuis le départ de ton choix, selon ton temps dispo" />
       <div className="space-y-8">
-        <RoutePlanner home={d.home} run={d.run} ride={d.ride} habits={d.habits}>
+        <RoutePlanner home={d.home} run={d.run} ride={d.ride} habits={d.habits} preset={preset(searchParams)}>
           <Section title="Mes habitudes">
             <Link href="/itineraires/habitudes" className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-4")}>
               <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"><Footprints className="size-5" aria-hidden /></span>

@@ -149,3 +149,8 @@ export async function getRideWeather(lat: number, lng: number, startISO: string,
     return null;
   }
 }
+
+/** Prévision brute (cache 30 min), pour évaluer plusieurs heures de départ sans rappeler Open-Meteo. */
+export async function getForecast(lat: number, lng: number): Promise<OpenMeteoRaw | null> {
+  try { return await loadRaw(lat, lng); } catch { return null; }
+}
