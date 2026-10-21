@@ -4,6 +4,7 @@ import {
   angleDiff, bearing, buildHeat, familiarity, findClassics, findJunctions, Heat, junctionText, lengthOf, proj, resample,
   type LL, type Trace,
 } from "../lib/habits/grid";
+import { parsePoiId, poiFacts } from "../lib/routes/poi-details";
 import { classicWhy, detours, familiarText, habitBonus, shortcuts, waypointsOf } from "../lib/habits/plan";
 
 const lat0 = 48.1, P = proj(lat0);
@@ -91,5 +92,16 @@ assert.equal(familiarText("habit", 0.72), "72 % sur tes chemins habituels");
 assert.equal(familiarText("balanced", 0.4), null);
 assert.equal(classicWhy({ classicId: "c", name: "Étang de Paimpont", count: 14, kind: "longer", deltaMin: 9, viaName: "Moulin du Pont", viaJunction: true, loop: true }),
   "Boucle vers Étang de Paimpont · faite 14 fois · +9 min par la bifurcation que tu prends parfois vers Moulin du Pont");
+
+// ── Fiche d'un point d'intérêt ──
+assert.deepEqual(parsePoiId("n123"), { type: "node", id: 123 });
+assert.deepEqual(parsePoiId("w45"), { type: "way", id: 45 });
+assert.equal(parsePoiId("x1"), null);
+assert.equal(parsePoiId("n1;out"), null, "pas d'injection dans la requête Overpass");
+assert.deepEqual(poiFacts({ ele: "312.4", start_date: "C12", heritage: "2", opening_hours: "Mo-Fr 09:00-18:00", fee: "no" }), [
+  { label: "Altitude", value: "312 m" }, { label: "Époque", value: "12ᵉ siècle" }, { label: "Patrimoine", value: "Monument historique" },
+  { label: "Horaires", value: "lun-ven 09:00-18:00" }, { label: "Accès", value: "Gratuit" },
+]);
+assert.deepEqual(poiFacts({ amenity: "drinking_water" }), [{ label: "Eau", value: "Eau potable" }]);
 
 console.log("test-habits : OK");

@@ -16,6 +16,8 @@ import { TraceChart } from "@/components/activity/trace-chart";
 import { RouteMapFill } from "@/components/activity/route-map-lazy";
 import { durationMetric } from "@/lib/routes/view";
 import { PoiIcon } from "./poi-icon";
+import { PoiSheet } from "./poi-sheet";
+import type { RoutePoi } from "@/lib/routes/poi";
 import { WeatherAlerts, WeatherCredit } from "./weather";
 
 const startLabel = (ms: number) =>
@@ -65,6 +67,7 @@ export function RouteDetail({ r }: { r: RouteView }) {
   const [saved, setSaved] = useState(r.saved);
   const [pending, start] = useTransition();
   const [shared, setShared] = useState<ShareResult | null>(null);
+  const [poi, setPoi] = useState<RoutePoi | null>(null);
   const t = durationMetric(r.estMinutes);
 
   const toggle = () => {
@@ -78,7 +81,7 @@ export function RouteDetail({ r }: { r: RouteView }) {
     <div className="space-y-8">
       <div className="space-y-4">
         <div className="h-[48dvh] min-h-72 overflow-hidden rounded-card">
-          <RouteMapFill points={points} pois={r.pois} expandable className="h-full rounded-none" />
+          <RouteMapFill points={points} pois={r.pois} expandable onPoi={setPoi} focusId={poi?.id} className="h-full rounded-none" />
         </div>
         <dl className="grid grid-cols-3 gap-3 px-1">
           <Metric size="xl" label="Temps estimé" value={t.value} unit={t.unit} />
@@ -125,11 +128,14 @@ export function RouteDetail({ r }: { r: RouteView }) {
         </Section>
       )}
 
+      <PoiSheet poi={poi} onClose={() => setPoi(null)} />
+
       <Section title="Sur le parcours" action={<span className="font-num text-sm tabular-nums text-ink-mute">{r.pois.length}</span>}>
         {r.pois.length ? (
           <ul className={cn(ui.card, "divide-y divide-line px-4")}>
             {r.pois.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 py-3">
+              <li key={p.id}>
+                <button type="button" onClick={() => { tap(6); setPoi(p); }} className="flex w-full touch-manipulation items-center gap-3 py-3 text-left active:opacity-60">
                 <PoiIcon type={p.type} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-semibold text-ink">{p.name ?? poiTitle(p.type)}</p>
@@ -138,6 +144,7 @@ export function RouteDetail({ r }: { r: RouteView }) {
                 <p className="shrink-0 font-num text-metric-sm tabular-nums text-ink">
                   <span className="mr-1 font-sans text-xs font-medium text-ink-soft">km</span>{fmtNum(p.km, 1)}
                 </p>
+                </button>
               </li>
             ))}
           </ul>

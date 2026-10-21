@@ -19,6 +19,10 @@ type Props = {
   interactive?: boolean;
   /** Bouton pour passer la carte en plein écran. */
   expandable?: boolean;
+  /** Toucher un point d'intérêt (carte interactive) : ouvre sa fiche. */
+  onPoi?: (p: RoutePoi) => void;
+  /** Point d'intérêt mis en avant : la carte se centre dessus. */
+  focusId?: string | null;
   className?: string;
 };
 
@@ -28,12 +32,14 @@ const token = (name: string, fallback: string) => {
   return v ? `rgb(${v.split(/\s+/).join(",")})` : fallback;
 };
 
-export default function RouteMap({ points, pois, interactive = true, expandable, className }: Props) {
+export default function RouteMap({ points, pois, interactive = true, expandable, onPoi, focusId, className }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const bounds = useRef<L.LatLngBounds | null>(null);
   const [slots, setSlots] = useState<{ el: HTMLElement; poi: RoutePoi }[]>([]);
   const [full, setFull] = useState(false);
+  const poiCb = useRef(onPoi);
+  poiCb.current = onPoi;
 
   useEffect(() => {
     if (!el.current || points.length < 2) return;
@@ -52,8 +58,11 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
     dot(first, good);
 
     const markers = (pois ?? []).map((p) => {
-      const mk = L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "", html: "", iconSize: [28, 28] }), keyboard: false, interactive: !still }).addTo(m);
-      if (!still) mk.bindTooltip(p.name ?? poiTitle(p.type), { direction: "top", offset: [0, -14] });
+      const mk = L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "", html: "", iconSize: [44, 44] }) /* zone tactile de 44 px autour de la pastille */, keyboard: false, interactive: !still }).addTo(m);
+      if (!still) {
+        mk.bindTooltip(p.name ?? poiTitle(p.type), { direction: "top", offset: [0, -20] });
+        mk.on("click", () => { tap(6); poiCb.current?.(p); });
+      }
       return mk;
     });
     setSlots(markers.map((mk, i) => ({ el: mk.getElement()!, poi: pois![i] })).filter((s) => s.el));
@@ -63,6 +72,12 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
     map.current = m;
     return () => { m.remove(); map.current = null; setSlots([]); };
   }, [points, pois, interactive]);
+
+  // Point d'intérêt choisi (carte ou liste) : la carte se centre dessus.
+  useEffect(() => {
+    const m = map.current, p = pois?.find((x) => x.id === focusId);
+    if (m && p) m.setView([p.lat, p.lng], Math.max(m.getZoom(), 16), { animate: true });
+  }, [focusId, pois]);
 
   // Plein écran : la carte se recadre sur la boucle ; Échap ou le bouton referme.
   useEffect(() => {
@@ -78,7 +93,7 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
   return (
     <div className={cn("isolate overflow-hidden bg-surface-2", full ? "fixed inset-0 z-50" : cn("relative h-72 w-full rounded-xl", className))}>
       <div ref={el} className={cn("size-full", !interactive && "pointer-events-none")} role="img" aria-label="Carte du parcours" />
-      {slots.map((s) => createPortal(<PoiIcon type={s.poi.type} marker />, s.el, s.poi.id))}
+      {slots.map((s) => createPortal(<span className="grid size-full place-items-center"><PoiIcon type={s.poi.type} marker active={s.poi.id === focusId} /></span>, s.el, s.poi.id))}
       {expandable && (
         <button
           type="button"

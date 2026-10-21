@@ -214,7 +214,7 @@ export const routeSuggestion: RouteView = {
     startAt: Date.parse("2026-10-18T15:30:00Z"), reversed: true,
     line: "Vent de face à l'aller, retour poussé · averses possibles (40 %) · nuit avant le retour",
     alerts: [{ tone: "warn", text: "Nuit avant le retour (coucher 18:52) · Pars avant 17:37 pour rentrer de jour · 38 % éclairé" }, { tone: "warn", text: "42 % non revêtu : chemins sans doute boueux (14 mm en 48 h)" }],
-    outfit: "Short ou corsaire, manches longues fines · veste de pluie légère dans la poche · frontale et gilet réfléchissant",
+    outfit: "Manches longues fines, gants fins dans la poche · veste de pluie légère dans la poche · frontale et gilet réfléchissant",
   },
 };
 

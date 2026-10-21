@@ -114,19 +114,20 @@ export function nightInfo(w: RideWeather, estMinutes: number, now = Date.now()) 
 }
 
 // ───────── Conseil tenue ─────────
+// Pas de conseil sur le bas (collant, corsaire, short) : chacun sait ce qu'il met. Le haut, le buff et les gants font la différence.
 const RUN_LAYERS: [number, string][] = [
-  [0, "Collant long, deux couches, gants et bonnet"],
-  [5, "Collant long, manches longues chaudes, gants fins"],
-  [10, "Collant ou corsaire, manches longues"],
-  [15, "Short ou corsaire, manches longues fines"],
-  [22, "Short et t-shirt"],
+  [0, "Deux couches, buff, gants chauds et bonnet"],
+  [5, "Manches longues chaudes, buff et gants"],
+  [10, "Manches longues, buff et gants fins"],
+  [15, "Manches longues fines, gants fins dans la poche"],
+  [22, "T-shirt"],
 ];
 const RIDE_LAYERS: [number, string][] = [
-  [3, "Collant long, veste thermique, gants d'hiver, couvre-chaussures"],
-  [8, "Collant long, manches longues et coupe-vent, gants longs"],
-  [13, "Jambières, manchettes, coupe-vent, gants fins"],
-  [18, "Cuissard court, maillot et gilet coupe-vent"],
-  [24, "Cuissard et maillot courts"],
+  [3, "Veste thermique, buff, gants d'hiver, couvre-chaussures"],
+  [8, "Manches longues et coupe-vent, buff et gants longs"],
+  [13, "Manchettes, coupe-vent, buff et gants fins"],
+  [18, "Maillot et gilet coupe-vent"],
+  [24, "Maillot court"],
 ];
 
 export function outfit(w: RideWeather, sport: RouteSport, night: boolean) {

@@ -13,13 +13,13 @@ export const POI_ICONS: Record<PoiType, LucideIcon> = {
 };
 
 /** Pastille d'un point d'intérêt : dans une liste, ou en repère sur la carte (`marker`). */
-export function PoiIcon({ type, marker, className }: { type: PoiType; marker?: boolean; className?: string }) {
+export function PoiIcon({ type, marker, active, className }: { type: PoiType; marker?: boolean; active?: boolean; className?: string }) {
   const Icon = POI_ICONS[type] ?? Landmark;
   return (
     <span
       className={cn(
         "grid shrink-0 place-items-center rounded-full",
-        marker ? "size-7 bg-surface text-brand shadow-pop ring-2 ring-brand" : "size-10 bg-surface-2 text-ink",
+        marker ? cn("size-7 cursor-pointer shadow-pop ring-2 ring-brand transition-transform", active ? "scale-125 bg-brand text-brand-ink" : "bg-surface text-brand") : "size-10 bg-surface-2 text-ink",
         className,
       )}
     >
