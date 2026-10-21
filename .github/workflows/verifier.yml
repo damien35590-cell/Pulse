@@ -1,0 +1,38 @@
+# Garde-fou : à chaque push (et pull request), on vérifie que Pulse compile, que les types sont bons et que les tests passent.
+# En cas d'échec, GitHub met une croix rouge sur le commit et envoie un e-mail. Aucun accès à la base : la construction
+# utilise des valeurs factices (la vraie base n'est touchée que par le build Vercel, via `prisma db push`).
+name: Vérifier Pulse
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      NEXTAUTH_SECRET: ci-secret-factice-de-32-caracteres-min
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Installer
+        run: npm ci
+      - name: Types
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Construction (comme sur Vercel, sans toucher la base)
+        run: npx next build
