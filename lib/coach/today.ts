@@ -45,8 +45,15 @@ export const EASY_RUN_AFTER_DAYS = 3; // sans programme : footing proposé aprè
 export const EASY_RUN_MIN = 40;
 export const REST_FORM = -30; // fatigue « risque élevé » (lib/fitness.ts)
 export const TIRED_FORM = -20;
-/** Horaires de travail : aucun créneau proposé qui les chevauche (lundi = 1 … vendredi = 5). */
-export const WORK = { days: [1, 2, 3, 4, 5], start: 9 * 60, end: 18 * 60 };
+/**
+ * Créneaux où tu peux courir (minutes depuis minuit, heure de Paris) : en semaine, avant le travail, le midi et le soir ;
+ * le week-end, toute la journée. La sortie doit tenir entièrement dans un créneau.
+ */
+const H = (h: number, m = 0) => h * 60 + m;
+export const FREE_TIME = {
+  weekday: [[H(6), H(9)], [H(12, 30), H(13, 30)], [H(18), H(23)]],
+  weekend: [[H(6), H(23)]],
+} as const;
 
 /** Jour ISO (1 = lundi) et minute de la journée, à l'heure de `tz`. */
 function local(ms: number, tz: string) {
@@ -54,10 +61,10 @@ function local(ms: number, tz: string) {
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   return { dow: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(get("weekday")) + 1, min: Number(get("hour")) * 60 + Number(get("minute")) };
 }
-/** La sortie [départ, départ + durée] tombe-t-elle sur les heures de travail ? */
-export function duringWork(startMs: number, minutes: number, tz: string) {
+/** La sortie [départ, départ + durée] tient-elle dans un de tes créneaux libres ? */
+export function fitsFreeTime(startMs: number, minutes: number, tz: string) {
   const { dow, min } = local(startMs, tz);
-  return WORK.days.includes(dow) && min < WORK.end && min + minutes > WORK.start;
+  return (dow >= 6 ? FREE_TIME.weekend : FREE_TIME.weekday).some(([from, to]) => min >= from && min + minutes <= to);
 }
 
 const UPPER = new Set(["CHEST", "BACK", "LATS", "TRAPS", "SHOULDERS", "BICEPS", "TRICEPS", "FOREARMS"]);
@@ -83,16 +90,15 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.p
 export const hhmm = (ms: number, tz: string) => new Intl.DateTimeFormat("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(new Date(ms)).replace(":", " h ").replace(/ h 00$/, " h");
 
 /**
- * Meilleur départ dans les prochaines heures (toutes les 30 min, de 6 h à 21 h, hors heures de travail, de jour autant que possible) :
+ * Meilleur départ dans les prochaines heures (toutes les 30 min, dans tes créneaux libres, de jour autant que possible) :
  * le moins de pluie, puis un ressenti proche de 12 °C, puis le moins de vent.
  */
 export function bestSlot(weatherAt: (startMs: number) => RideWeather | null, now: number, minutes: number, tz: string): CoachSlot | null {
   const first = Math.ceil((now + 10 * 6e4) / 18e5) * 18e5;
-  const lastHour = 21;
   let best: { s: CoachSlot; score: number } | null = null;
   for (let t = first; t <= now + 14 * 36e5; t += 18e5) {
     const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hourCycle: "h23" }).format(new Date(t)));
-    if (h >= lastHour || h < 6 || duringWork(t, minutes, tz)) continue;
+    if (!fitsFreeTime(t, minutes, tz)) continue;
     if (dayKey(t, tz) !== dayKey(now, tz) && best) break; // aujourd'hui d'abord ; demain seulement si rien ce soir
     const w = weatherAt(t);
     if (!w) continue;
