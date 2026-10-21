@@ -80,4 +80,10 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 
 `app/globals.css` + `components/layout/native-feel.tsx` : pas de surbrillance au tap, pas de tirer-pour-rafraîchir,
 pas de zoom au double tap, pas de sélection ni de menu au long-press (tactile uniquement), `hover:` actif seulement sur PC.
+
+Règle exacte : dans `@media (pointer: coarse)`, `html, body, body *` reçoivent `user-select: none` + `-webkit-user-select: none`
++ `-webkit-touch-callout: none` ; `input`, `textarea`, `[contenteditable]` et la classe utilitaire **`.selectable`** (et ses
+descendants) réactivent `user-select: text`. `native-feel.tsx` ajoute, toujours sur tactile, un `preventDefault()` sur
+`contextmenu` et `selectstart` hors de ces mêmes zones (+ `[data-allow-menu]` pour le menu seul). Ne jamais mettre `select-text`
+sur un composant : pour un texte à copier (code, identifiant…), poser `.selectable`. Sur PC (souris), la sélection reste possible.
 Dans une zone qui défile à l'intérieur d'un écran : `overscroll-contain`. Sur une courbe interactive : `touch-pan-y`.

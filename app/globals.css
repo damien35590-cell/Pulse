@@ -49,11 +49,16 @@
     overscroll-behavior-y: contain;
     touch-action: manipulation; /* pas de zoom au double tap, pas de délai de 300 ms */
   }
-  /* Éléments tactiles : pas de sélection de texte ni de loupe au long-press. */
-  a, button, [role="button"], [role="tab"], [role="radio"], [role="switch"], summary, label {
-    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  /* Écran tactile : aucun texte sélectionnable (ni barre Copier, ni bandeau de recherche Google au long-press).
+     Seuls les champs de saisie, [contenteditable] et .selectable gardent la sélection. Sur PC (souris), rien ne change. */
+  @media (pointer: coarse) {
+    html, body, body * {
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    }
+    input, textarea, [contenteditable], [contenteditable] *, .selectable, .selectable * {
+      -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+    }
   }
-  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
   img, svg { -webkit-user-drag: none; }
 
   :focus-visible { @apply outline-2 outline-offset-2 outline-brand; }
