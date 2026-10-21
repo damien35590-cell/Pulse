@@ -830,14 +830,14 @@ model ProgramExerciseSlot {
 }
 
 // ───────── Notifications Web Push (lib/push, lib/notify) ─────────
-/** Petits secrets générés par l'app elle-même (ex. paire VAPID quand elle n'est pas fournie par l'environnement). */
+/// Petits secrets générés par l'app elle-même (ex. paire VAPID quand elle n'est pas fournie par l'environnement).
 model AppSecret {
   key       String   @id
   value     String   @db.Text
   createdAt DateTime @default(now())
 }
 
-/** Abonnement push d'un navigateur (un par appareil / navigateur). Supprimé quand le service push répond 404 ou 410. */
+/// Abonnement push d'un navigateur (un par appareil / navigateur). Supprimé quand le service push répond 404 ou 410.
 model PushSubscription {
   id        String    @id @default(cuid())
   userId    String
@@ -852,7 +852,7 @@ model PushSubscription {
   @@index([userId])
 }
 
-/** Quelles notifications envoyer (une ligne par utilisateur, créée au premier réglage). */
+/// Quelles notifications envoyer (une ligne par utilisateur, créée au premier réglage).
 model NotificationPrefs {
   userId    String   @id
   morning   Boolean  @default(true) // coach du matin
@@ -862,7 +862,7 @@ model NotificationPrefs {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-/** Journal d'envoi : au plus une notification de chaque type par jour (heure de Paris). */
+/// Journal d'envoi : au plus une notification de chaque type par jour (heure de Paris).
 model NotificationLog {
   id     String   @id @default(cuid())
   userId String
