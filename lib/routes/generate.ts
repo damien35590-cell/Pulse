@@ -35,6 +35,8 @@ export type Candidate = {
   /** Part de la distance par type de voie ORS (waytype) : 1 = State Road, 2 = Road… */
   bigRoadPct: number;
   unpavedPct: number;
+  /** Plages d'indices de `coords` sur grande route (lignes droites du fractionné). Absent pour une trace GPS. */
+  bigRoadSpans?: [number, number][];
 };
 
 export class RoutingError extends Error {
@@ -77,6 +79,10 @@ export function extraShare(coords: [number, number, number][], values: [number, 
   }
   return all ? hit / all : 0;
 }
+
+/** Plages d'indices [de, à] dont la valeur d'extra ORS est dans `codes`. */
+export const extraSpans = (values: [number, number, number][] | undefined, codes: number[]): [number, number][] =>
+  (values ?? []).filter(([, , v]) => codes.includes(v)).map(([from, to]) => [from, to] as [number, number]);
 
 // Codes ORS : waytype 1 = State Road, 2 = Road ; surface non revêtue = 2, 8 à 12, 15 à 17.
 const BIG_ROADS = [1, 2];
@@ -129,6 +135,7 @@ async function orsRequest(ctx: Ctx, body: Record<string, unknown>): Promise<Rout
       coords, distanceM, ascentM,
       estMinutes: estimateMinutes(ctx.profile, distanceM / 1000, ascentM),
       bigRoadPct: extraShare(coords, f.properties.extras?.waytype?.values, BIG_ROADS),
+      bigRoadSpans: extraSpans(f.properties.extras?.waytype?.values, BIG_ROADS),
       unpavedPct: extraShare(coords, f.properties.extras?.surface?.values, UNPAVED),
     };
   }

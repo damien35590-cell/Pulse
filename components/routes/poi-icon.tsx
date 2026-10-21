@@ -1,5 +1,5 @@
 import {
-  Castle, Church, Cross, Droplet, Eye, GlassWater, Landmark, Mountain, MountainSnow, Palette, Star, TowerControl, Utensils, Waves, Wind, type LucideIcon,
+  Castle, Church, Cross, Droplet, Droplets, Eye, GlassWater, Landmark, Mountain, MountainSnow, Palette, Star, TowerControl, Utensils, Waves, Wind, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PoiType } from "@/lib/routes/poi";
@@ -9,7 +9,7 @@ export const POI_ICONS: Record<PoiType, LucideIcon> = {
   peak: Mountain, spring: Droplet, waterfall: Waves, cave_entrance: MountainSnow,
   castle: Castle, ruins: Landmark, cross: Cross, memorial: Landmark, monument: Landmark, manor: Castle, church: Church,
   archaeological_site: Landmark, historic: Landmark,
-  lighthouse: TowerControl, tower: TowerControl, windmill: Wind, drinking_water: GlassWater,
+  lighthouse: TowerControl, tower: TowerControl, windmill: Wind, drinking_water: GlassWater, cemetery: Droplets,
 };
 
 /** Pastille d'un point d'intérêt : dans une liste, ou en repère sur la carte (`marker`). */

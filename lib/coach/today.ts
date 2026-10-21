@@ -3,6 +3,7 @@
  * de l'alternance Lafay (haut / bas du corps), de la météo et de tes classiques. Fonctions pures (tests : tools/test-coach.ts).
  */
 import type { RideWeather } from "@/lib/weather/open-meteo";
+import { sessionFromProgram, type RunSession } from "../routes/session-fit";
 
 export type Half = "upper" | "lower";
 export type CoachSlot = { at: number; feels: number; rainPct: number; windKmh: number; night: boolean };
@@ -18,7 +19,7 @@ export type CoachInput = {
   /** Moitié travaillée à la dernière séance de muscu (déduite des muscles). */
   lastLiftHalf: Half | null;
   /** Prochaine séance du programme course (date au format AAAA-MM-JJ, heure de Paris). */
-  runNext: { title: string; summary: string; minutes: number; date: string; isKey: boolean } | null;
+  runNext: { title: string; summary: string; minutes: number; date: string; isKey: boolean; /** SessionKind du programme (INTERVALS_SHORT, LONG_RUN…) */ kind?: string } | null;
   /** Meilleur créneau météo pour la séance course, si le domicile est connu. */
   slot: CoachSlot | null;
   /** Un de tes classiques qui tient dans le temps de la séance. */
@@ -117,7 +118,9 @@ export function slotText(s: CoachSlot, tz: string, now: number) {
   return [`${day}${hhmm(s.at, tz)}`, `${s.feels} °C ressentis`, rain, `vent ${s.windKmh} km/h`, s.night && "finit de nuit : frontale"].filter(Boolean).join(" · ");
 }
 
-const routeHref = (minutes: number) => `/itineraires?sport=RUN&minutes=${Math.max(15, Math.round(minutes / 5) * 5)}`;
+/** Lien vers les Itinéraires, avec le type de séance quand on le connaît (boucle avec ligne droite, points d'eau, plat). */
+export const routeHref = (minutes: number, session?: RunSession | null) =>
+  `/itineraires?sport=RUN&minutes=${Math.max(15, Math.round(minutes / 5) * 5)}${session && session !== "normal" ? `&session=${session}` : ""}`;
 const LIFT_HREF = "/record/session";
 
 /** La recommandation du jour. */
@@ -159,7 +162,7 @@ export function coachToday(i: CoachInput): CoachPlan {
     if (late > 0) lines.push(`Prévue ${late === 1 ? "hier" : `il y a ${late} jours`} : fais-la aujourd'hui, le programme suit.`);
     return {
       kind: "run", tag: r.isKey ? "Séance clé" : "Course", title: r.title, lines,
-      primary: { label: `Trouver une boucle de ${r.minutes} min`, href: routeHref(r.minutes) },
+      primary: { label: `Trouver une boucle de ${r.minutes} min`, href: routeHref(r.minutes, sessionFromProgram(r)) },
       secondary: { label: "Voir le programme", href: "/plan" },
       next: liftDue ? `Demain : muscu ${lift.title.toLowerCase()}` : undefined, tone: tired ? "easy" : "go",
     };
@@ -182,7 +185,7 @@ export function coachToday(i: CoachInput): CoachPlan {
     if (i.classic) lines.push(`${i.classic.title} tient pile (${i.classic.minutes} min)`);
     return {
       kind: "run", tag: "Footing", title: `Footing facile · ${EASY_RUN_MIN} min`, lines,
-      primary: { label: `Trouver une boucle de ${EASY_RUN_MIN} min`, href: routeHref(EASY_RUN_MIN) }, tone: "easy",
+      primary: { label: `Trouver une boucle de ${EASY_RUN_MIN} min`, href: routeHref(EASY_RUN_MIN, "easy") }, tone: "easy",
     };
   }
 

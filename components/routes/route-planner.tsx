@@ -5,6 +5,7 @@ import type { RouteView } from "@/lib/data/routes";
 import type { RideWeather } from "@/lib/weather/open-meteo";
 import type { Place } from "@/lib/routes/places";
 import { fmtPaceMin } from "@/lib/routes/estimate";
+import { RUN_SESSIONS, SESSION_LABEL, type RunSession } from "@/lib/routes/session-fit";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
@@ -31,7 +32,7 @@ type Props = {
   run: { paceSKm: number; samples: number };
   ride: { speedKmh: number; samples: number };
   /** Recherche pré-remplie (lien du coach du jour) : remplace la dernière recherche gardée. */
-  preset?: { sport: Sport; minutes: number } | null;
+  preset?: { sport: Sport; minutes: number; session?: RunSession } | null;
   /** Sections de la page affichées sous les résultats, avant l'espace réservé au bouton du bas. */
   children?: React.ReactNode;
 };
@@ -45,7 +46,7 @@ type Mode = "home" | "here" | "place";
 type Saved = {
   sport: Sport; variant: Variant; minutes: number; custom: boolean; routes: RouteView[]; note?: string;
   /** Départ choisi : retrouvé au retour d'une fiche (sinon « Choisis un départ » alors que les boucles sont là). */
-  mode?: Mode; here?: (LatLng & { acc: number }) | null; place?: Place | null; habit?: Habit;
+  mode?: Mode; here?: (LatLng & { acc: number }) | null; place?: Place | null; habit?: Habit; session?: RunSession;
 };
 const load = (): Saved | null => { try { return JSON.parse(sessionStorage.getItem(STORE) ?? "null"); } catch { return null; } };
 const store = (s: Saved) => { try { sessionStorage.setItem(STORE, JSON.stringify(s)); } catch { /* stockage indisponible */ } };
@@ -72,6 +73,13 @@ function readPosition(): Promise<GeolocationPosition> {
   });
 }
 
+const SESSION_HINT: Record<RunSession, string> = {
+  normal: "Boucles classées comme d'habitude : nature, curiosités, équilibre.",
+  intervals: "Une ligne droite plate d'au moins 400 m (1 km idéalement), hors grandes routes, pour tes répétitions.",
+  long: "Des points d'eau sur le parcours (fontaines, cimetières) ; plus de 75 min sans eau est pénalisé.",
+  easy: "Du plat et de la nature (parcs, forêts, chemins), le moins de routes fréquentées possible.",
+};
+
 const HABIT_HINT: Record<Habit, string> = {
   habit: "Tes chemins connus d'abord, et ton classique adapté à ton temps.",
   balanced: "Un mélange : ton classique s'il tient dans ce temps, puis des boucles variées.",
@@ -84,6 +92,9 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, preset, chi
   const [minutes, setMinutes] = useState(60);
   const [custom, setCustom] = useState(false);
   const [habit, setHabit] = useState<Habit>("balanced");
+  const [session, setSession] = useState<RunSession>("normal");
+  /** Séance reprise du lien du coach (programme) : signalée sous le sélecteur. */
+  const [fromPlan, setFromPlan] = useState(false);
   const [home, setHomeState] = useState(initialHome);
   const [mode, setMode] = useState<Mode>(initialHome ? "home" : "here");
   const [here, setHere] = useState<(LatLng & { acc: number }) | null>(null);
@@ -107,12 +118,14 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, preset, chi
   useEffect(() => {
     if (preset) {
       setSport(preset.sport); setMinutes(preset.minutes); setCustom(!(PRESETS as readonly number[]).includes(preset.minutes));
+      setSession(preset.session ?? "normal"); setFromPlan(!!preset.session && preset.session !== "normal");
       return;
     }
     const s = load();
     if (!s) return;
     setSport(s.sport); setVariant(s.variant); setMinutes(s.minutes); setCustom(s.custom); setRoutes(s.routes); setNote(s.note ?? null);
     if (s.habit) setHabit(s.habit);
+    if (s.session) setSession(s.session);
     if (s.mode === "place" && s.place) { setPlace(s.place); setMode("place"); }
     else if (s.mode === "here" && s.here) { setHere(s.here); setMode("here"); }
     else if (s.mode === "home" && initialHome) setMode("home");
@@ -178,13 +191,16 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, preset, chi
     try {
       const res = await fetch("/api/routes/suggest", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sport, variant: sport === "RIDE" ? variant : undefined, minutes, start: { lat: start.lat, lng: start.lng }, startISO: startISO(when, pick), habit }),
+        body: JSON.stringify({
+          sport, variant: sport === "RIDE" ? variant : undefined, minutes, start: { lat: start.lat, lng: start.lng }, startISO: startISO(when, pick), habit,
+          session: sport === "RUN" ? session : undefined,
+        }),
       });
       const j = await res.json().catch(() => null);
       if (!res.ok || !j?.routes) throw new Error(j?.error ?? (res.status === 504 ? "La recherche a pris trop de temps. Réessaie : la zone sera en cache." : "La recherche a échoué."));
       setRoutes(j.routes); setNote(j.note ?? null);
       if (j.weather !== undefined) setWeather(j.weather);
-      store({ sport, variant, minutes, custom, routes: j.routes, note: j.note, mode, here, place, habit });
+      store({ sport, variant, minutes, custom, routes: j.routes, note: j.note, mode, here, place, habit, session });
     } catch (e) {
       setError(e instanceof Error ? e.message : "La recherche a échoué.");
     } finally {
@@ -205,6 +221,22 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, preset, chi
           <p className="px-1 text-xs text-ink-mute">{hint}</p>
         </div>
       </Section>
+
+      {sport === "RUN" && (
+        <Section title="Séance">
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Type de séance">
+              {RUN_SESSIONS.map((s) => (
+                <Chip key={s} active={session === s} onClick={() => { setSession(s); setFromPlan(false); }}>{SESSION_LABEL[s]}</Chip>
+              ))}
+            </div>
+            <p className="px-1 text-xs text-ink-mute">
+              {fromPlan && <span className="font-semibold text-ink-soft">D&apos;après ta séance du programme. </span>}
+              {SESSION_HINT[session]}
+            </p>
+          </div>
+        </Section>
+      )}
 
       <Section title="Style">
         <div className="space-y-2">

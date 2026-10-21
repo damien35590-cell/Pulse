@@ -8,21 +8,23 @@ import { Section } from "@/components/ui/section";
 import { RoutePlanner } from "@/components/routes/route-planner";
 import { RouteCard } from "@/components/routes/route-card";
 import { sportLine } from "@/lib/routes/view";
+import { parseSession } from "@/lib/routes/session-fit";
 import Link from "next/link";
 import { ChevronRight, Footprints } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-/** Lien du coach du jour : /itineraires?sport=RUN&minutes=45 pré-remplit la recherche. */
-function preset(q: { sport?: string; minutes?: string }) {
+/** Lien du coach du jour : /itineraires?sport=RUN&minutes=45&session=intervals pré-remplit la recherche (séance : course seulement). */
+function preset(q: { sport?: string; minutes?: string; session?: string }) {
   const minutes = Number(q.minutes), sport = q.sport === "RIDE" ? "RIDE" : q.sport === "RUN" ? "RUN" : null;
-  return sport && minutes >= 15 && minutes <= 300 ? { sport, minutes: Math.round(minutes) } as const : null;
+  if (!sport || !(minutes >= 15 && minutes <= 300)) return null;
+  return { sport, minutes: Math.round(minutes), session: sport === "RUN" ? parseSession(q.session) : "normal" } as const;
 }
 export const metadata = { title: "Itinéraires" };
 
 const date = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }).format(new Date(iso));
 
-export default async function RoutesPage({ searchParams }: { searchParams: { sport?: string; minutes?: string } }) {
+export default async function RoutesPage({ searchParams }: { searchParams: { sport?: string; minutes?: string; session?: string } }) {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const d = await getRoutePlanner(s.user.id);

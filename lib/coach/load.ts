@@ -35,7 +35,7 @@ export async function getCoach(userId: string, run: RunProgramView | null, now =
   const todayDone = recent.filter((a) => dayKey(a.startedAt, tz) === today && !isSoft(a.type) && !isCommute(a)).map((a) => ({ type: a.type, title: a.title }));
 
   const next = run?.status === "ACTIVE" ? run.next : null;
-  const runNext = next ? { title: next.title, summary: next.summary, minutes: Math.max(15, Math.round(next.durationS / 60)), date: next.date, isKey: next.isKeySession } : null;
+  const runNext = next ? { title: next.title, summary: next.summary, minutes: Math.max(15, Math.round(next.durationS / 60)), date: next.date, isKey: next.isKeySession, kind: next.kind } : null;
   const minutes = runNext?.minutes ?? EASY_RUN_MIN;
 
   // Météo et classiques : seulement si le domicile est connu (départ des boucles).

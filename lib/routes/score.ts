@@ -8,7 +8,8 @@ import { lineString } from "@turf/helpers";
 import type { RouteSport } from "./estimate";
 import { timeError, TIME_TOLERANCE } from "./estimate";
 import type { NatureKind, OsmData, Pt, RouteKind } from "./overpass";
-import { poiLabel, type PoiType, type RoutePoi } from "./poi";
+import { isWaterPoi, poiLabel, type PoiType, type RoutePoi } from "./poi";
+import type { SessionScores } from "./session-fit";
 
 /** Réglages de la notation. */
 const SAMPLE_M = 50;
@@ -39,6 +40,8 @@ export type RouteScores = {
   lit?: number | null;
   /** Part du tracé sur tes chemins habituels (lib/habits), absente sans trace GPS. */
   familiar?: number;
+  /** Atout pour la séance demandée (fractionné, sortie longue, récup) ; bonus déjà compris dans `global`. */
+  session?: SessionScores;
 };
 
 export type ScoreInput = { coords: [number, number, number][]; distanceM: number; estMinutes: number; bigRoadPct: number; unpavedPct: number };
@@ -198,8 +201,8 @@ export function scoreRoute<T extends ScoreInput>(c: T, idx: OsmIndex | null, spo
   }
 
   const n = samples.length || 1;
-  const poiCount = pois.filter((x) => x.type !== "drinking_water").length;
-  const waterPoints = pois.length - poiCount;
+  const poiCount = pois.filter((x) => !isWaterPoi(x.type)).length;
+  const waterPoints = pois.filter((x) => x.type === "drinking_water").length;
   const err = timeError(c.estMinutes, target);
   const scores: RouteScores = {
     nature: natureN / n,
@@ -237,25 +240,33 @@ export function overlap(a: { coords: [number, number, number][]; samples: Sample
 export type Choice<T> = { label: string; route: Scored<T> };
 
 /**
- * « La nature » (max nature), « Les curiosités » (max POI), « L'équilibrée » (meilleur score global),
+ * `lead` d'abord s'il est donné (séance : « Pour le fractionné »…),
+ * puis « La nature » (max nature), « Les curiosités » (max POI), « L'équilibrée » (meilleur score global),
  * en écartant toute boucle qui recouvre à 60 % ou plus une boucle déjà choisie.
  * Sans OpenStreetMap : la plus tranquille (moins de grandes routes), la plus juste en temps, l'équilibrée.
  */
-export function pickThree<T extends ScoreInput>(list: Scored<T>[], pinned: Choice<T>[] = [], max = 3): Choice<T>[] {
-  const chosen: Choice<T>[] = [...pinned], cache = new Map<string, number>();
+export function pickThree<T extends ScoreInput>(
+  list: Scored<T>[], pinned: Choice<T>[] = [], max = 3,
+  /** Choix pris en premier (après les boucles épinglées) : « Pour le fractionné »… */
+  lead?: { label: string; key: (r: Scored<T>) => number },
+): Choice<T>[] {
+  const chosen: Choice<T>[] = [...pinned], cache = new Map<Scored<T>, Map<Scored<T>, number>>();
   const ov = (a: Scored<T>, b: Scored<T>) => {
-    const k = `${list.indexOf(a)}-${list.indexOf(b)}`;
-    if (!cache.has(k)) cache.set(k, overlap(a, b));
-    return cache.get(k)!;
+    let m = cache.get(a);
+    if (!m) cache.set(a, (m = new Map()));
+    if (!m.has(b)) m.set(b, overlap(a, b));
+    return m.get(b)!;
   };
   const take = (label: string, key: (r: Scored<T>) => number) => {
-    if (chosen.length >= max) return undefined;
+    // Un libellé déjà pris (complément d'une première sélection) n'est pas redonné.
+    if (chosen.length >= max || chosen.some((c) => c.label === label)) return undefined;
     const r = [...list]
       .sort((a, b) => key(b) - key(a) || b.scores.global - a.scores.global)
       .find((x) => chosen.every((c) => c.route !== x && ov(x, c.route) < MAX_OVERLAP));
     if (r) chosen.push({ label, route: r });
     return r;
   };
+  if (lead) take(lead.label, lead.key);
   const osm = list.some((r) => r.scores.osm);
   if (osm) {
     take("La nature", (r) => r.scores.nature + (r.scores.weather ?? 0));
@@ -273,8 +284,11 @@ export function pickThree<T extends ScoreInput>(list: Scored<T>[], pinned: Choic
 const pct = (x: number) => `${Math.round(x * 100)} %`;
 const NATURE_WORDS: Record<NatureKind, string> = { forest: "en forêt", water: "au bord de l'eau", heath: "dans les landes", park: "dans les parcs" };
 
-/** « 72 % en forêt ou au bord de l'eau · 3 points de vue · 1 point d'eau » */
-export function whyText(s: RouteScores, pois: RoutePoi[]) {
+/**
+ * « 72 % en forêt ou au bord de l'eau · 3 points de vue · 1 point d'eau ».
+ * `water: false` : points d'eau déjà détaillés par l'atout séance (sortie longue).
+ */
+export function whyText(s: RouteScores, pois: RoutePoi[], opts: { water?: boolean } = {}) {
   if (!s.osm) {
     const parts = [s.bigRoad < 0.05 ? "Quasiment pas de grandes routes" : `${pct(s.bigRoad)} sur grandes routes`];
     if (s.unpaved >= 0.2) parts.push(`${pct(s.unpaved)} non revêtu`);
@@ -287,9 +301,9 @@ export function whyText(s: RouteScores, pois: RoutePoi[]) {
     parts.push(`${pct(s.nature)} ${kinds.length ? kinds.map((k) => NATURE_WORDS[k]).join(" ou ") : "en nature"}`);
   }
   const counts = new Map<PoiType, number>();
-  for (const p of pois) if (p.type !== "drinking_water") counts.set(p.type, (counts.get(p.type) ?? 0) + 1);
+  for (const p of pois) if (!isWaterPoi(p.type)) counts.set(p.type, (counts.get(p.type) ?? 0) + 1);
   [...counts].sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(([t, n]) => parts.push(`${n} ${poiLabel(t, n)}`));
-  if (s.waterPoints) parts.push(`${s.waterPoints} ${poiLabel("drinking_water", s.waterPoints)}`);
+  if (s.waterPoints && opts.water !== false) parts.push(`${s.waterPoints} ${poiLabel("drinking_water", s.waterPoints)}`);
   if (parts.length < 3 && s.marked >= 0.3) parts.push(`${pct(s.marked)} balisé`);
   if (parts.length < 3 && s.bigRoad >= 0.15) parts.push(`${pct(s.bigRoad)} sur grandes routes`);
   if (!parts.length) parts.push(s.bigRoad < 0.05 ? "Petites routes et chemins, peu de nature cartographiée" : "Peu de nature cartographiée sur ce secteur");

@@ -6,6 +6,7 @@ import { buildProfile, HISTORY_DAYS, type BikeVariant, type RouteSport } from ".
 import { generateCandidates, RoutingError, type LatLng } from "./generate";
 import { loadLit, loadOsm } from "./overpass";
 import { bboxOfRoutes, indexOsm, pickThree, projection, scoreRoute, SegIndex, shareNear, whyText } from "./score";
+import { reverseSpans, sessionFit, SESSION_PICK, STRAIGHT_MIN_M, type RunSession, type SessionFit } from "./session-fit";
 import { toRouteView, type RouteView } from "@/lib/data/routes";
 import { getRideWeather, type RideWeather } from "@/lib/weather/open-meteo";
 import { nightInfo, shouldReverse, weatherAdjust, type RouteWeather } from "@/lib/weather/rules";
@@ -14,7 +15,11 @@ import { familiarity, type LL } from "@/lib/habits/grid";
 import { classicLabel, classicVariants, classicWhy, familiarText, habitBonus, type ClassicCandidate, type HabitMode } from "@/lib/habits/variants";
 import type { Candidate } from "./generate";
 
-export type SuggestInput = { sport: RouteSport; variant?: BikeVariant; minutes: number; start: LatLng; startISO?: string; habit?: HabitMode };
+export type SuggestInput = {
+  sport: RouteSport; variant?: BikeVariant; minutes: number; start: LatLng; startISO?: string; habit?: HabitMode;
+  /** Course : type de séance (fractionné, sortie longue, récup) ; « normal » ou absent = classement habituel. */
+  session?: RunSession;
+};
 export type SuggestResult = { routes: RouteView[]; note?: string; weather: RideWeather | null };
 
 /** Suggestions non gardées conservées quelques jours (historique de la page), puis supprimées. */
@@ -24,6 +29,7 @@ const LIT_NEAR_M = 20;
 
 export async function suggestRoutes(userId: string, input: SuggestInput, deadline: number): Promise<SuggestResult> {
   const { sport, minutes, start } = input, variant = sport === "RIDE" ? input.variant ?? "road" : undefined;
+  const session: RunSession = sport === "RUN" ? input.session ?? "normal" : "normal";
   const startISO = input.startISO ?? new Date().toISOString();
   // Météo en parallèle du tracé : elle ne bloque jamais la recherche.
   const weatherP = getRideWeather(start.lat, start.lng, startISO, minutes);
@@ -59,7 +65,9 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
   const w = await weatherP;
   const classic = classics[0] as (Candidate & { classic?: ClassicCandidate["classic"] }) | undefined;
   const candidates = [...gen.candidates, ...(classic ? [classic] : [])].map((c: Candidate & { classic?: ClassicCandidate["classic"] }) =>
-    w && shouldReverse(c.coords, w, sport) ? { ...c, coords: [...c.coords].reverse(), reversed: true } : { ...c, reversed: false },
+    w && shouldReverse(c.coords, w, sport)
+      ? { ...c, coords: [...c.coords].reverse(), bigRoadSpans: c.bigRoadSpans && reverseSpans(c.bigRoadSpans, c.coords.length), reversed: true }
+      : { ...c, reversed: false },
   );
 
   const bbox = bboxOfRoutes(candidates.map((c) => c.coords));
@@ -69,6 +77,7 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
   const litIdx = lit ? lit.reduce((ix, l, i) => ix.add(l, i), new SegIndex(projection(start.lat))) : null;
 
   const weatherOf = new Map<object, RouteWeather>();
+  const fitOf = new Map<object, SessionFit>();
   const scored = candidates.map((c) => {
     const r = scoreRoute(c, idx, sport, minutes);
     if (w) {
@@ -87,11 +96,29 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
       r.scores.familiar = Math.round(familiarity(habits.heat, r.samples.map((x) => [x.lat, x.lng] as LL)) * 1000) / 1000;
       r.scores.global += habitBonus(mode, r.scores.familiar);
     }
+    // Les cimetières (robinet probable) ne servent qu'à la sortie longue : ailleurs, ils ne sont pas signalés.
+    if (session !== "long") r.pois = r.pois.filter((p) => p.type !== "cemetery");
+    // Séance : ligne droite plate (fractionné), points d'eau (sortie longue), plat et nature (récup).
+    const fit = sessionFit(session, {
+      coords: r.coords, distanceM: r.distanceM, ascentM: r.ascentM, estMinutes: r.estMinutes, bigRoadSpans: c.bigRoadSpans,
+      pois: r.pois, nature: r.scores.nature, unpaved: r.scores.unpaved, bigRoad: r.scores.bigRoad,
+    });
+    if (fit) {
+      r.scores.session = fit.scores;
+      r.scores.global += fit.bonus;
+      fitOf.set(r, fit);
+    }
     return r;
   });
-  // Ton classique passe en premier (Habitude, Équilibre), puis les boucles ORS les plus différentes.
-  const mine = scored.find((r) => r.classic);
-  const picks = pickThree(scored.filter((r) => !r.classic), mine ? [{ label: classicLabel(mine.classic!), route: mine }] : []);
+  // Ton classique passe en premier (Habitude, Équilibre), puis la meilleure boucle pour la séance, puis les plus différentes.
+  // Fractionné : seules les boucles avec une ligne droite plate comptent, complétées par les autres s'il en manque.
+  const fits = (r: object) => fitOf.get(r)?.ok ?? true;
+  const mine = scored.find((r) => r.classic && fits(r));
+  const others = scored.filter((r) => !r.classic);
+  const lead = session !== "normal" ? { label: SESSION_PICK[session], key: (r: object) => fitOf.get(r)?.key ?? 0 } : undefined;
+  const first = pickThree(others.filter(fits), mine ? [{ label: classicLabel(mine.classic!), route: mine }] : [], 3, lead);
+  const picks = first.length < 3 ? pickThree(others, first) : first;
+  const fitCount = picks.filter(({ route }) => fitOf.get(route)?.ok).length;
 
   const old = new Date(Date.now() - KEEP_UNSAVED_DAYS * 864e5);
   const rows = await prisma.$transaction([
@@ -104,8 +131,11 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
           elevation: r.coords.map((c) => Math.round(c[2])),
           distanceM: Math.round(r.distanceM), ascentM: r.ascentM, estMinutes: Math.round(r.estMinutes),
           label,
-          why: [r.classic ? classicWhy(r.classic) : whyText(r.scores, r.pois), habits && r.scores.familiar != null && !r.classic ? familiarText(mode, r.scores.familiar) : null]
-            .filter(Boolean).join(" · "),
+          why: [
+            fitOf.get(r)?.text,
+            r.classic ? classicWhy(r.classic) : whyText(r.scores, r.pois, { water: session !== "long" }),
+            habits && r.scores.familiar != null && !r.classic ? familiarText(mode, r.scores.familiar) : null,
+          ].filter(Boolean).join(" · "),
           scores: r.scores as unknown as Prisma.InputJsonValue,
           pois: r.pois as unknown as Prisma.InputJsonValue,
           weather: (weatherOf.get(r) ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
@@ -116,6 +146,8 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
   const routes = rows.slice(1).map((r) => toRouteView(r as Parameters<typeof toRouteView>[0]));
   const notes = [
     habits && mode !== "discover" && habits.classics.length && !classic && "Aucun de tes classiques ne part d'ici dans ce temps.",
+    session === "intervals" && !fitCount && `Aucune boucle avec une ligne droite plate de ${STRAIGHT_MIN_M} m depuis ce départ : fais tes fractions au temps.`,
+    session === "intervals" && fitCount > 0 && fitCount < routes.length && `${fitCount} boucle${fitCount > 1 ? "s" : ""} sur ${routes.length} avec une ligne droite plate de ${STRAIGHT_MIN_M} m.`,
     routes.length < 3 && `Seulement ${routes.length} boucle${routes.length > 1 ? "s" : ""} assez différente${routes.length > 1 ? "s" : ""} dans ce temps.`,
     !osm.data && "OpenStreetMap n'a pas répondu : boucles classées sans le détail nature et curiosités.",
     !w && "Open-Meteo n'a pas répondu : boucles classées sans la météo.",

@@ -21,7 +21,8 @@ const URL = "https://overpass-api.de/api/interpreter";
 /** Taille d'une tuile de cache (degrés) : environ 5,5 × 3,7 km en Bretagne. */
 export const TILE = 0.05;
 const CACHE_DAYS = 30;
-const VERSION = "ovp1";
+// ovp2 : fontaines et robinets potables, cimetières (points d'eau des sorties longues).
+const VERSION = "ovp2";
 /** Les relations sont découpées par Overpass à la zone demandée + cette marge (degrés). */
 const REL_MARGIN = 0.01;
 // Overpass public met parfois 40 s à répondre (file d'attente) : on lui laisse tout le temps restant.
@@ -115,7 +116,8 @@ function buildQuery(b: BBox) {
 out geom qt;
 (rel[landuse=forest];rel[natural~"^(wood|water|wetland|heath|scrub)$"];rel[leisure~"^(park|nature_reserve)$"];);
 out geom(${rel}) qt;
-(nw[tourism~"^(viewpoint|attraction|artwork|picnic_site)$"];nw[natural~"^(peak|spring|waterfall|cave_entrance)$"];nw[historic];nw[man_made~"^(lighthouse|tower|windmill)$"];node[amenity=drinking_water];);
+(nw[tourism~"^(viewpoint|attraction|artwork|picnic_site)$"];nw[natural~"^(peak|spring|waterfall|cave_entrance)$"];nw[historic];nw[man_made~"^(lighthouse|tower|windmill)$"];node[amenity=drinking_water];
+ nw[amenity~"^(fountain|water_point)$"][drinking_water=yes];node[man_made=water_tap][drinking_water=yes];nw[landuse=cemetery];nw[amenity=grave_yard];);
 out center qt;
 rel[route~"^(hiking|foot|running|bicycle|mtb)$"];
 out geom(${rel}) qt;`;

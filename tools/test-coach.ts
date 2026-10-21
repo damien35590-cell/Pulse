@@ -24,7 +24,7 @@ const slot = { at: Date.parse("2026-10-21T16:00:00Z"), feels: 11, rainPct: 10, w
 const r = coachToday({ ...base, lastLiftAt: now - 3 * day, runNext: run, slot, classic: { title: "Boucle vers Étang", minutes: 48 } });
 assert.equal(r.kind, "run");
 assert.equal(r.tag, "Séance clé");
-assert.equal(r.primary?.href, "/itineraires?sport=RUN&minutes=50");
+assert.equal(r.primary?.href, "/itineraires?sport=RUN&minutes=50&session=intervals", "fractionné : la boucle cherche une ligne droite");
 assert.ok(r.lines.some((l) => l.startsWith("Meilleur créneau : 18 h")), r.lines.join(" | "));
 assert.ok(r.lines.some((l) => l.includes("Boucle vers Étang tient pile (48 min)")));
 assert.equal(r.next, "Demain : muscu bas du corps + abdos", "muscu due : annoncée pour demain");
@@ -52,7 +52,12 @@ assert.equal(done.lines[0], "Footing du matin");
 
 // ── Sans programme : footing après 3 jours sans courir, sinon récup ──
 assert.equal(coachToday({ ...base, lastRunAt: now - 4 * day }).kind, "run");
-assert.equal(coachToday({ ...base, lastRunAt: now - 4 * day }).primary?.href, "/itineraires?sport=RUN&minutes=40");
+assert.equal(coachToday({ ...base, lastRunAt: now - 4 * day }).primary?.href, "/itineraires?sport=RUN&minutes=40&session=easy");
+// Type de séance : le genre du programme d'abord, sinon le titre.
+assert.ok(coachToday({ ...base, runNext: { ...run, title: "Sortie longue · 65′", isKey: false } }).primary?.href.endsWith("&session=long"));
+assert.ok(coachToday({ ...base, runNext: { ...run, title: "Footing souple · 35′", isKey: false } }).primary?.href.endsWith("&session=easy"));
+assert.ok(coachToday({ ...base, runNext: { ...run, title: "Séance", kind: "LONG_RUN" } }).primary?.href.endsWith("&session=long"));
+assert.equal(coachToday({ ...base, runNext: { ...run, title: "Côtes · 8 × 45″", kind: "HILLS" } }).primary?.href, "/itineraires?sport=RUN&minutes=50", "côtes : boucle normale");
 assert.equal(coachToday(base).kind, "rest");
 
 // ── Meilleur créneau : la pluie de l'après-midi fait choisir 18 h ──
