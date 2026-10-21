@@ -10,6 +10,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
 import { Delta, Metric } from "@/components/ui/metric";
 import { Segmented } from "@/components/ui/segmented";
+import { Switch } from "@/components/ui/switch";
 import { TodayCard } from "@/components/dashboard/today-card";
 import { WeekCard } from "@/components/dashboard/week-card";
 import { StatTile } from "@/components/dashboard/stat-tile";
@@ -261,6 +262,7 @@ function Tokens() {
   const [theme, setThemeState] = useState<"dark" | "light">(() =>
     typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark",
   );
+  const [sw, setSw] = useState({ a: true, b: false });
   const swatch = (name: string, cls: string, note?: string) => (
     <div key={name} className="min-w-0">
       <div className={cn("h-14 rounded-tile ring-1 ring-inset ring-white/5", cls)} />
@@ -350,6 +352,13 @@ function Tokens() {
             <div><div className="h-16 rounded-tile bg-surface shadow-card" /><p className="mt-1.5">tile · 14</p></div>
             <div><div className="h-16 rounded-card bg-surface shadow-card" /><p className="mt-1.5">card · 20</p></div>
             <div><div className="h-16 rounded-t-sheet bg-surface-2 shadow-pop" /><p className="mt-1.5">sheet · 28</p></div>
+          </div>
+        </Section>
+
+        <Section title="Interrupteurs · toute la ligne se touche">
+          <div className={cn(ui.card, "divide-y divide-line/60 px-4")}>
+            <Switch label="Coach du matin" description="Vers 7 h : la séance du jour et le meilleur créneau" checked={sw.a} onChange={(a) => setSw({ ...sw, a })} />
+            <Switch label="Bilan du dimanche" checked={sw.b} onChange={(b) => setSw({ ...sw, b })} />
           </div>
         </Section>
 

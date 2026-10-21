@@ -1,3 +1,22 @@
 {
-  "crons": [{ "path": "/api/cron/sync-intervals", "schedule": "0 22 * * *" }]
+  "crons": [
+    { "path": "/api/cron/sync-intervals", "schedule": "0 22 * * *" },
+    { "path": "/api/cron/notify/matin", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/notify/rappel-06", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/notify/rappel-07", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/notify/rappel-08", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/notify/rappel-09", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/notify/rappel-10", "schedule": "0 10 * * *" },
+    { "path": "/api/cron/notify/rappel-11", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/notify/rappel-12", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/notify/rappel-13", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/notify/rappel-14", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/notify/rappel-15", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/notify/rappel-16", "schedule": "0 16 * * *" },
+    { "path": "/api/cron/notify/rappel-17", "schedule": "0 17 * * *" },
+    { "path": "/api/cron/notify/rappel-18", "schedule": "0 18 * * *" },
+    { "path": "/api/cron/notify/rappel-19", "schedule": "0 19 * * *" },
+    { "path": "/api/cron/notify/rappel-20", "schedule": "0 20 * * *" },
+    { "path": "/api/cron/notify/bilan", "schedule": "0 18 * * 0" }
+  ]
 }

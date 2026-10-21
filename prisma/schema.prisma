@@ -103,6 +103,11 @@ model User {
 
   suggestedRoutes SuggestedRoute[]
   habitMaps       HabitMap[]
+
+  // Notifications Web Push
+  pushSubscriptions PushSubscription[]
+  notificationPrefs NotificationPrefs?
+  notificationLogs  NotificationLog[]
 }
 
 model Account {
@@ -822,4 +827,49 @@ model ProgramExerciseSlot {
   logs     WorkoutExercise[]
 
   @@unique([workoutId, order])
+}
+
+// ───────── Notifications Web Push (lib/push, lib/notify) ─────────
+/** Petits secrets générés par l'app elle-même (ex. paire VAPID quand elle n'est pas fournie par l'environnement). */
+model AppSecret {
+  key       String   @id
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+/** Abonnement push d'un navigateur (un par appareil / navigateur). Supprimé quand le service push répond 404 ou 410. */
+model PushSubscription {
+  id        String    @id @default(cuid())
+  userId    String
+  endpoint  String    @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime  @default(now())
+  lastOkAt  DateTime? // dernier envoi accepté par le service push
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/** Quelles notifications envoyer (une ligne par utilisateur, créée au premier réglage). */
+model NotificationPrefs {
+  userId    String   @id
+  morning   Boolean  @default(true) // coach du matin
+  reminder  Boolean  @default(true) // rappel avant la séance du programme
+  weekly    Boolean  @default(true) // bilan du dimanche soir
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/** Journal d'envoi : au plus une notification de chaque type par jour (heure de Paris). */
+model NotificationLog {
+  id     String   @id @default(cuid())
+  userId String
+  kind   String   // "morning" | "reminder" | "weekly"
+  day    String   // AAAA-MM-JJ dans le fuseau de l'utilisateur
+  sentAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, day])
 }

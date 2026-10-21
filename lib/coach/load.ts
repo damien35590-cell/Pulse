@@ -15,6 +15,11 @@ const CLASSIC_FIT = 0.12;
 const CLASSIC_NEAR_M = 600;
 
 export async function getCoach(userId: string, run: RunProgramView | null, now = new Date()): Promise<CoachPlan> {
+  return coachToday(await loadCoachInput(userId, run, now));
+}
+
+/** Entrées du coach (aussi utilisées par les notifications : créneau, séance du programme). */
+export async function loadCoachInput(userId: string, run: RunProgramView | null, now = new Date()): Promise<CoachInput> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true, homeLat: true, homeLng: true } });
   const tz = user?.timezone ?? "Europe/Paris";
   const [fitActs, recent, lastRun, lastLift] = await Promise.all([
@@ -56,7 +61,7 @@ export async function getCoach(userId: string, run: RunProgramView | null, now =
   }
 
   const muscles = (lastLift?.exercises ?? []).flatMap((e) => (e.exercise?.primaryMuscles as string[] | undefined) ?? []);
-  return coachToday({
+  return {
     now: +now, tz,
     form: { value: fit?.form ?? 0, label: zone(fit?.form ?? 0).label },
     todayDone,
@@ -64,5 +69,5 @@ export async function getCoach(userId: string, run: RunProgramView | null, now =
     lastLiftAt: lastLift ? +lastLift.startedAt : null,
     lastLiftHalf: liftHalf(muscles),
     runNext, slot, classic,
-  });
+  };
 }

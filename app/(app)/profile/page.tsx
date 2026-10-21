@@ -11,6 +11,8 @@ import { ZonesForm } from "@/components/profile/zones-form";
 import { BadgeGrid } from "@/components/profile/badge-grid";
 import { Section } from "@/components/ui/section";
 import { ThemePicker } from "@/components/profile/theme-picker";
+import { NotificationSettings } from "@/components/profile/notification-settings";
+import { getPrefs } from "@/lib/notify/prefs";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
@@ -26,7 +28,7 @@ export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const [zones, gear, raceRows] = await Promise.all([getZones(userId), getGear(userId), prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 })]);
+  const [zones, gear, notifyPrefs, raceRows] = await Promise.all([getZones(userId), getGear(userId), getPrefs(userId), prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 })]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
   const { acts, rec, stats } = await loadBadgeStats(userId, TZ);
@@ -78,6 +80,7 @@ export default async function ProfilePage() {
       <div id="badges" className="scroll-mt-20"><BadgeGrid badges={badges} /></div>
       <ZonesForm zones={zones} />
       <Section title="Réglages"><ThemePicker /></Section>
+      <NotificationSettings prefs={notifyPrefs} />
       <InstallPrompt variant="card" />
       <SignOut />
     </div>

@@ -73,3 +73,19 @@ Limite : une séance qui n'arrive dans Intervals.icu que par Strava n'a pas de f
 
 ### Option B : script sur le PC (si MyWhoosh enregistre ses fichiers en local)
 `tools\trouver-fit.ps1` (clic droit, Exécuter avec PowerShell) liste les `.fit` modifiés ces 3 dernières heures. Si un dossier apparaît, renseignez-le dans `tools\lancer-pulse-sync.bat` (variable `INGEST_TOKEN` dans Vercel). Le script vérifie le dossier toutes les 10 minutes.
+
+## 7. Notifications (coach du matin, rappel de séance, bilan du dimanche)
+
+Sur le téléphone : **Vous** > **Notifications** > **Activer les notifications**, acceptez, puis **Envoyer un test**. Les trois interrupteurs choisissent ce que vous recevez. Toucher une notification ouvre la bonne page (boucle adaptée à la séance, séance de muscu, analyse de la semaine).
+
+Rien à configurer : la paire de clés VAPID est créée au premier besoin et gardée en base (table `AppSecret`). Pour imposer vos propres clés, ajoutez `VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY` dans Vercel (les appareils se réabonnent seuls à la visite suivante de la page Vous). Facultatif : `VAPID_SUBJECT` (`mailto:…`), sinon `ALLOWED_EMAIL` est utilisé. Les envois planifiés utilisent le même `CRON_SECRET` que la synchro.
+
+Horaires (crons Vercel, en UTC ; l'offre gratuite déclenche chaque cron une fois par jour, n'importe quand dans l'heure prévue) :
+
+| Envoi | Cron (UTC) | Heure de Paris, été (UTC+2) | Heure de Paris, hiver (UTC+1) |
+|---|---|---|---|
+| Coach du matin | `0 5 * * *` | 7 h – 8 h | 6 h – 7 h |
+| Rappel de séance | `0 6 * * *` … `0 20 * * *` (un cron par heure) | 8 h – 23 h | 7 h – 22 h |
+| Bilan de la semaine | `0 18 * * 0` (dimanche) | 20 h – 21 h | 19 h – 20 h |
+
+Le rappel part au premier passage tombant moins de 100 minutes avant le créneau choisi par le coach (le plus souvent 30 à 90 min avant), seulement si une séance du programme est prévue et pas encore faite (Pulse resynchronise Intervals.icu juste avant pour le vérifier). Sans domicile renseigné (pas de créneau météo), le rappel part vers 17 h. Chaque type part au plus une fois par jour.

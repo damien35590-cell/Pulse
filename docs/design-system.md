@@ -60,6 +60,7 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `Section` | `components/ui/section.tsx` | bloc de page avec titre en capitales + action |
 | `Metric`, `Delta` | `components/ui/metric.tsx` | toute valeur chiffrée (dans un `<dl>`) |
 | `Segmented` | `components/ui/segmented.tsx` | onglets (FC / puissance, filtres) |
+| `Switch` | `components/ui/switch.tsx` | réglage on / off : toute la ligne (libellé + phrase) est la cible, 56 px de haut |
 | `BottomSheet`, `ConfirmSheet` | `components/ui/bottom-sheet.tsx` | choix, confirmation, fin de séance |
 | `NumberStepper` | `components/ui/number-stepper.tsx` | saisie kg / reps : ±, appui long, clavier numérique |
 | `Sparkline` | `components/ui/sparkline.tsx` | tendance sans axe |
