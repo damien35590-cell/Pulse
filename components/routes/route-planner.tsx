@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { House, LocateFixed, MapPin, Route } from "lucide-react";
 import type { RouteView } from "@/lib/data/routes";
 import type { RideWeather } from "@/lib/weather/open-meteo";
+import type { Place } from "@/lib/routes/places";
 import { fmtPaceMin } from "@/lib/routes/estimate";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { NumberStepper } from "@/components/ui/number-stepper";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { RouteCard, RouteCardSkeleton } from "./route-card";
 import { WeatherBanner, WeatherCredit } from "./weather";
+import { PlacePicker } from "./place-picker";
 
 type Sport = "RUN" | "RIDE";
 type Variant = "road" | "trail";
@@ -64,8 +66,9 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
   const [minutes, setMinutes] = useState(60);
   const [custom, setCustom] = useState(false);
   const [home, setHomeState] = useState(initialHome);
-  const [mode, setMode] = useState<"home" | "here">(initialHome ? "home" : "here");
+  const [mode, setMode] = useState<"home" | "here" | "place">(initialHome ? "home" : "here");
   const [here, setHere] = useState<(LatLng & { acc: number }) | null>(null);
+  const [place, setPlace] = useState<Place | null>(null);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [routes, setRoutes] = useState<RouteView[] | null>(null);
@@ -94,7 +97,7 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
     return () => clearInterval(id);
   }, [loading]);
 
-  const start = mode === "home" ? home : here;
+  const start = mode === "home" ? home : mode === "here" ? here : place;
   const pickPast = when === "pick" && pickAt(pick) < Date.now() - 30 * 6e4;
 
   // Bandeau météo : rechargé quand le départ, l'heure ou la durée changent (le serveur garde la prévision 30 min).
@@ -208,7 +211,7 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
 
       <Section title="Départ">
         <div className="space-y-3">
-          <Segmented options={[{ value: "home", label: "Domicile" }, { value: "here", label: "Ma position" }]} value={mode} onChange={setMode} />
+          <Segmented options={[{ value: "home", label: "Domicile" }, { value: "here", label: "Ma position" }, { value: "place", label: "Autre lieu" }]} value={mode} onChange={setMode} />
           {mode === "home" ? (
             home ? (
               <div className={cn(ui.card, "flex items-center gap-3 p-4")}>
@@ -226,6 +229,8 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
                 </button>
               </div>
             )
+          ) : mode === "place" ? (
+            <PlacePicker near={home ?? here} value={place} onChange={setPlace} />
           ) : (
             <div className={cn(ui.card, "space-y-3 p-4")}>
               {here && (

@@ -9,6 +9,7 @@ import { parseOverpass, tilesFor, mergeTiles } from "../lib/routes/overpass";
 import { classifyPoi } from "../lib/routes/poi";
 import { indexOsm, overlap, pickThree, sampleRoute, scoreRoute, whyText } from "../lib/routes/score";
 import { gpxFileName, toGpx } from "../lib/routes/gpx";
+import { parsePhoton } from "../lib/routes/places";
 
 const now = new Date("2026-10-20T10:00:00Z");
 const ago = (days: number, type: string, km: number, min: number, extra: Partial<HistoryActivity> = {}): HistoryActivity =>
@@ -118,6 +119,18 @@ assert.equal(picks.length, 3);
 assert.equal(picks[0].label, "La nature");
 assert.ok(!picks.some((p) => p.route === twin), "le doublon de la boucle en forêt est écarté");
 
+// ── Lieux de départ (Photon) ──
+const places = parsePhoton([
+  { geometry: { coordinates: [-2.189, 48.017] }, properties: { osm_type: "W", osm_id: 42, name: "Forêt de Brocéliande", city: "Paimpont", county: "Ille-et-Vilaine", countrycode: "FR" } },
+  { geometry: { coordinates: [-2.189, 48.017] }, properties: { osm_type: "R", osm_id: 43, name: "Forêt de Brocéliande", city: "Paimpont", county: "Ille-et-Vilaine", countrycode: "FR" } },
+  { geometry: { coordinates: [-1.68, 48.11] }, properties: { street: "Rue de Brest", housenumber: "12", city: "Rennes", countrycode: "FR" } },
+  { geometry: { coordinates: [-1.6, 48.2] }, properties: { city: "Rennes" } },
+]);
+assert.equal(places.length, 2, "doublon et résultat sans nom écartés");
+assert.deepEqual(places[0], { id: "W42", name: "Forêt de Brocéliande", detail: "Paimpont, Ille-et-Vilaine", lat: 48.017, lng: -2.189 });
+assert.equal(places[1].name, "12 Rue de Brest");
+assert.equal(places[1].detail, "Rennes");
+
 // ── GPX ──
 const gpx = toGpx({ name: "La nature & co", points: [[48.1, -1.6], [48.2, -1.5]], elevation: [50, 60], pois: inForest.pois, time: now });
 assert.match(gpx, /<trkpt lat="48\.100000" lon="-1\.600000"><ele>50<\/ele><\/trkpt>/);
@@ -126,4 +139,4 @@ assert.match(gpx, /<name>La nature &amp; co<\/name>/);
 assert.ok(gpx.indexOf("<wpt") < gpx.indexOf("<trk>"), "waypoints avant la trace (ordre du schéma GPX)");
 assert.equal(gpxFileName("L'équilibrée", 12.44), "pulse-l-equilibree-12-4-km.gpx");
 
-console.log("✓ itinéraires : estimation, OSM, notation, choix et GPX");
+console.log("✓ itinéraires : estimation, OSM, notation, choix, lieux et GPX");
