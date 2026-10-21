@@ -7,10 +7,14 @@ export type TrackPoint = { lat?: number; lng?: number; ele?: number; t: number; 
 export type ParsedActivity = {
   /** Clé anti-doublon : début de l'activité arrondi à la minute (UTC). */
   dedupeKey: string;
-  source: "fit" | "gpx";
+  /** Identifiant dans la source d'origine (id d'activité Strava) ; à défaut, la clé anti-doublon. */
+  externalId?: string;
+  source: "fit" | "gpx" | "strava";
   fileName: string;
   type: ActivityKind;
   title: string;
+  /** Description / commentaire de la source (Strava), enregistré dans les notes. */
+  notes?: string;
   startedAt: string; // ISO
   distanceM: number;
   movingTimeS: number;
