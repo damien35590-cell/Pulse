@@ -51,7 +51,7 @@ export const TIRED_FORM = -20;
  */
 const H = (h: number, m = 0) => h * 60 + m;
 export const FREE_TIME = {
-  weekday: [[H(6), H(8)], [H(12, 30), H(13, 30)], [H(18), H(23)]], // 8 h – 9 h : trajet en vélo électrique vers le travail
+  weekday: [[H(6), H(8)], [H(12, 30), H(13, 30)], [H(19), H(23)]], // 8 h – 9 h et 18 h – 19 h : trajets en vélo électrique
   weekend: [[H(6), H(23)]],
 } as const;
 

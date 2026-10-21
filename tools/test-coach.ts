@@ -66,15 +66,17 @@ const at = (t: number) => {
 };
 const best = bestSlot(at, now, 45, tz)!;
 assert.ok(best.rainPct <= 10, "créneau sec");
-assert.ok(!best.night, "fini avant la nuit");
-assert.match(slotText(best, tz, now), /°C ressentis · sec · vent 10 km\/h$/);
+assert.ok(best.night, "seul créneau sec : 19 h, après le coucher du soleil");
+assert.match(slotText(best, tz, now), /finit de nuit : frontale/);
+assert.match(slotText(best, tz, now), /°C ressentis · sec · vent 10 km\/h/);
 
-// ── Créneaux libres : semaine 6 h – 8 h, 12 h 30 – 13 h 30, 18 h – 23 h ; week-end 6 h – 23 h ──
+// ── Créneaux libres : semaine 6 h – 8 h, 12 h 30 – 13 h 30, 19 h – 23 h ; week-end 6 h – 23 h ──
 const paris = (iso: string) => Date.parse(iso); // heures UTC, Paris = UTC+2 en octobre
 assert.equal(fitsFreeTime(paris("2026-10-21T14:00:00Z"), 45, tz), false, "mercredi 16 h : au travail");
 assert.equal(fitsFreeTime(paris("2026-10-21T10:30:00Z"), 45, tz), true, "mercredi 12 h 30 → 13 h 15 : pause du midi");
 assert.equal(fitsFreeTime(paris("2026-10-21T10:30:00Z"), 70, tz), false, "70 min ne tiennent pas dans la pause du midi");
-assert.equal(fitsFreeTime(paris("2026-10-21T16:00:00Z"), 45, tz), true, "mercredi 18 h : libre");
+assert.equal(fitsFreeTime(paris("2026-10-21T16:00:00Z"), 45, tz), false, "mercredi 18 h : trajet retour");
+assert.equal(fitsFreeTime(paris("2026-10-21T17:00:00Z"), 45, tz), true, "mercredi 19 h : libre");
 assert.equal(fitsFreeTime(paris("2026-10-21T20:00:00Z"), 45, tz), true, "mercredi 22 h → 22 h 45 : libre");
 assert.equal(fitsFreeTime(paris("2026-10-21T20:30:00Z"), 45, tz), false, "finirait après 23 h");
 assert.equal(fitsFreeTime(paris("2026-10-21T06:00:00Z"), 45, tz), false, "mercredi 8 h : trajet vers le travail");
@@ -85,6 +87,6 @@ const lunch = bestSlot(() => w(5, 11, Date.parse("2026-10-21T17:30:00Z")), now, 
 assert.equal(slotText(lunch, tz, now).split(" · ")[0], "12 h 30");
 // Séance longue (70 min) : pas le midi, le soir.
 const evening = bestSlot(() => w(5, 11, Date.parse("2026-10-21T17:30:00Z")), now, 70, tz)!;
-assert.ok(new Date(evening.at).getUTCHours() + 2 >= 18, `créneau du soir (${slotText(evening, tz, now)})`);
+assert.ok(new Date(evening.at).getUTCHours() + 2 >= 19, `créneau du soir (${slotText(evening, tz, now)})`);
 
 console.log("test-coach : OK");
