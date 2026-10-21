@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { syncIntervals } from "@/lib/sync/intervals";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
 import { matchRaceActivities } from "@/lib/races/link";
+import { buildAllHabits } from "@/lib/habits/build";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ const same = (a: string, b: string) => timingSafeEqual(createHash("sha256").upda
 
 /** Appelé une fois par jour par Vercel Cron (voir vercel.json). Vercel envoie « Authorization: Bearer <CRON_SECRET> ». */
 export async function GET(req: Request) {
+  const t0 = Date.now();
   const secret = process.env.CRON_SECRET?.trim(), email = process.env.ALLOWED_EMAIL?.trim().toLowerCase();
   const given = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!secret || secret.length < 16 || !given || !same(given, secret)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -40,9 +42,17 @@ export async function GET(req: Request) {
       races = { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
 
+    // Nouvelles traces GPS : habitudes recalculées (noms de lieux seulement s'il reste du temps), sans faire échouer le cron.
+    let habits: { ok: boolean; error?: string } | undefined;
+    const fresh = intervals.status === "fulfilled" && intervals.value.saved + intervals.value.backfilled > 0;
+    if (fresh) {
+      try { await buildAllHabits(user.id, t0 + 55_000); habits = { ok: true }; }
+      catch (e) { console.error("[cron] habitudes", e); habits = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+    }
+
     const failed = intervals.status === "rejected" || googleFit.status === "rejected";
     return NextResponse.json(
-      { intervals: report(intervals), googleFit: report(googleFit), races },
+      { intervals: report(intervals), googleFit: report(googleFit), races, habits },
       { status: failed ? 502 : 200 }
     );
   } catch (e) {

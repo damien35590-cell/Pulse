@@ -37,6 +37,8 @@ export type RouteScores = {
   weather?: number;
   /** Part du tracé sur voie éclairée, cherchée seulement quand la sortie finit de nuit. */
   lit?: number | null;
+  /** Part du tracé sur tes chemins habituels (lib/habits), absente sans trace GPS. */
+  familiar?: number;
 };
 
 export type ScoreInput = { coords: [number, number, number][]; distanceM: number; estMinutes: number; bigRoadPct: number; unpavedPct: number };
@@ -239,14 +241,15 @@ export type Choice<T> = { label: string; route: Scored<T> };
  * en écartant toute boucle qui recouvre à 60 % ou plus une boucle déjà choisie.
  * Sans OpenStreetMap : la plus tranquille (moins de grandes routes), la plus juste en temps, l'équilibrée.
  */
-export function pickThree<T extends ScoreInput>(list: Scored<T>[]): Choice<T>[] {
-  const chosen: Choice<T>[] = [], cache = new Map<string, number>();
+export function pickThree<T extends ScoreInput>(list: Scored<T>[], pinned: Choice<T>[] = [], max = 3): Choice<T>[] {
+  const chosen: Choice<T>[] = [...pinned], cache = new Map<string, number>();
   const ov = (a: Scored<T>, b: Scored<T>) => {
     const k = `${list.indexOf(a)}-${list.indexOf(b)}`;
     if (!cache.has(k)) cache.set(k, overlap(a, b));
     return cache.get(k)!;
   };
   const take = (label: string, key: (r: Scored<T>) => number) => {
+    if (chosen.length >= max) return undefined;
     const r = [...list]
       .sort((a, b) => key(b) - key(a) || b.scores.global - a.scores.global)
       .find((x) => chosen.every((c) => c.route !== x && ov(x, c.route) < MAX_OVERLAP));

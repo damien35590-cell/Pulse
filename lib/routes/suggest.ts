@@ -9,8 +9,12 @@ import { bboxOfRoutes, indexOsm, pickThree, projection, scoreRoute, SegIndex, sh
 import { toRouteView, type RouteView } from "@/lib/data/routes";
 import { getRideWeather, type RideWeather } from "@/lib/weather/open-meteo";
 import { nightInfo, shouldReverse, weatherAdjust, type RouteWeather } from "@/lib/weather/rules";
+import { loadHabitIndex } from "@/lib/habits/build";
+import { familiarity, type LL } from "@/lib/habits/grid";
+import { classicLabel, classicVariants, classicWhy, familiarText, habitBonus, type ClassicCandidate, type HabitMode } from "@/lib/habits/variants";
+import type { Candidate } from "./generate";
 
-export type SuggestInput = { sport: RouteSport; variant?: BikeVariant; minutes: number; start: LatLng; startISO?: string };
+export type SuggestInput = { sport: RouteSport; variant?: BikeVariant; minutes: number; start: LatLng; startISO?: string; habit?: HabitMode };
 export type SuggestResult = { routes: RouteView[]; note?: string; weather: RideWeather | null };
 
 /** Suggestions non gardées conservées quelques jours (historique de la page), puis supprimées. */
@@ -29,10 +33,18 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
     select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, source: true, dedupeKey: true, startLat: true, title: true },
   });
   const profile = buildProfile(sport, variant, acts);
+  const mode: HabitMode = input.habit ?? "balanced";
+  const habits = await loadHabitIndex(userId, sport).catch(() => null);
 
   // L'analyse OSM et l'écriture en base ont besoin d'environ 15 s : ORS s'arrête avant.
-  const gen = await generateCandidates({ start, profile, minutes, deadline: deadline - 15_000 });
-  if (!gen.candidates.length) {
+  // Tes classiques (sauf en Découverte) sont adaptés en même temps que les boucles ORS sont tracées.
+  const [gen, classics] = await Promise.all([
+    generateCandidates({ start, profile, minutes, deadline: deadline - 15_000 }),
+    habits && mode !== "discover"
+      ? classicVariants({ classics: habits.classics, junctions: habits.junctions, heat: habits.heat, profile, minutes, start, mode, deadline: deadline - 15_000 }).catch(() => [] as ClassicCandidate[])
+      : Promise.resolve([] as ClassicCandidate[]),
+  ]);
+  if (!gen.candidates.length && !classics.length) {
     if (gen.rateLimited) throw new RoutingError("OpenRouteService limite les requêtes pour l'instant. Réessaie dans une minute.", 429);
     const closest = gen.all.sort((a, b) => Math.abs(a.estMinutes - minutes) - Math.abs(b.estMinutes - minutes))[0];
     throw new RoutingError(
@@ -45,7 +57,8 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
 
   // Vent fort : chaque boucle est parcourue dans le sens qui met le vent de face à l'aller.
   const w = await weatherP;
-  const candidates = gen.candidates.map((c) =>
+  const classic = classics[0] as (Candidate & { classic?: ClassicCandidate["classic"] }) | undefined;
+  const candidates = [...gen.candidates, ...(classic ? [classic] : [])].map((c: Candidate & { classic?: ClassicCandidate["classic"] }) =>
     w && shouldReverse(c.coords, w, sport) ? { ...c, coords: [...c.coords].reverse(), reversed: true } : { ...c, reversed: false },
   );
 
@@ -69,9 +82,16 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
       r.scores.global += adj.bonus;
       weatherOf.set(r, adj.weather);
     }
+    // Habitudes : part du tracé sur tes chemins connus, favorisée (Habitude) ou évitée (Découverte).
+    if (habits) {
+      r.scores.familiar = Math.round(familiarity(habits.heat, r.samples.map((x) => [x.lat, x.lng] as LL)) * 1000) / 1000;
+      r.scores.global += habitBonus(mode, r.scores.familiar);
+    }
     return r;
   });
-  const picks = pickThree(scored);
+  // Ton classique passe en premier (Habitude, Équilibre), puis les boucles ORS les plus différentes.
+  const mine = scored.find((r) => r.classic);
+  const picks = pickThree(scored.filter((r) => !r.classic), mine ? [{ label: classicLabel(mine.classic!), route: mine }] : []);
 
   const old = new Date(Date.now() - KEEP_UNSAVED_DAYS * 864e5);
   const rows = await prisma.$transaction([
@@ -83,7 +103,9 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
           polyline: encodePolyline(r.coords.map(([lat, lng]) => [lat, lng])),
           elevation: r.coords.map((c) => Math.round(c[2])),
           distanceM: Math.round(r.distanceM), ascentM: r.ascentM, estMinutes: Math.round(r.estMinutes),
-          label, why: whyText(r.scores, r.pois),
+          label,
+          why: [r.classic ? classicWhy(r.classic) : whyText(r.scores, r.pois), habits && r.scores.familiar != null && !r.classic ? familiarText(mode, r.scores.familiar) : null]
+            .filter(Boolean).join(" · "),
           scores: r.scores as unknown as Prisma.InputJsonValue,
           pois: r.pois as unknown as Prisma.InputJsonValue,
           weather: (weatherOf.get(r) ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
@@ -93,6 +115,7 @@ export async function suggestRoutes(userId: string, input: SuggestInput, deadlin
   ]);
   const routes = rows.slice(1).map((r) => toRouteView(r as Parameters<typeof toRouteView>[0]));
   const notes = [
+    habits && mode !== "discover" && habits.classics.length && !classic && "Aucun de tes classiques ne part d'ici dans ce temps.",
     routes.length < 3 && `Seulement ${routes.length} boucle${routes.length > 1 ? "s" : ""} assez différente${routes.length > 1 ? "s" : ""} dans ce temps.`,
     !osm.data && "OpenStreetMap n'a pas répondu : boucles classées sans le détail nature et curiosités.",
     !w && "Open-Meteo n'a pas répondu : boucles classées sans la météo.",

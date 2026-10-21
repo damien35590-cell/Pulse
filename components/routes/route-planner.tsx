@@ -23,8 +23,11 @@ type Variant = "road" | "trail";
 type LatLng = { lat: number; lng: number };
 type When = "now" | "1h" | "pick";
 type Pick = { day: "today" | "tomorrow"; time: string }; // time : « HH:MM », heure du téléphone
+type Habit = "habit" | "balanced" | "discover";
+type HabitSummary = { traces: number; classics: number; junctions: number } | null;
 type Props = {
   home: LatLng | null;
+  habits: { RUN: HabitSummary; RIDE: HabitSummary };
   run: { paceSKm: number; samples: number };
   ride: { speedKmh: number; samples: number };
 };
@@ -60,11 +63,18 @@ function readPosition(): Promise<GeolocationPosition> {
   });
 }
 
-export function RoutePlanner({ home: initialHome, run, ride }: Props) {
+const HABIT_HINT: Record<Habit, string> = {
+  habit: "Tes chemins connus d'abord, et ton classique adapté à ton temps.",
+  balanced: "Un mélange : ton classique s'il tient dans ce temps, puis des boucles variées.",
+  discover: "Des chemins où tu n'es jamais passé autour de ton départ.",
+};
+
+export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
   const [sport, setSport] = useState<Sport>("RUN");
   const [variant, setVariant] = useState<Variant>("road");
   const [minutes, setMinutes] = useState(60);
   const [custom, setCustom] = useState(false);
+  const [habit, setHabit] = useState<Habit>("balanced");
   const [home, setHomeState] = useState(initialHome);
   const [mode, setMode] = useState<"home" | "here" | "place">(initialHome ? "home" : "here");
   const [here, setHere] = useState<(LatLng & { acc: number }) | null>(null);
@@ -150,7 +160,7 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
     try {
       const res = await fetch("/api/routes/suggest", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sport, variant: sport === "RIDE" ? variant : undefined, minutes, start: { lat: start.lat, lng: start.lng }, startISO: startISO(when, pick) }),
+        body: JSON.stringify({ sport, variant: sport === "RIDE" ? variant : undefined, minutes, start: { lat: start.lat, lng: start.lng }, startISO: startISO(when, pick), habit }),
       });
       const j = await res.json().catch(() => null);
       if (!res.ok || !j?.routes) throw new Error(j?.error ?? (res.status === 504 ? "La recherche a pris trop de temps. Réessaie : la zone sera en cache." : "La recherche a échoué."));
@@ -175,6 +185,17 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
           <Segmented options={[{ value: "RUN", label: "Course" }, { value: "RIDE", label: "Vélo" }]} value={sport} onChange={setSport} />
           {sport === "RIDE" && <Segmented size="sm" options={[{ value: "road", label: "Route" }, { value: "trail", label: "Chemins" }]} value={variant} onChange={setVariant} />}
           <p className="px-1 text-xs text-ink-mute">{hint}</p>
+        </div>
+      </Section>
+
+      <Section title="Style">
+        <div className="space-y-2">
+          <Segmented options={[{ value: "habit", label: "Habitude" }, { value: "balanced", label: "Équilibre" }, { value: "discover", label: "Découverte" }]} value={habit} onChange={setHabit} />
+          <p className="px-1 text-xs text-ink-mute">
+            {habits[sport]?.traces
+              ? `${HABIT_HINT[habit]} D'après tes ${habits[sport]!.traces} sorties avec GPS${habits[sport]!.classics ? `, ${habits[sport]!.classics} classique${habits[sport]!.classics > 1 ? "s" : ""}` : ""}.`
+              : "Pulse ne connaît pas encore tes chemins : récupère tes traces GPS dans Mes habitudes."}
+          </p>
         </div>
       </Section>
 

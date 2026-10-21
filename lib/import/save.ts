@@ -57,7 +57,23 @@ export async function saveActivities(uid: string, raw: ParsedActivity[]) {
   let backfilled = 0;
   for (const a of items) {
     const e = match(a);
-    if (!e || e.stream) continue;
+    if (!e) continue;
+    // Séance déjà là SANS trace GPS (ex. arrivée par Google Fit ou un fichier sans GPS) : on lui ajoute celle du fichier.
+    const gps = e.polyline || e.source === "mywhoosh" ? [] : gpsOf(a); // home trainer : jamais de trace
+
+    if (gps.length > 1) {
+      const stride = Math.max(1, Math.ceil(gps.length / 500)), track = compactTrack(a.points ?? [], 900);
+      await prisma.activity.update({
+        where: { id: e.id },
+        data: {
+          polyline: encodePolyline(gps.filter((_, j) => j % stride === 0).map((p) => [p.lat, p.lng])),
+          startLat: a.startLat ?? gps[0].lat, startLng: a.startLng ?? gps[0].lng,
+          trackPoints: track.length ? (JSON.parse(JSON.stringify(track)) as Prisma.InputJsonValue) : undefined,
+        },
+      });
+      backfilled++;
+    }
+    if (e.stream) continue;
     const s = prepStream(a);
     if (s) { try { await prisma.activityStream.create({ data: { activityId: e.id, ...s } }); backfilled++; } catch { /* déjà rattrapée */ } }
   }

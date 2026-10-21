@@ -102,6 +102,7 @@ model User {
   athleteMetrics  AthleteMetric[]
 
   suggestedRoutes SuggestedRoute[]
+  habitMaps       HabitMap[]
 }
 
 model Account {
@@ -319,6 +320,23 @@ model SuggestedRoute {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, saved, createdAt(sort: Desc)])
+}
+
+/// Habitudes de parcours (lib/habits) : carte de chaleur, classiques et bifurcations, recalculées après chaque synchro.
+model HabitMap {
+  id        String       @id @default(cuid())
+  userId    String
+  sport     ActivityType // RUN ou RIDE
+  lat0      Float        // latitude de référence de la grille (projection locale)
+  cellM     Int          // taille des cases (m)
+  cells     Json         // [[ligne, colonne, nombre de sorties]]
+  classics  Json         // lib/habits/build.ts : StoredClassic[]
+  junctions Json         // lib/habits/grid.ts : Junction[]
+  traces    Int          // sorties avec trace GPS prises en compte
+  builtAt   DateTime     @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sport])
 }
 
 /// Réponses Overpass découpées par tuile (lib/routes/overpass.ts), gardées 30 jours.

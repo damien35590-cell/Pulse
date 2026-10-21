@@ -82,25 +82,23 @@ export function extraShare(coords: [number, number, number][], values: [number, 
 const BIG_ROADS = [1, 2];
 const UNPAVED = [2, 8, 9, 10, 11, 12, 15, 16, 17];
 
-type Ctx = { start: LatLng; profile: Profile; ors: string; key: string; deadline: number; used: number; rateLimited: boolean };
+type Ctx = { start: LatLng; profile: Profile; ors: string; key: string; deadline: number; used: number; rateLimited: boolean; maxCalls?: number };
 
-async function callOrs(ctx: Ctx, seed: number, points: number, length: number): Promise<Candidate | null> {
-  if (ctx.used >= MAX_CALLS || ctx.rateLimited || Date.now() > ctx.deadline) return null;
+type Routed = Omit<Candidate, "key" | "seed" | "points" | "length">;
+
+/** Un appel /directions (créneau du quota, une nouvelle tentative après un 429), converti en tracé noté par ORS. */
+async function orsRequest(ctx: Ctx, body: Record<string, unknown>): Promise<Routed | null> {
+  const max = ctx.maxCalls ?? MAX_CALLS;
+  if (ctx.used >= max || ctx.rateLimited || Date.now() > ctx.deadline) return null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (ctx.used >= MAX_CALLS || !(await waitForSlot(ctx.deadline))) return null;
+    if (ctx.used >= max || !(await waitForSlot(ctx.deadline))) return null;
     ctx.used++;
     let res: Response;
     try {
       res = await fetch(`https://api.openrouteservice.org/v2/directions/${ctx.ors}/geojson`, {
         method: "POST",
         headers: { Authorization: ctx.key, "Content-Type": "application/json", Accept: "application/geo+json" },
-        body: JSON.stringify({
-          coordinates: [[ctx.start.lng, ctx.start.lat]],
-          options: { round_trip: { length: Math.round(length), points, seed } },
-          elevation: true,
-          extra_info: ["waytype", "surface", "steepness"],
-          instructions: false,
-        }),
+        body: JSON.stringify({ ...body, elevation: true, extra_info: ["waytype", "surface", "steepness"], instructions: false }),
         signal: AbortSignal.timeout(Math.min(CALL_TIMEOUT_MS, Math.max(1000, ctx.deadline - Date.now()))),
         cache: "no-store",
       });
@@ -115,26 +113,51 @@ async function callOrs(ctx: Ctx, seed: number, points: number, length: number): 
       return null;
     }
     if (res.status === 401 || res.status === 403) throw new RoutingError("Clé OpenRouteService refusée : vérifie ORS_API_KEY.", 500);
-    const body = await res.json().catch(() => null);
+    const json = await res.json().catch(() => null);
     if (!res.ok) {
-      const code = body?.error?.code as number | undefined;
+      const code = json?.error?.code as number | undefined;
       // 2010 : point non routable ; 2009 : aucune route trouvée.
       if (code === 2010) throw new RoutingError("Le point de départ est trop loin d'une route ou d'un chemin praticable.", 422);
       return null;
     }
-    const f = body?.features?.[0] as OrsFeature | undefined;
+    const f = json?.features?.[0] as OrsFeature | undefined;
     if (!f || f.geometry.coordinates.length < 2) return null;
     const coords = f.geometry.coordinates.map(([lng, lat, ele]) => [lat, lng, ele ?? 0] as [number, number, number]);
     const distanceM = f.properties.summary.distance;
     const ascentM = ascentOf(coords.map((c) => c[2]));
     return {
-      key: `${seed}-${points}`, seed, points, length, coords, distanceM, ascentM,
+      coords, distanceM, ascentM,
       estMinutes: estimateMinutes(ctx.profile, distanceM / 1000, ascentM),
       bigRoadPct: extraShare(coords, f.properties.extras?.waytype?.values, BIG_ROADS),
       unpavedPct: extraShare(coords, f.properties.extras?.surface?.values, UNPAVED),
     };
   }
   return null;
+}
+
+async function callOrs(ctx: Ctx, seed: number, points: number, length: number): Promise<Candidate | null> {
+  const r = await orsRequest(ctx, { coordinates: [[ctx.start.lng, ctx.start.lat]], options: { round_trip: { length: Math.round(length), points, seed } } });
+  return r && { key: `${seed}-${points}`, seed, points, length, ...r };
+}
+
+/** ORS accepte au plus 50 points de passage par itinéraire. */
+export const MAX_WAYPOINTS = 50;
+
+/**
+ * Itinéraire passant par `via` dans l'ordre (variantes des classiques). Budget d'appels propre, quota minute partagé.
+ * Renvoie null si ORS ne trouve rien ou si le temps manque ; jamais d'exception pour un point non routable.
+ */
+export function viaRouter(profile: Profile, deadline: number, maxCalls: number) {
+  const key = process.env.ORS_API_KEY;
+  if (!key) throw new RoutingError("ORS_API_KEY n'est pas configurée sur le serveur.", 500);
+  const ctx: Ctx = { start: { lat: 0, lng: 0 }, profile, ors: orsProfile(profile.sport, profile.variant), key, deadline, used: 0, rateLimited: false, maxCalls };
+  return {
+    get used() { return ctx.used; },
+    async route(via: LatLng[]): Promise<Routed | null> {
+      if (via.length < 2 || via.length > MAX_WAYPOINTS) return null;
+      try { return await orsRequest(ctx, { coordinates: via.map((p) => [p.lng, p.lat]) }); } catch { return null; }
+    },
+  };
 }
 
 /** Exécute les tâches par paquets de `PARALLEL`. */

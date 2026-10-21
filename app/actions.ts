@@ -416,3 +416,44 @@ export async function setRouteSaved(id: string, saved: boolean) {
   revalidatePath(`/itineraires/${id}`);
   return { ok: true };
 }
+
+/**
+ * Prépare un de tes classiques tel quel (vraie trace de la sortie la plus représentative) comme boucle à exporter en GPX.
+ * Renvoie l'id de la boucle créée, ouverte ensuite sur /itineraires/[id].
+ */
+export async function prepareClassic(sport: "RUN" | "RIDE", classicId: string) {
+  const userId = await uid();
+  if (sport !== "RUN" && sport !== "RIDE") return { ok: false as const };
+  const { getHabits } = await import("@/lib/habits/build");
+  const { classicTitle } = await import("@/lib/habits/grid");
+  const { buildProfile, estimateMinutes, HISTORY_DAYS } = await import("@/lib/routes/estimate");
+  const { decodePolyline, encodePolyline } = await import("@/lib/polyline");
+  const h = await getHabits(userId, sport);
+  const c = h?.classics.find((x) => x.id === classicId);
+  if (!c) return { ok: false as const };
+
+  const [rep, acts] = await Promise.all([
+    prisma.activity.findFirst({ where: { id: c.repId, userId }, select: { trackPoints: true } }),
+    prisma.activity.findMany({
+      where: { userId, type: { in: ["RUN", "RIDE"] }, startedAt: { gte: new Date(Date.now() - HISTORY_DAYS * 864e5) } },
+      select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, source: true, dedupeKey: true, startLat: true, title: true },
+    }),
+  ]);
+  const tp = ((rep?.trackPoints as { lat?: number; lng?: number; ele?: number }[] | null) ?? []).filter((x) => x.lat != null && x.lng != null);
+  const coords = tp.length > 1 ? tp.map((x) => [x.lat!, x.lng!, x.ele ?? 0] as const) : decodePolyline(c.polyline).map(([lat, lng]) => [lat, lng, 0] as const);
+  // Trace allégée (≤ 600 points) : la fiche et le GPX restent légers.
+  const stride = Math.max(1, Math.ceil(coords.length / 600)), slim = coords.filter((_, i) => i % stride === 0 || i === coords.length - 1);
+  const est = Math.round(estimateMinutes(buildProfile(sport, sport === "RIDE" ? "road" : undefined, acts), c.distanceM / 1000, c.ascentM));
+  const r = await prisma.suggestedRoute.create({
+    data: {
+      userId, sport, variant: sport === "RIDE" ? "road" : null, minutes: est, startLat: c.start.lat, startLng: c.start.lng,
+      polyline: encodePolyline(slim.map(([lat, lng]) => [lat, lng])), elevation: slim.map((x) => Math.round(x[2])),
+      distanceM: c.distanceM, ascentM: c.ascentM, estMinutes: est,
+      label: "Ton classique", why: `${classicTitle(c)} · faite ${c.count} fois`,
+      scores: { familiar: 1, global: 0, osm: false }, pois: [],
+    },
+    select: { id: true },
+  });
+  revalidatePath("/itineraires");
+  return { ok: true as const, id: r.id };
+}

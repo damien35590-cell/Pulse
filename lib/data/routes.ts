@@ -34,19 +34,25 @@ export const toRouteView = (r: SuggestedRoute): RouteView => ({
 /** Page /itineraires : domicile, allure et vitesse retenues, boucles gardées. */
 export async function getRoutePlanner(userId: string) {
   const since = new Date(Date.now() - HISTORY_DAYS * 864e5);
-  const [user, acts, saved] = await Promise.all([
+  const [user, acts, saved, habitRows] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { homeLat: true, homeLng: true } }),
     prisma.activity.findMany({
       where: { userId, type: { in: ["RUN", "RIDE"] }, startedAt: { gte: since } },
       select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, source: true, dedupeKey: true, startLat: true, title: true },
     }),
     prisma.suggestedRoute.findMany({ where: { userId, saved: true }, orderBy: { createdAt: "desc" }, take: 30 }),
+    prisma.habitMap.findMany({ where: { userId }, select: { sport: true, traces: true, classics: true, junctions: true } }),
   ]);
+  const habit = (sport: "RUN" | "RIDE") => {
+    const h = habitRows.find((x) => x.sport === sport);
+    return h ? { traces: h.traces, classics: ((h.classics as unknown[]) ?? []).length, junctions: ((h.junctions as unknown[]) ?? []).length } : null;
+  };
   return {
     home: user?.homeLat != null && user.homeLng != null ? { lat: user.homeLat, lng: user.homeLng } : null,
     run: runPace(acts),
     ride: bikeSpeed(acts),
     saved: saved.map(toRouteView),
+    habits: { RUN: habit("RUN"), RIDE: habit("RIDE") },
   };
 }
 
