@@ -23,32 +23,33 @@ export default async function RoutesPage() {
 
   return (
     <>
-      <TopBar title="Itinéraires" back="/" subtitle="3 boucles au départ de chez toi, selon ton temps dispo" />
+      <TopBar title="Itinéraires" back="/" subtitle="3 boucles depuis le départ de ton choix, selon ton temps dispo" />
       <div className="space-y-8">
-        <RoutePlanner home={d.home} run={d.run} ride={d.ride} habits={d.habits} />
-        <Section title="Mes habitudes">
-          <Link href="/itineraires/habitudes" className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-4")}>
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"><Footprints className="size-5" aria-hidden /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-ink">Carte de chaleur, classiques, bifurcations</span>
-              <span className="block text-sm text-ink-soft">
-                {d.habits.RUN || d.habits.RIDE
-                  ? `${(d.habits.RUN?.classics ?? 0) + (d.habits.RIDE?.classics ?? 0)} classiques · ${(d.habits.RUN?.junctions ?? 0) + (d.habits.RIDE?.junctions ?? 0)} bifurcations`
-                  : "Récupère tes traces GPS pour que Pulse apprenne tes chemins"}
+        <RoutePlanner home={d.home} run={d.run} ride={d.ride} habits={d.habits}>
+          <Section title="Mes habitudes">
+            <Link href="/itineraires/habitudes" className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-4")}>
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink"><Footprints className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-ink">Carte de chaleur, classiques, bifurcations</span>
+                <span className="block text-sm text-ink-soft">
+                  {d.habits.RUN || d.habits.RIDE
+                    ? `${(d.habits.RUN?.classics ?? 0) + (d.habits.RIDE?.classics ?? 0)} classiques · ${(d.habits.RUN?.junctions ?? 0) + (d.habits.RIDE?.junctions ?? 0)} bifurcations`
+                    : "Récupère tes traces GPS pour que Pulse apprenne tes chemins"}
+                </span>
               </span>
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
-          </Link>
-        </Section>
-        <Section title="Mes boucles gardées" action={d.saved.length ? <span className="font-num text-sm tabular-nums text-ink-mute">{d.saved.length}</span> : undefined}>
-          {d.saved.length ? (
-            <div className="space-y-3">
-              {d.saved.map((r) => <RouteCard key={r.id} r={r} meta={`${sportLine(r)} · ${date(r.createdAt)}`} />)}
-            </div>
-          ) : (
-            <p className={cn(ui.card, "p-4 text-sm text-ink-soft")}>Touche « Garder » sur une boucle pour la retrouver ici.</p>
-          )}
-        </Section>
+              <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
+            </Link>
+          </Section>
+          <Section title="Mes boucles gardées" action={d.saved.length ? <span className="font-num text-sm tabular-nums text-ink-mute">{d.saved.length}</span> : undefined}>
+            {d.saved.length ? (
+              <div className="space-y-3">
+                {d.saved.map((r) => <RouteCard key={r.id} r={r} meta={`${sportLine(r)} · ${date(r.createdAt)}`} />)}
+              </div>
+            ) : (
+              <p className={cn(ui.card, "p-4 text-sm text-ink-soft")}>Touche « Garder » sur une boucle pour la retrouver ici.</p>
+            )}
+          </Section>
+        </RoutePlanner>
       </div>
     </>
   );

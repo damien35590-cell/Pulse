@@ -30,6 +30,8 @@ type Props = {
   habits: { RUN: HabitSummary; RIDE: HabitSummary };
   run: { paceSKm: number; samples: number };
   ride: { speedKmh: number; samples: number };
+  /** Sections de la page affichées sous les résultats, avant l'espace réservé au bouton du bas. */
+  children?: React.ReactNode;
 };
 
 const PRESETS = [30, 45, 60, 90, 120] as const;
@@ -37,7 +39,12 @@ const WAIT = ["Pulse trace une vingtaine de boucles…", "Recherche des forêts,
 const WEATHER_DEBOUNCE_MS = 400;
 const STORE = "pulse:itineraires"; // dernière recherche : retrouvée au retour d'une fiche
 
-type Saved = { sport: Sport; variant: Variant; minutes: number; custom: boolean; routes: RouteView[]; note?: string };
+type Mode = "home" | "here" | "place";
+type Saved = {
+  sport: Sport; variant: Variant; minutes: number; custom: boolean; routes: RouteView[]; note?: string;
+  /** Départ choisi : retrouvé au retour d'une fiche (sinon « Choisis un départ » alors que les boucles sont là). */
+  mode?: Mode; here?: (LatLng & { acc: number }) | null; place?: Place | null; habit?: Habit;
+};
 const load = (): Saved | null => { try { return JSON.parse(sessionStorage.getItem(STORE) ?? "null"); } catch { return null; } };
 const store = (s: Saved) => { try { sessionStorage.setItem(STORE, JSON.stringify(s)); } catch { /* stockage indisponible */ } };
 
@@ -69,14 +76,14 @@ const HABIT_HINT: Record<Habit, string> = {
   discover: "Des chemins où tu n'es jamais passé autour de ton départ.",
 };
 
-export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
+export function RoutePlanner({ home: initialHome, run, ride, habits, children }: Props) {
   const [sport, setSport] = useState<Sport>("RUN");
   const [variant, setVariant] = useState<Variant>("road");
   const [minutes, setMinutes] = useState(60);
   const [custom, setCustom] = useState(false);
   const [habit, setHabit] = useState<Habit>("balanced");
   const [home, setHomeState] = useState(initialHome);
-  const [mode, setMode] = useState<"home" | "here" | "place">(initialHome ? "home" : "here");
+  const [mode, setMode] = useState<Mode>(initialHome ? "home" : "here");
   const [here, setHere] = useState<(LatLng & { acc: number }) | null>(null);
   const [place, setPlace] = useState<Place | null>(null);
   const [locating, setLocating] = useState(false);
@@ -93,11 +100,16 @@ export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
   const [weather, setWeather] = useState<RideWeather | null | undefined>(undefined);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const results = useRef<HTMLDivElement>(null);
+  const departure = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const s = load();
     if (!s) return;
     setSport(s.sport); setVariant(s.variant); setMinutes(s.minutes); setCustom(s.custom); setRoutes(s.routes); setNote(s.note ?? null);
+    if (s.habit) setHabit(s.habit);
+    if (s.mode === "place" && s.place) { setPlace(s.place); setMode("place"); }
+    else if (s.mode === "here" && s.here) { setHere(s.here); setMode("here"); }
+    else if (s.mode === "home" && initialHome) setMode("home");
   }, []);
 
   useEffect(() => {
@@ -166,7 +178,7 @@ export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
       if (!res.ok || !j?.routes) throw new Error(j?.error ?? (res.status === 504 ? "La recherche a pris trop de temps. Réessaie : la zone sera en cache." : "La recherche a échoué."));
       setRoutes(j.routes); setNote(j.note ?? null);
       if (j.weather !== undefined) setWeather(j.weather);
-      store({ sport, variant, minutes, custom, routes: j.routes, note: j.note });
+      store({ sport, variant, minutes, custom, routes: j.routes, note: j.note, mode, here, place, habit });
     } catch (e) {
       setError(e instanceof Error ? e.message : "La recherche a échoué.");
     } finally {
@@ -230,6 +242,7 @@ export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
 
       <StartSheet open={picking} value={pick} onClose={() => setPicking(false)} onPick={(p) => { setPick(p); setWhen("pick"); setPicking(false); }} />
 
+      <div ref={departure} className="scroll-mt-20">
       <Section title="Départ">
         <div className="space-y-3">
           <Segmented options={[{ value: "home", label: "Domicile" }, { value: "here", label: "Ma position" }, { value: "place", label: "Autre lieu" }]} value={mode} onChange={setMode} />
@@ -273,6 +286,7 @@ export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
           {geoError && <p role="alert" className="px-1 text-sm text-bad">{geoError}</p>}
         </div>
       </Section>
+      </div>
 
       <div ref={results} className="scroll-mt-20 empty:hidden">
         {loading && (
@@ -295,14 +309,29 @@ export function RoutePlanner({ home: initialHome, run, ride, habits }: Props) {
         )}
       </div>
 
-      {/* Action principale dans la zone du pouce, au-dessus de la barre de navigation. */}
-      <div className={start ? "h-36" : "h-16"} aria-hidden />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 mx-auto max-w-md space-y-2 px-4">
-        {start && !pickPast && <WeatherBanner w={weather} loading={weatherLoading} />}
-        <button type="button" onClick={search} disabled={!start || loading || pickPast} className={cn(ui.btnPrimary, "pointer-events-auto w-full")}>
-          <Route className="size-5" aria-hidden />
-          {loading ? "Recherche…" : start ? "Trouver 3 boucles" : "Choisis un départ"}
-        </button>
+      {children}
+
+      {/* Action principale dans la zone du pouce, au-dessus de la barre de navigation, sur un fond qui masque ce qui défile dessous. */}
+      <div className={start && !pickPast ? "h-40" : "h-24"} aria-hidden />
+      <div className="pointer-events-none fixed inset-x-0 bottom-nav z-30 mx-auto max-w-md bg-gradient-to-t from-bg from-60% to-transparent px-4 pb-3 pt-6">
+        <div className="space-y-2">
+          {start && !pickPast && <WeatherBanner w={weather} loading={weatherLoading} />}
+          {start ? (
+            <button type="button" onClick={search} disabled={loading || pickPast} className={cn(ui.btnPrimary, "pointer-events-auto w-full")}>
+              <Route className="size-5" aria-hidden />
+              {loading ? "Recherche…" : pickPast ? "Choisis une heure à venir" : "Trouver 3 boucles"}
+            </button>
+          ) : (
+            // Pas encore de départ : le bouton mène à la section Départ au lieu de rester grisé.
+            <button
+              type="button"
+              onClick={() => { tap(6); departure.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+              className={cn(ui.btnSecondary, "pointer-events-auto w-full shadow-pop")}
+            >
+              <MapPin className="size-5" aria-hidden />Choisis un départ
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

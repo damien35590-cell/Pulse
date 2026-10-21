@@ -152,7 +152,7 @@ export function RouteDetail({ r }: { r: RouteView }) {
       </p>
 
       <div className="h-16" aria-hidden />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 mx-auto grid max-w-md grid-cols-[1fr_auto] gap-2 px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-nav z-30 mx-auto grid max-w-md grid-cols-[1fr_auto] gap-2 bg-gradient-to-t from-bg from-60% to-transparent px-4 pb-3 pt-6">
         <button type="button" onClick={async () => { tap(10); setShared(await shareGpx(r, points)); }} className={cn(ui.btnPrimary, "pointer-events-auto")}>
           <Share2 className="size-5" aria-hidden />Partager le GPX
         </button>
