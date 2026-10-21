@@ -69,7 +69,7 @@ assert.ok(best.rainPct <= 10, "créneau sec");
 assert.ok(!best.night, "fini avant la nuit");
 assert.match(slotText(best, tz, now), /°C ressentis · sec · vent 10 km\/h$/);
 
-// ── Créneaux libres : semaine 6 h – 9 h, 12 h 30 – 13 h 30, 18 h – 23 h ; week-end 6 h – 23 h ──
+// ── Créneaux libres : semaine 6 h – 8 h, 12 h 30 – 13 h 30, 18 h – 23 h ; week-end 6 h – 23 h ──
 const paris = (iso: string) => Date.parse(iso); // heures UTC, Paris = UTC+2 en octobre
 assert.equal(fitsFreeTime(paris("2026-10-21T14:00:00Z"), 45, tz), false, "mercredi 16 h : au travail");
 assert.equal(fitsFreeTime(paris("2026-10-21T10:30:00Z"), 45, tz), true, "mercredi 12 h 30 → 13 h 15 : pause du midi");
@@ -77,7 +77,8 @@ assert.equal(fitsFreeTime(paris("2026-10-21T10:30:00Z"), 70, tz), false, "70 min
 assert.equal(fitsFreeTime(paris("2026-10-21T16:00:00Z"), 45, tz), true, "mercredi 18 h : libre");
 assert.equal(fitsFreeTime(paris("2026-10-21T20:00:00Z"), 45, tz), true, "mercredi 22 h → 22 h 45 : libre");
 assert.equal(fitsFreeTime(paris("2026-10-21T20:30:00Z"), 45, tz), false, "finirait après 23 h");
-assert.equal(fitsFreeTime(paris("2026-10-21T06:30:00Z"), 45, tz), false, "mercredi 8 h 30 → 9 h 15 : déborde sur le travail");
+assert.equal(fitsFreeTime(paris("2026-10-21T06:00:00Z"), 45, tz), false, "mercredi 8 h : trajet vers le travail");
+assert.equal(fitsFreeTime(paris("2026-10-21T05:00:00Z"), 45, tz), true, "mercredi 7 h → 7 h 45 : avant le trajet");
 assert.equal(fitsFreeTime(paris("2026-10-24T08:00:00Z"), 90, tz), true, "samedi 10 h : libre");
 // Mercredi 10 h, beau temps : la pause du midi est le premier créneau.
 const lunch = bestSlot(() => w(5, 11, Date.parse("2026-10-21T17:30:00Z")), now, 45, tz)!;
