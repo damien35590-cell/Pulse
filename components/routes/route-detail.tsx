@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, useTransition } from "react";
-import { Bookmark, BookmarkCheck, Share2, Sparkles } from "lucide-react";
+import { Bookmark, BookmarkCheck, CloudSun, Share2, Shirt, Sparkles } from "lucide-react";
 import type { RouteView } from "@/lib/data/routes";
 import { decodePolyline } from "@/lib/polyline";
 import { gpxFileName, toGpx } from "@/lib/routes/gpx";
@@ -16,6 +16,10 @@ import { TraceChart } from "@/components/activity/trace-chart";
 import { RouteMapFill } from "@/components/activity/route-map-lazy";
 import { durationMetric } from "@/lib/routes/view";
 import { PoiIcon } from "./poi-icon";
+import { WeatherAlerts, WeatherCredit } from "./weather";
+
+const startLabel = (ms: number) =>
+  new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(new Date(ms));
 
 const R = 6_371_000, rad = Math.PI / 180;
 const dist = ([a, b]: [number, number], [c, d]: [number, number]) =>
@@ -86,6 +90,27 @@ export function RouteDetail({ r }: { r: RouteView }) {
           <span>{r.why}</span>
         </p>
       </div>
+
+      {r.weather && (
+        <Section title="Météo" action={<span className="text-xs text-ink-mute">départ {startLabel(r.weather.startAt)}</span>}>
+          <div className={cn(ui.card, "space-y-3 p-4")}>
+            <p className="flex gap-2 text-[15px] leading-snug text-ink">
+              <CloudSun className="mt-0.5 size-4 shrink-0 text-ink-soft" aria-hidden />
+              <span>{r.weather.line}</span>
+            </p>
+            <WeatherAlerts alerts={r.weather.alerts} />
+            <div className="flex gap-2 border-t border-line pt-3">
+              <Shirt className="mt-0.5 size-4 shrink-0 text-ink-soft" aria-hidden />
+              <div className="min-w-0">
+                <p className={ui.label}>Conseil tenue</p>
+                <p className="mt-0.5 text-sm text-ink-soft">{r.weather.outfit}</p>
+              </div>
+            </div>
+            {r.weather.reversed && <p className="text-xs text-ink-mute">Boucle parcourue dans le sens qui met le vent de face à l&apos;aller.</p>}
+          </div>
+          <WeatherCredit className="px-1" />
+        </Section>
+      )}
 
       {alt && (
         <Section title="Altitude" action={<span className="font-num text-sm tabular-nums text-ink-mute">{fmtNum(r.ascentM, 0)} m D+</span>}>

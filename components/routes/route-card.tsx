@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { CloudSun, Sparkles } from "lucide-react";
 import type { RouteView } from "@/lib/data/routes";
 import { decodePolyline } from "@/lib/polyline";
 import { durationMetric, sportLine } from "@/lib/routes/view";
@@ -11,6 +11,7 @@ import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { Metric } from "@/components/ui/metric";
 import { RouteMapFill } from "@/components/activity/route-map-lazy";
+import { WeatherAlerts } from "./weather";
 
 /**
  * Boucle proposée : nom, 3 chiffres (temps, km, D+), vignette de carte figée, une phrase « pourquoi ».
@@ -37,6 +38,15 @@ export function RouteCard({ r, onSelect, meta }: { r: RouteView; onSelect?: () =
         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-brand" aria-hidden />
         <span className="line-clamp-2">{r.why}</span>
       </p>
+      {r.weather && (
+        <>
+          <p className="mt-1.5 flex gap-2 text-[13px] leading-snug text-ink-soft">
+            <CloudSun className="mt-0.5 size-3.5 shrink-0 text-ink-mute" aria-hidden />
+            <span className="line-clamp-2">{r.weather.line}</span>
+          </p>
+          <WeatherAlerts alerts={r.weather.alerts} max={2} className="mt-2" />
+        </>
+      )}
     </>
   );
   const cls = cn(ui.card, ui.pressCard, "block w-full p-4 text-left");

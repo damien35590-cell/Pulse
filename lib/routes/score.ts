@@ -33,6 +33,10 @@ export type RouteScores = {
   global: number;
   /** false : OpenStreetMap n'a pas répondu, seules les données ORS comptent. */
   osm: boolean;
+  /** Bonus ou malus météo déjà compris dans `global` (lib/weather/rules.ts). Absent sans météo. */
+  weather?: number;
+  /** Part du tracé sur voie éclairée, cherchée seulement quand la sortie finit de nuit. */
+  lit?: number | null;
 };
 
 export type ScoreInput = { coords: [number, number, number][]; distanceM: number; estMinutes: number; bigRoadPct: number; unpavedPct: number };
@@ -212,6 +216,11 @@ export function globalScore(s: RouteScores, km: number, sport: RouteSport) {
   return 0.45 * s.nature + 0.2 * poiDensity + 0.15 * s.marked + 0.05 * Math.min(1, s.waterPoints) + 0.15 * timeFit - roadPenalty * s.bigRoad;
 }
 
+/** Part des échantillons à moins de `r` mètres d'un segment de l'index (voies éclairées…). */
+export function shareNear(samples: Sample[], idx: SegIndex, r: number) {
+  return samples.filter((s) => idx.near(s.lat, s.lng, r).size).length / (samples.length || 1);
+}
+
 // ───────── Recouvrement et choix des 3 boucles ─────────
 /** Recouvrement (0 → 1) : part de la boucle la plus « recouverte » qui passe à moins de 30 m de l'autre. */
 export function overlap(a: { coords: [number, number, number][]; samples: Sample[] }, b: { coords: [number, number, number][]; samples: Sample[] }) {
@@ -246,7 +255,7 @@ export function pickThree<T extends ScoreInput>(list: Scored<T>[]): Choice<T>[] 
   };
   const osm = list.some((r) => r.scores.osm);
   if (osm) {
-    take("La nature", (r) => r.scores.nature);
+    take("La nature", (r) => r.scores.nature + (r.scores.weather ?? 0));
     const cur = take("Les curiosités", (r) => r.scores.poiCount);
     if (cur && cur.scores.poiCount === 0) chosen.at(-1)!.label = "L'alternative";
   } else {

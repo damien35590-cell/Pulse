@@ -29,11 +29,11 @@ const FETCH_TIMEOUT_MS = 48_000;
 
 const r5 = (x: number) => Math.round(x * 1e5) / 1e5;
 const tileOf = (lat: number, lng: number) => [Math.floor(lat / TILE), Math.floor(lng / TILE)] as const;
-const tileKey = (ty: number, tx: number) => `${VERSION}:${ty}:${tx}`;
+const tileKey = (ty: number, tx: number, version = VERSION) => `${version}:${ty}:${tx}`;
 
-export function tilesFor(b: BBox) {
+export function tilesFor(b: BBox, version = VERSION) {
   const [y0, x0] = tileOf(b.s, b.w), [y1, x1] = tileOf(b.n, b.e), out: { key: string; ty: number; tx: number }[] = [];
-  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) out.push({ key: tileKey(ty, tx), ty, tx });
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) out.push({ key: tileKey(ty, tx, version), ty, tx });
   return out;
 }
 
@@ -123,14 +123,14 @@ out geom(${rel}) qt;`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchOverpass(b: BBox, deadline: number): Promise<El[]> {
+async function fetchOverpass(query: string, deadline: number): Promise<El[]> {
   for (let attempt = 0; ; attempt++) {
     const left = deadline - Date.now();
     if (left < 3000) throw new Error("Plus assez de temps pour interroger OpenStreetMap.");
     const res = await fetch(URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Pulse/1.0 (appli perso d'entraînement)" },
-      body: "data=" + encodeURIComponent(buildQuery(b)),
+      body: "data=" + encodeURIComponent(query),
       signal: AbortSignal.timeout(Math.min(FETCH_TIMEOUT_MS, left)),
       cache: "no-store",
     });
@@ -176,7 +176,7 @@ export async function loadOsm(b: BBox, deadline: number): Promise<{ data: OsmDat
   };
   let osm: OsmData;
   try {
-    osm = parseOverpass(await fetchOverpass(req, deadline));
+    osm = parseOverpass(await fetchOverpass(buildQuery(req), deadline));
   } catch (e) {
     return { data: null, cached: rows.length, fetched: 0, error: e instanceof Error ? e.message : "Overpass indisponible." };
   }
@@ -195,4 +195,40 @@ export async function loadOsm(b: BBox, deadline: number): Promise<{ data: OsmDat
   ]).catch(() => undefined); // le cache est un bonus : une erreur d'écriture ne doit pas faire échouer la recherche
 
   return { data: mergeTiles([...have.values(), osm]), cached: rows.length, fetched: missing.length };
+}
+
+// ───────── Voies éclairées (lit=yes) : seulement quand la sortie finit de nuit ─────────
+const LIT_VERSION = "lit1";
+
+/**
+ * Tronçons des voies éclairées sur la zone, avec le même cache par tuile (30 jours).
+ * Null si Overpass ne répond pas : la note de nuit se passe alors du bonus éclairage.
+ */
+export async function loadLit(b: BBox, deadline: number): Promise<Pt[][] | null> {
+  const tiles = tilesFor(b, LIT_VERSION);
+  const since = new Date(Date.now() - CACHE_DAYS * 864e5);
+  const rows = await prisma.overpassCache.findMany({ where: { key: { in: tiles.map((t) => t.key) }, fetchedAt: { gte: since } } }).catch(() => []);
+  const have = new Map(rows.map((r) => [r.key, r.data as unknown as Pt[][]]));
+  const missing = tiles.filter((t) => !have.has(t.key));
+  if (!missing.length) return [...have.values()].flat();
+
+  const req: BBox = {
+    s: Math.min(...missing.map((t) => t.ty)) * TILE, w: Math.min(...missing.map((t) => t.tx)) * TILE,
+    n: (Math.max(...missing.map((t) => t.ty)) + 1) * TILE, e: (Math.max(...missing.map((t) => t.tx)) + 1) * TILE,
+  };
+  let lit: Pt[][];
+  try {
+    const els = await fetchOverpass(`[out:json][timeout:20][bbox:${req.s},${req.w},${req.n},${req.e}];way[highway][lit=yes];out skel geom qt;`, deadline);
+    lit = els.flatMap((el) => lines(el.geometry).parts);
+  } catch {
+    return null;
+  }
+  // Une voie à cheval sur deux tuiles est rangée dans les deux : un doublon ne change pas le test « à moins de 20 m ».
+  const per = missing.map((t) => ({ key: t.key, data: lit.filter((l) => intersects(bboxOfLines([l]), tileBox(t.ty, t.tx))) }));
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.overpassCache.deleteMany({ where: { key: { in: missing.map((t) => t.key) } } }),
+    prisma.overpassCache.createMany({ data: per.map((t) => ({ key: t.key, data: t.data as unknown as Prisma.InputJsonValue, fetchedAt: now })) }),
+  ]).catch(() => undefined);
+  return [...[...have.values()].flat(), ...lit];
 }

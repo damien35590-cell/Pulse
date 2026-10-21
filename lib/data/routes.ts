@@ -2,6 +2,7 @@ import type { SuggestedRoute } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { bikeSpeed, HISTORY_DAYS, runPace } from "@/lib/routes/estimate";
 import type { RoutePoi } from "@/lib/routes/poi";
+import type { RouteWeather } from "@/lib/weather/rules";
 
 /** Boucle telle que l'affiche l'interface (sérialisable : passe du serveur au client). */
 export type RouteView = {
@@ -17,6 +18,8 @@ export type RouteView = {
   polyline: string;
   elevation: number[];
   pois: RoutePoi[];
+  /** Météo prévue au départ choisi lors de la recherche ; absente sans Open-Meteo. */
+  weather?: RouteWeather | null;
   saved: boolean;
   createdAt: string;
 };
@@ -24,7 +27,8 @@ export type RouteView = {
 export const toRouteView = (r: SuggestedRoute): RouteView => ({
   id: r.id, sport: r.sport === "RIDE" ? "RIDE" : "RUN", variant: r.variant === "trail" ? "trail" : r.variant === "road" ? "road" : null,
   label: r.label, why: r.why, minutes: r.minutes, estMinutes: r.estMinutes, distanceM: r.distanceM, ascentM: r.ascentM,
-  polyline: r.polyline, elevation: (r.elevation as number[]) ?? [], pois: (r.pois as RoutePoi[]) ?? [], saved: r.saved, createdAt: r.createdAt.toISOString(),
+  polyline: r.polyline, elevation: (r.elevation as number[]) ?? [], pois: (r.pois as RoutePoi[]) ?? [],
+  weather: (r.weather as RouteWeather | null) ?? null, saved: r.saved, createdAt: r.createdAt.toISOString(),
 });
 
 /** Page /itineraires : domicile, allure et vitesse retenues, boucles gardées. */

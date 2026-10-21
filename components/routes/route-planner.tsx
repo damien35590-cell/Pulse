@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { House, LocateFixed, MapPin, Route } from "lucide-react";
 import type { RouteView } from "@/lib/data/routes";
+import type { RideWeather } from "@/lib/weather/open-meteo";
 import { fmtPaceMin } from "@/lib/routes/estimate";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -11,11 +12,15 @@ import { setHome } from "@/app/actions";
 import { Section } from "@/components/ui/section";
 import { Segmented } from "@/components/ui/segmented";
 import { NumberStepper } from "@/components/ui/number-stepper";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { RouteCard, RouteCardSkeleton } from "./route-card";
+import { WeatherBanner, WeatherCredit } from "./weather";
 
 type Sport = "RUN" | "RIDE";
 type Variant = "road" | "trail";
 type LatLng = { lat: number; lng: number };
+type When = "now" | "1h" | "pick";
+type Pick = { day: "today" | "tomorrow"; time: string }; // time : « HH:MM », heure du téléphone
 type Props = {
   home: LatLng | null;
   run: { paceSKm: number; samples: number };
@@ -24,11 +29,26 @@ type Props = {
 
 const PRESETS = [30, 45, 60, 90, 120] as const;
 const WAIT = ["Pulse trace une vingtaine de boucles…", "Recherche des forêts, rivières et points de vue…", "Comparaison des boucles…", "OpenStreetMap prend son temps, encore un instant…"];
+const WEATHER_DEBOUNCE_MS = 400;
 const STORE = "pulse:itineraires"; // dernière recherche : retrouvée au retour d'une fiche
 
 type Saved = { sport: Sport; variant: Variant; minutes: number; custom: boolean; routes: RouteView[]; note?: string };
 const load = (): Saved | null => { try { return JSON.parse(sessionStorage.getItem(STORE) ?? "null"); } catch { return null; } };
 const store = (s: Saved) => { try { sessionStorage.setItem(STORE, JSON.stringify(s)); } catch { /* stockage indisponible */ } };
+
+/** Heure choisie → instant (ms), dans le fuseau du téléphone. */
+function pickAt(p: Pick) {
+  const [h, m] = p.time.split(":").map(Number), d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (p.day === "tomorrow" ? 1 : 0), h, m).getTime();
+}
+
+/** Départ en ISO (undefined = maintenant, décidé par le serveur). */
+function startISO(when: When, pick: Pick) {
+  if (when === "now") return undefined;
+  return new Date(when === "1h" ? Date.now() + 36e5 : pickAt(pick)).toISOString();
+}
+
+const pickLabel = (p: Pick) => `${p.day === "today" ? "Auj." : "Demain"} ${p.time}`;
 
 /** Une seule lecture GPS (pas de suivi) : Pulse prépare la boucle, la navigation se fait dans OsmAnd ou sur la Garmin. */
 function readPosition(): Promise<GeolocationPosition> {
@@ -54,6 +74,11 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
   const [loading, setLoading] = useState(false);
   const [wait, setWait] = useState(0);
   const [saving, startSaving] = useTransition();
+  const [when, setWhen] = useState<When>("now");
+  const [pick, setPick] = useState<Pick>({ day: "today", time: "18:00" });
+  const [picking, setPicking] = useState(false);
+  const [weather, setWeather] = useState<RideWeather | null | undefined>(undefined);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const results = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,6 +95,29 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
   }, [loading]);
 
   const start = mode === "home" ? home : here;
+  const pickPast = when === "pick" && pickAt(pick) < Date.now() - 30 * 6e4;
+
+  // Bandeau météo : rechargé quand le départ, l'heure ou la durée changent (le serveur garde la prévision 30 min).
+  useEffect(() => {
+    if (!start || pickPast) { setWeather(undefined); return; }
+    const ctrl = new AbortController();
+    setWeatherLoading(true);
+    const id = setTimeout(async () => {
+      const q = new URLSearchParams({ lat: String(start.lat), lng: String(start.lng), minutes: String(minutes) });
+      const iso = startISO(when, pick);
+      if (iso) q.set("start", iso);
+      try {
+        const r = await fetch(`/api/weather?${q}`, { signal: ctrl.signal });
+        const j = await r.json().catch(() => null);
+        setWeather(r.ok ? j?.weather ?? null : null);
+      } catch {
+        if (!ctrl.signal.aborted) setWeather(null);
+      } finally {
+        if (!ctrl.signal.aborted) setWeatherLoading(false);
+      }
+    }, WEATHER_DEBOUNCE_MS);
+    return () => { clearTimeout(id); ctrl.abort(); };
+  }, [start?.lat, start?.lng, minutes, when, pick, pickPast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function locate(saveAsHome = false) {
     setGeoError(null); setLocating(true);
@@ -92,18 +140,19 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
   }
 
   async function search() {
-    if (!start || loading) return;
+    if (!start || loading || pickPast) return;
     tap(10);
     setLoading(true); setError(null); setNote(null); setRoutes(null);
     requestAnimationFrame(() => results.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     try {
       const res = await fetch("/api/routes/suggest", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sport, variant: sport === "RIDE" ? variant : undefined, minutes, start: { lat: start.lat, lng: start.lng } }),
+        body: JSON.stringify({ sport, variant: sport === "RIDE" ? variant : undefined, minutes, start: { lat: start.lat, lng: start.lng }, startISO: startISO(when, pick) }),
       });
       const j = await res.json().catch(() => null);
       if (!res.ok || !j?.routes) throw new Error(j?.error ?? (res.status === 504 ? "La recherche a pris trop de temps. Réessaie : la zone sera en cache." : "La recherche a échoué."));
       setRoutes(j.routes); setNote(j.note ?? null);
+      if (j.weather !== undefined) setWeather(j.weather);
       store({ sport, variant, minutes, custom, routes: j.routes, note: j.note });
     } catch (e) {
       setError(e instanceof Error ? e.message : "La recherche a échoué.");
@@ -137,6 +186,25 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
         </div>
         {custom && <NumberStepper label="Durée" unit="minutes" value={minutes} onChange={setMinutes} step={5} min={15} max={300} />}
       </Section>
+
+      <Section title="Heure de départ">
+        <div className="space-y-2">
+          <Segmented
+            options={[{ value: "now", label: "Maintenant" }, { value: "1h", label: "Dans 1 h" }, { value: "pick", label: when === "pick" ? pickLabel(pick) : "Choisir" }]}
+            value={when}
+            onChange={(v) => (v === "pick" ? setPicking(true) : setWhen(v))}
+          />
+          {when === "pick" && (
+            <button type="button" onClick={() => setPicking(true)} className="flex h-12 w-full touch-manipulation items-center justify-between px-1 text-sm active:opacity-60">
+              <span className={pickPast ? "text-bad" : "text-ink-soft"}>{pickPast ? "Cette heure est passée" : `Départ ${pick.day === "today" ? "aujourd'hui" : "demain"} à ${pick.time}`}</span>
+              <span className="font-semibold text-brand">Modifier</span>
+            </button>
+          )}
+          <WeatherCredit className="px-1" />
+        </div>
+      </Section>
+
+      <StartSheet open={picking} value={pick} onClose={() => setPicking(false)} onPick={(p) => { setPick(p); setWhen("pick"); setPicking(false); }} />
 
       <Section title="Départ">
         <div className="space-y-3">
@@ -202,9 +270,10 @@ export function RoutePlanner({ home: initialHome, run, ride }: Props) {
       </div>
 
       {/* Action principale dans la zone du pouce, au-dessus de la barre de navigation. */}
-      <div className="h-16" aria-hidden />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 mx-auto max-w-md px-4">
-        <button type="button" onClick={search} disabled={!start || loading} className={cn(ui.btnPrimary, "pointer-events-auto w-full")}>
+      <div className={start ? "h-36" : "h-16"} aria-hidden />
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 mx-auto max-w-md space-y-2 px-4">
+        {start && !pickPast && <WeatherBanner w={weather} loading={weatherLoading} />}
+        <button type="button" onClick={search} disabled={!start || loading || pickPast} className={cn(ui.btnPrimary, "pointer-events-auto w-full")}>
           <Route className="size-5" aria-hidden />
           {loading ? "Recherche…" : start ? "Trouver 3 boucles" : "Choisis un départ"}
         </button>
@@ -227,5 +296,33 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     >
       {children}
     </button>
+  );
+}
+
+/** Choix de l'heure de départ : aujourd'hui ou demain, au quart d'heure. */
+function StartSheet({ open, value, onClose, onPick }: { open: boolean; value: Pick; onClose: () => void; onPick: (p: Pick) => void }) {
+  const [draft, setDraft] = useState(value);
+  // Heure déjà passée : on propose l'heure pleine suivante.
+  useEffect(() => {
+    if (!open) return;
+    const next = new Date(Date.now() + 36e5);
+    setDraft(pickAt(value) >= Date.now() ? value : { day: next.getDate() === new Date().getDate() ? "today" : "tomorrow", time: `${String(next.getHours()).padStart(2, "0")}:00` });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const past = !draft.time || pickAt(draft) < Date.now() - 30 * 6e4;
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Heure de départ">
+      <div className="mt-4 space-y-3">
+        <Segmented options={[{ value: "today", label: "Aujourd'hui" }, { value: "tomorrow", label: "Demain" }]} value={draft.day} onChange={(day) => setDraft({ ...draft, day })} className="bg-surface-3" />
+        <label className="block">
+          <span className={ui.label}>Heure</span>
+          <input
+            type="time" step={900} value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+            className="mt-1 h-14 w-full rounded-tile bg-surface-3 px-4 font-num text-metric-md tabular-nums text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          />
+        </label>
+        {past && draft.time && <p className="px-1 text-sm text-bad">Cette heure est passée : choisis plus tard ou demain.</p>}
+        <button type="button" disabled={past} onClick={() => { tap(10); onPick(draft); }} className={cn(ui.btnPrimary, "w-full")}>Valider</button>
+      </div>
+    </BottomSheet>
   );
 }

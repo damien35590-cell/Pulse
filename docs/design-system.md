@@ -71,6 +71,7 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
 | `RouteCard` | `components/routes/route-card.tsx` | boucle proposée (Itinéraires) : nom, temps / km / D+, vignette, phrase « pourquoi » |
+| `WeatherBanner`, `WeatherAlerts`, `WeatherCredit` | `components/routes/weather.tsx` | météo d'une sortie (ressenti, pluie, vent fléché, coucher), alertes en `warn` / `bad`, crédit Open-Meteo obligatoire (CC BY 4.0) |
 | `PoiIcon` | `components/routes/poi-icon.tsx` | pastille d'un point d'intérêt (liste ou repère de carte) |
 
 ## Comportement « appli native » (déjà global)

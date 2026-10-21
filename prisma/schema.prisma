@@ -313,6 +313,7 @@ model SuggestedRoute {
   why        String       // « 72 % en forêt ou au bord de l'eau · 3 points de vue · 1 point d'eau »
   scores     Json         // lib/routes/score.ts : RouteScores
   pois       Json         // [{ id, name, type, lat, lng, km }]
+  weather    Json?        // lib/weather/rules.ts : RouteWeather (météo prévue au départ choisi), null si Open-Meteo n'a pas répondu
   saved      Boolean      @default(false)
   createdAt  DateTime     @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -322,6 +323,13 @@ model SuggestedRoute {
 
 /// Réponses Overpass découpées par tuile (lib/routes/overpass.ts), gardées 30 jours.
 model OverpassCache {
+  key       String   @id
+  data      Json
+  fetchedAt DateTime @default(now())
+}
+
+/// Prévisions Open-Meteo brutes (lib/weather/open-meteo.ts), par maille de 0,05° et par heure, gardées 30 min.
+model WeatherCache {
   key       String   @id
   data      Json
   fetchedAt DateTime @default(now())

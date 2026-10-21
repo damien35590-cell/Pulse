@@ -10,6 +10,7 @@ import type { Band } from "@/components/activity/trace-chart";
 import type { LiftExercise } from "@/components/workout/set-logger";
 import type { ActivitySummaryData } from "@/components/dashboard/activity-summary";
 import type { RouteView } from "@/lib/data/routes";
+import type { RideWeather } from "@/lib/weather/open-meteo";
 import { encodePolyline } from "@/lib/polyline";
 
 export const HR_MAX = 191;
@@ -209,4 +210,18 @@ export const routeSuggestion: RouteView = {
   id: "demo-route", sport: "RUN", variant: null, label: "La nature", minutes: 60, estMinutes: 58, distanceM: 9400, ascentM: 86,
   why: "64 % en forêt ou au bord de l'eau · 2 calvaires · 1 point de vue", polyline: encodePolyline(loopPts),
   elevation: loopPts.map((_, i) => Math.round(60 + 25 * Math.sin((i / 47) * Math.PI * 2))), pois: [], saved: false, createdAt: "2026-10-18T08:00:00.000Z",
+  weather: {
+    startAt: Date.parse("2026-10-18T15:30:00Z"), reversed: true,
+    line: "Vent de face à l'aller, retour poussé · averses possibles (40 %) · nuit avant le retour",
+    alerts: [{ tone: "warn", text: "Nuit avant le retour (coucher 18:52) · Pars avant 17:37 pour rentrer de jour · 38 % éclairé" }, { tone: "warn", text: "42 % non revêtu : chemins sans doute boueux (14 mm en 48 h)" }],
+    outfit: "Short ou corsaire, manches longues fines · veste de pluie légère dans la poche · frontale et gilet réfléchissant",
+  },
+};
+
+/** Météo du bandeau d'Itinéraires (fenêtre de la sortie). */
+export const rideWeather: RideWeather = {
+  startAt: Date.parse("2026-10-18T15:30:00Z"), endAt: Date.parse("2026-10-18T16:28:00Z"),
+  feelsMin: 9.2, feelsMax: 11.4, tempMin: 11.8, rainProbMax: 40, rainMm: 0.4, windKmh: 21, windFromDeg: 250, gustMax: 44,
+  uvMax: 1.2, cloudMean: 55, isDay: true, sunrise: Date.parse("2026-10-18T06:24:00Z"), sunset: Date.parse("2026-10-18T16:52:00Z"),
+  rain48hMm: 14, coolest: null,
 };
