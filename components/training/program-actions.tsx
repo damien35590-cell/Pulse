@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Pause, Play, SkipForward } from "lucide-react";
-import { completePlannedSession, saveVmaTest, skipPlannedSession, toggleProgramPause, updateVma } from "@/app/actions";
+import { Check, Pause, Play, SkipForward, Watch } from "lucide-react";
+import { completePlannedSession, saveVmaTest, sendProgramToIntervals, skipPlannedSession, toggleProgramPause, updateVma } from "@/app/actions";
 import { celebrate, tap } from "@/lib/haptics";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -54,6 +54,26 @@ export function PauseToggle({ id, paused, full }: { id: string; paused: boolean;
       </button>
       {err && <p role="alert" className="text-sm font-semibold">{err}</p>}
     </>
+  );
+}
+
+const syncedLabel = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(new Date(iso));
+
+/** « Envoyer sur Garmin » : les séances des 14 prochains jours partent dans le calendrier Intervals.icu, puis sur la montre. */
+export function SendToGarmin({ syncedAt, paused }: { syncedAt: string | null; paused: boolean }) {
+  const { pending, err, run } = useAction();
+  return (
+    <div className="space-y-2">
+      <button disabled={pending || paused} onClick={() => { tap(); run(() => sendProgramToIntervals()); }} className={cn(ui.btnSecondary, "w-full")}>
+        <Watch className="h-5 w-5" aria-hidden />{pending ? "Envoi…" : syncedAt ? "Renvoyer sur Garmin" : "Envoyer sur Garmin"}
+      </button>
+      <p className="text-xs text-ink-mute" aria-live="polite">
+        {paused ? "Programme en pause : reprends-le pour envoyer les séances."
+          : syncedAt ? `Envoyé le ${syncedLabel(syncedAt)} · 14 prochains jours, mis à jour chaque nuit`
+          : "Les séances des 14 prochains jours vont dans Intervals.icu, puis sur ta montre."}
+      </p>
+      {err && <p role="alert" className="text-sm font-semibold text-bad">{err}</p>}
+    </div>
   );
 }
 

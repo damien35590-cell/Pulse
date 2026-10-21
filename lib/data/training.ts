@@ -139,6 +139,8 @@ export type RunProgramView = {
   weekDone: number; next: SessionView | null; weeks: WeekView[]; doneCount: number; totalCount: number;
   vma: { vmaKmh: number; label: string; measuredAt: string | null };
   pendingTest: { sessionId: string } | null;
+  /** Dernier envoi réussi vers le calendrier Intervals.icu (séances à faire), ISO ; null = jamais envoyé. */
+  intervalsSyncedAt: string | null;
 };
 
 /** Programme RUN actif (ou en pause), avec allures recalculées à partir de la VMA du moment. Null s'il n'y en a pas. */
@@ -183,6 +185,8 @@ export async function getRunProgram(userId: string, now = new Date()): Promise<R
   const test = flat.map(({ s }) => s).filter((s) => s.kind === "VMA_TEST" && s.status === "COMPLETED" && s.completedAt && +now - +s.completedAt < TEST_PROMPT_DAYS * 864e5)
     .find((s) => !lastTest || +lastTest.measuredAt < +s.completedAt!);
 
+  const syncedAt = Math.max(0, ...flat.filter(({ s }) => s.status === "PLANNED" && s.intervalsSyncedAt).map(({ s }) => +s.intervalsSyncedAt!));
+
   return {
     id: p.id, name: p.name, status: p.status as "ACTIVE" | "PAUSED", totalWeeks: p.totalWeeks, sessionsPerWeek: p.sessionsPerWeek, blockWeeks: RUN_BASE_VMA.blockWeeks,
     current: { number: cw.number, block: blockOf(cw.number), weekInBlock: weekInBlock(cw.number), phaseName: phase?.name ?? "", phaseFocus: phase?.focus ?? null, isRecovery: cw.isRecovery },
@@ -190,5 +194,6 @@ export async function getRunProgram(userId: string, now = new Date()): Promise<R
     doneCount: flat.filter(({ s }) => s.status !== "PLANNED").length, totalCount: flat.length,
     vma: { vmaKmh, label: current?.label ?? "par défaut", measuredAt: current?.measuredAt?.toISOString() ?? null },
     pendingTest: test ? { sessionId: test.id } : null,
+    intervalsSyncedAt: syncedAt ? new Date(syncedAt).toISOString() : null,
   };
 }

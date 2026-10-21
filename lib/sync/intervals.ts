@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { parseOne } from "@/lib/import";
 import { saveActivities } from "@/lib/import/save";
 
-const BASE = "https://intervals.icu/api/v1";
+export const BASE = "https://intervals.icu/api/v1";
 const day = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Historique GPS : jusqu'où on remonte, et par fenêtres de combien de jours. */
@@ -15,7 +15,7 @@ type IntervalsActivity = { id: string; file_type?: string | null; start_date?: s
 
 export type SyncStats = { found: number; withFile: number; saved: number; duplicates: number; backfilled: number; skipped: number; known: number; errors: string[] };
 
-function headers() {
+export function headers() {
   const key = process.env.INTERVALS_API_KEY?.trim();
   if (!key) throw new Error("INTERVALS_API_KEY manquante dans Vercel");
   return { Authorization: "Basic " + Buffer.from(`API_KEY:${key}`).toString("base64") };

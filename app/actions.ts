@@ -10,6 +10,7 @@ import { buildPlan, PLAN_GOALS, type PlanSport } from "@/lib/plan";
 import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
+import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { createRunProgram, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
 import { revokeLostBadges } from "@/lib/data/badges";
 import { recomputeRecords } from "@/lib/pipeline/post-import";
@@ -90,6 +91,15 @@ export async function skipPlannedSession(id: string): Promise<Res> {
   if (s.status !== "PLANNED") return { ok: true };
   await prisma.plannedSession.update({ where: { id }, data: { status: "SKIPPED" } });
   await finishIfDone(s.programId);
+  programPaths();
+  return { ok: true };
+}
+
+/** « Envoyer sur Garmin » : séances des 14 prochains jours → calendrier Intervals.icu (→ montre). Renvoyer met à jour. */
+export async function sendProgramToIntervals(): Promise<Res> {
+  const userId = await uid();
+  try { await syncProgramToIntervals(userId); }
+  catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Envoi impossible." }; }
   programPaths();
   return { ok: true };
 }

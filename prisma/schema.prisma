@@ -736,7 +736,8 @@ model PlannedSession {
   complianceScore     Int?          // 0–100 : réalisé vs prévu
   skipReason          String?
   completedAt         DateTime?
-  intervalsEventId    String?       // séance envoyée au calendrier Intervals.icu (→ Garmin)
+  intervalsEventId    String?       // id de l'événement WORKOUT créé sur Intervals.icu (→ Garmin) ; external_id = "pulse-<id>"
+  intervalsSyncedAt   DateTime?     // dernier envoi réussi vers le calendrier Intervals.icu
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   program           Program         @relation(fields: [programId], references: [id], onDelete: Cascade)

@@ -5,7 +5,7 @@ import { fmtDuration, fmtNum } from "@/lib/format";
 import { fmtPaceS, fmtStepTime } from "@/lib/training/resolve";
 import { cn } from "@/lib/utils";
 import { KeyBadge, NextSession, WeekDots, weekLabel } from "./program-card";
-import { PauseToggle, VmaTestPrompt, VmaUpdate } from "./program-actions";
+import { PauseToggle, SendToGarmin, VmaTestPrompt, VmaUpdate } from "./program-actions";
 import { RunProgramForm } from "./run-program-form";
 
 const ROLE = { warmup: "Échauffement", active: "Effort", recovery: "Récup", cooldown: "Retour au calme", rest: "Repos" } as const;
@@ -79,6 +79,7 @@ export function RunProgramView({ p }: { p: View }) {
         {p.pendingTest && <VmaTestPrompt sessionId={p.pendingTest.sessionId} />}
         {p.next && <NextSession s={p.next} paused={paused} />}
         {p.next && <Steps s={p.next} />}
+        <SendToGarmin syncedAt={p.intervalsSyncedAt} paused={paused} />
         <PauseToggle id={p.id} paused={paused} full />
       </section>
 

@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncIntervals } from "@/lib/sync/intervals";
+import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
 import { matchRaceActivities } from "@/lib/races/link";
 import { buildAllHabits } from "@/lib/habits/build";
@@ -20,10 +21,12 @@ export async function GET(req: Request) {
   try {
     const user = await prisma.user.upsert({ where: { email }, update: {}, create: { email, name: email.split("@")[0] } });
 
-    // Les deux synchros tournent en même temps ; si l'une échoue, l'autre continue.
-    const [intervals, googleFit] = await Promise.allSettled([
+    // Les synchros tournent en même temps ; si l'une échoue, les autres continuent.
+    // Programme de course → calendrier Intervals.icu (→ Garmin) pour les 14 prochains jours.
+    const [intervals, googleFit, calendar] = await Promise.allSettled([
       syncIntervals(user.id, 3),
       syncGoogleFit(user.id, 3),
+      syncProgramToIntervals(user.id, 14),
     ]);
 
     const report = (r: PromiseSettledResult<unknown>) =>
@@ -50,9 +53,9 @@ export async function GET(req: Request) {
       catch (e) { console.error("[cron] habitudes", e); habits = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     }
 
-    const failed = intervals.status === "rejected" || googleFit.status === "rejected";
+    const failed = intervals.status === "rejected" || googleFit.status === "rejected" || calendar.status === "rejected";
     return NextResponse.json(
-      { intervals: report(intervals), googleFit: report(googleFit), races, habits },
+      { intervals: report(intervals), googleFit: report(googleFit), calendar: report(calendar), races, habits },
       { status: failed ? 502 : 200 }
     );
   } catch (e) {
