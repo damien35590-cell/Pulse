@@ -20,7 +20,7 @@ const saveRecent = (p: Place) => {
 };
 
 /**
- * Départ ailleurs qu'au domicile ou à la position actuelle : recherche d'un lieu (Photon / OpenStreetMap)
+ * Départ ailleurs qu'au domicile ou à la position actuelle : recherche d'un lieu (IGN + Photon / OpenStreetMap)
  * ou toucher sur la carte, puis ajustement du point d'un autre toucher.
  */
 export function PlacePicker({ near, value, onChange }: { near: LatLng | null; value: Place | null; onChange: (p: Place) => void }) {
@@ -93,7 +93,7 @@ export function PlacePicker({ near, value, onChange }: { near: LatLng | null; va
 
       {searching && !results && <p className="px-1 text-sm text-ink-mute" aria-live="polite">Recherche…</p>}
       {failed && <p className="px-1 text-sm text-ink-soft">La recherche de lieux ne répond pas : touche la carte pour placer le départ.</p>}
-      {results && !results.length && !failed && <p className="px-1 text-sm text-ink-soft">Aucun lieu trouvé. Essaie un autre nom ou touche la carte.</p>}
+      {results && !results.length && !failed && <p className="px-1 text-sm text-ink-soft">Aucun lieu trouvé. Essaie le nom de la commune, ou touche la carte pour placer le départ.</p>}
       {list && list.length > 0 && (
         <div>
           {!results && <p className={cn(ui.label, "px-1")}>Récents</p>}
@@ -104,7 +104,9 @@ export function PlacePicker({ near, value, onChange }: { near: LatLng | null; va
                   {results ? <MapPin className="size-4 shrink-0 text-ink-mute" aria-hidden /> : <History className="size-4 shrink-0 text-ink-mute" aria-hidden />}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold text-ink">{p.name}</span>
-                    {p.detail && <span className="block truncate text-xs text-ink-mute">{p.detail}</span>}
+                    {(p.detail || p.km != null) && (
+                      <span className="block truncate text-xs text-ink-mute">{[p.detail, results && p.km != null && `à ${p.km < 10 ? p.km.toLocaleString("fr-FR") : Math.round(p.km)} km`].filter(Boolean).join(" · ")}</span>
+                    )}
                   </span>
                 </button>
               </li>
@@ -120,7 +122,7 @@ export function PlacePicker({ near, value, onChange }: { near: LatLng | null; va
         </p>
       )}
       <PickMap center={near} value={value} onPick={pickOnMap} />
-      <p className="px-1 text-xs text-ink-mute">{value ? "Touche la carte pour ajuster le point de départ." : "Ou touche la carte pour placer le départ."} Recherche : Photon (OpenStreetMap).</p>
+      <p className="px-1 text-xs text-ink-mute">{value ? "Touche la carte pour ajuster le point de départ." : "Ou touche la carte pour placer le départ."} Recherche : IGN Géoplateforme et Photon (OpenStreetMap).</p>
     </div>
   );
 }

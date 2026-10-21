@@ -1,13 +1,16 @@
 /**
- * Recherche de lieux de départ avec Photon (géocodeur OpenStreetMap de komoot, gratuit, sans clé). Côté serveur uniquement.
- * Null au moindre souci : l'interface propose alors de toucher la carte.
+ * Recherche de lieux de départ, côté serveur uniquement, gratuite et sans clé :
+ * - IGN Géoplateforme (BAN + lieux nommés BD TOPO) : connaît les hameaux et lieux-dits, autocomplétion tolérante aux fautes ;
+ * - Photon (OpenStreetMap, komoot) : parkings, forêts, étangs saisis dans OSM.
+ * Les deux sont interrogées en parallèle puis fusionnées. Null si aucune ne répond : l'interface propose alors la carte.
  */
 const URL = "https://photon.komoot.io";
+const IGN = "https://data.geopf.fr/geocodage";
 const TIMEOUT_MS = 4000;
 const LIMIT = 6;
 
 /** Lieu affiché dans la liste : « Forêt de Brocéliande » · « Paimpont, Ille-et-Vilaine ». */
-export type Place = { id: string; name: string; detail: string; lat: number; lng: number };
+export type Place = { id: string; name: string; detail: string; lat: number; lng: number; km?: number };
 
 export type PhotonFeature = {
   geometry: { coordinates: [number, number] };
@@ -49,16 +52,102 @@ async function photon(path: string, q: URLSearchParams): Promise<PhotonFeature[]
   }
 }
 
-/** Lieux correspondant à `q`, les plus proches de `near` d'abord (domicile ou position). */
+export type IgnCompletion = { x: number; y: number; city?: string; zipcode?: string; kind?: string; fulltext?: string };
+
+/** Département affiché après la commune : « Paimpont (35) ». */
+const dept = (zip?: string) => (zip && /^\d{5}$/.test(zip) ? (zip.startsWith("97") ? zip.slice(0, 3) : zip.slice(0, 2)) : "");
+
+/** Conversion pure de l'autocomplétion IGN (« Girec, 31160 Boutx » → Girec · Boutx (31)). */
+export function parseIgnCompletion(results: IgnCompletion[]): Place[] {
+  const out: Place[] = [];
+  for (const r of results) {
+    const [lng, lat] = [Number(r.x), Number(r.y)];
+    const name = r.fulltext?.split(",")[0]?.trim();
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const d = dept(r.zipcode), city = r.city && r.city !== name ? r.city : "";
+    const detail = [city, d && `(${d})`].filter(Boolean).join(" ") || (d ? `Département ${d}` : "");
+    out.push({ id: `ign:${lat.toFixed(5)},${lng.toFixed(5)}`, name, detail, lat, lng });
+  }
+  return out;
+}
+
+const first = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined;
+
+/** Conversion pure d'une réponse /search IGN (index poi ou address). */
+export function parseIgnSearch(features: { geometry?: { coordinates?: number[] }; properties?: Record<string, unknown> }[]): Place[] {
+  const out: Place[] = [];
+  for (const f of features) {
+    const [lng, lat] = f.geometry?.coordinates ?? [];
+    const p = f.properties ?? {};
+    const name = first(p.toponym) ?? first(p.name) ?? first(p.label);
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const city = first(p.city), d = dept(first(p.postcode));
+    const detail = [city && city !== name ? city : "", d && `(${d})`].filter(Boolean).join(" ");
+    out.push({ id: `ign:${lat.toFixed(5)},${lng.toFixed(5)}`, name, detail, lat, lng });
+  }
+  return out;
+}
+
+async function getJson(url: string): Promise<unknown | null> {
+  try {
+    const r = await fetch(url, {
+      headers: { "User-Agent": "Pulse/1.0 (appli perso d'entraînement)" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      next: { revalidate: 86_400 },
+    });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function ign(q: string, near?: { lat: number; lng: number }): Promise<Place[] | null> {
+  const c = new URLSearchParams({ text: q, maximumResponses: "8" });
+  if (near) c.set("lonlat", `${near.lng},${near.lat}`);
+  const s = new URLSearchParams({ q, index: "poi", limit: "6" });
+  if (near) { s.set("lat", String(near.lat)); s.set("lon", String(near.lng)); }
+  const [comp, poi] = (await Promise.all([getJson(`${IGN}/completion/?${c}`), getJson(`${IGN}/search?${s}`)])) as [
+    { results?: IgnCompletion[] } | null, { features?: Parameters<typeof parseIgnSearch>[0] } | null,
+  ];
+  if (!comp && !poi) return null;
+  return [...parseIgnSearch(poi?.features ?? []), ...parseIgnCompletion(comp?.results ?? [])];
+}
+
+/** Distance en km (haversine). */
+export function km(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/**
+ * Fusion pure (tests : tools/test-routes.ts) : doublons à moins de 150 m écartés (la 1re source gagne),
+ * puis tri : nom qui commence par la saisie, puis qui la contient, puis le reste ; à égalité, le plus proche.
+ */
+export function mergePlaces(lists: Place[][], q: string, near?: { lat: number; lng: number }, limit = 8): Place[] {
+  const all: Place[] = [];
+  for (const p of lists.flat()) if (!all.some((x) => km(x, p) < 0.15)) all.push(near ? { ...p, km: Math.round(km(near, p) * 10) / 10 } : p);
+  const nq = norm(q), rank = (p: Place) => { const n = norm(p.name); return n.startsWith(nq) ? 0 : n.includes(nq) ? 1 : 2; };
+  return all.sort((a, b) => rank(a) - rank(b) || (a.km ?? 0) - (b.km ?? 0)).slice(0, limit);
+}
+
+/** Lieux correspondant à `q` (IGN + Photon), les plus proches de `near` d'abord (domicile ou position). */
 export async function searchPlaces(q: string, near?: { lat: number; lng: number }) {
   const params = new URLSearchParams({ q, lang: "fr", limit: String(LIMIT) });
   if (near) { params.set("lat", String(near.lat)); params.set("lon", String(near.lng)); }
-  const f = await photon("/api/", params);
-  return f && parsePhoton(f);
+  const [fromIgn, f] = await Promise.all([ign(q, near), photon("/api/", params)]);
+  if (!fromIgn && !f) return null;
+  return mergePlaces([fromIgn ?? [], f ? parsePhoton(f) : []], q, near);
 }
 
 /** Nom du lieu le plus proche d'un point touché sur la carte. */
 export async function placeAt(lat: number, lng: number) {
   const f = await photon("/reverse", new URLSearchParams({ lat: String(lat), lon: String(lng), lang: "fr", limit: "1" }));
-  return f ? parsePhoton(f)[0] ?? null : null;
+  const osm = f ? parsePhoton(f)[0] : undefined;
+  if (osm) return osm;
+  // Repli IGN : lieu-dit ou adresse le plus proche.
+  const j = (await getJson(`${IGN}/reverse?${new URLSearchParams({ lat: String(lat), lon: String(lng), index: "poi,address", limit: "1" })}`)) as { features?: Parameters<typeof parseIgnSearch>[0] } | null;
+  return j ? parseIgnSearch(j.features ?? [])[0] ?? null : null;
 }

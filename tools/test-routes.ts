@@ -9,7 +9,7 @@ import { parseOverpass, tilesFor, mergeTiles } from "../lib/routes/overpass";
 import { classifyPoi } from "../lib/routes/poi";
 import { indexOsm, overlap, pickThree, sampleRoute, scoreRoute, whyText } from "../lib/routes/score";
 import { gpxFileName, toGpx } from "../lib/routes/gpx";
-import { parsePhoton } from "../lib/routes/places";
+import { mergePlaces, parseIgnCompletion, parseIgnSearch, parsePhoton } from "../lib/routes/places";
 
 const now = new Date("2026-10-20T10:00:00Z");
 const ago = (days: number, type: string, km: number, min: number, extra: Partial<HistoryActivity> = {}): HistoryActivity =>
@@ -130,6 +130,22 @@ assert.equal(places.length, 2, "doublon et résultat sans nom écartés");
 assert.deepEqual(places[0], { id: "W42", name: "Forêt de Brocéliande", detail: "Paimpont, Ille-et-Vilaine", lat: 48.017, lng: -2.189 });
 assert.equal(places[1].name, "12 Rue de Brest");
 assert.equal(places[1].detail, "Rennes");
+
+// ── Lieux de départ (IGN + fusion) ──
+const ignC = parseIgnCompletion([
+  { x: -1.7, y: 48.15, city: "Rennes", zipcode: "35000", kind: "locality", fulltext: "Le Gérec, 35000 Rennes" },
+  { x: 0.81, y: 42.93, city: "Boutx", zipcode: "31160", kind: "locality", fulltext: "Girec, 31160 Boutx" },
+  { x: 0, y: 0 },
+]);
+assert.equal(ignC.length, 2, "résultat sans libellé écarté");
+assert.equal(ignC[0].name, "Le Gérec");
+assert.equal(ignC[0].detail, "Rennes (35)");
+const ignS = parseIgnSearch([{ geometry: { coordinates: [-2.19, 48.02] }, properties: { toponym: "Étang du Pas du Houx", city: ["Paimpont"], postcode: ["35380"] } }]);
+assert.deepEqual([ignS[0].name, ignS[0].detail], ["Étang du Pas du Houx", "Paimpont (35)"]);
+const merged = mergePlaces([ignC, places], "gerec", { lat: 48.11, lng: -1.68 });
+assert.equal(merged[0].name, "Le Gérec", "nom contenant la saisie (sans accents) en premier");
+assert.ok(merged[0].km! < 10, "distance au départ habituel calculée");
+assert.equal(mergePlaces([[places[0]], [{ ...places[0], id: "x", lat: places[0].lat + 0.0005 }]], "foret").length, 1, "doublon à moins de 150 m écarté");
 
 // ── GPX ──
 const gpx = toGpx({ name: "La nature & co", points: [[48.1, -1.6], [48.2, -1.5]], elevation: [50, 60], pois: inForest.pois, time: now });
