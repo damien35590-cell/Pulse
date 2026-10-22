@@ -126,7 +126,8 @@ export function buildCyclingAnalysis(input: { rides: RideRow[]; prevRides: RideR
   };
 }
 
-export async function getCyclingAnalysis(userId: string, tz: string, weeks: number, now = new Date()): Promise<CyclingAnalysis> {
+/** `withStreams: false` : saute la lecture des séries 1 Hz (zones et puissance normalisée vides) ; suffisant pour les phrases « à retenir ». */
+export async function getCyclingAnalysis(userId: string, tz: string, weeks: number, now = new Date(), withStreams = true): Promise<CyclingAnalysis> {
   const first = shiftDay(weekKeys(now, tz)[0], -7 * (weeks - 1)), prevFirst = shiftDay(first, -7 * weeks);
   const [found, z] = await Promise.all([
     prisma.activity.findMany({
@@ -141,7 +142,7 @@ export async function getCyclingAnalysis(userId: string, tz: string, weeks: numb
   const rides = training.filter(inCur).sort((a, b) => +b.startedAt - +a.startedAt);
   // Séries seconde par seconde : seulement les plus récentes sorties de la période (la période précédente n'a besoin que des courbes en cache)
   const ids = rides.filter((r) => r.curve || (r.avgPower ?? 0) > 0 || (r.avgHr ?? 0) > 0).slice(0, STREAM_RIDES).map((r) => r.id);
-  const raw = ids.length ? await prisma.activityStream.findMany({ where: { activityId: { in: ids } }, select: { activityId: true, data: true } }) : [];
+  const raw = withStreams && ids.length ? await prisma.activityStream.findMany({ where: { activityId: { in: ids } }, select: { activityId: true, data: true } }) : [];
   const streams: RideStream[] = raw.map((s) => { const d = s.data as { power?: number[]; hr?: number[] } | null; return { id: s.activityId, power: d?.power ?? [], hr: d?.hr ?? [] }; });
   return buildCyclingAnalysis({
     rides, prevRides: training.filter((a) => !inCur(a)), commutes: all.filter((a) => inCur(a) && isCommute(a)),

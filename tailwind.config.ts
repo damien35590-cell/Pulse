@@ -20,6 +20,7 @@ const config: Config = {
         ink: c("ink"), "ink-soft": c("ink-soft"), "ink-mute": c("ink-mute"), line: c("line"),
         brand: c("brand"), "brand-ink": c("brand-ink"),
         good: c("good"), warn: c("warn"), bad: c("bad"),
+        stack: { workout: c("stack-workout"), run: c("stack-run"), ride: c("stack-ride"), hike: c("stack-hike"), other: c("stack-other") },
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
       },
       fontFamily: {

@@ -16,6 +16,10 @@ import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { StrengthView } from "@/components/analysis/strength-view";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
 import { CyclingView } from "@/components/analysis/cycling-view";
+import { getOverview } from "@/lib/analytics/overview";
+import { OverviewView } from "@/components/analysis/overview-view";
+import { getHikingAnalysis } from "@/lib/analytics/hiking";
+import { HikingView } from "@/components/analysis/hiking-view";
 import { Section } from "@/components/ui/section";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -62,6 +66,18 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   if (S === "RIDE") {
     const cycling = await getCyclingAnalysis(session.user.id, TZ, W, now);
     return <div>{header}<div className="mt-6"><CyclingView data={cycling} weeks={W} /></div></div>;
+  }
+
+  // Tous les sports : séances d'entraînement seulement, ni distance cumulée ni allure
+  if (S === "all") {
+    const overview = await getOverview(session.user.id, TZ, W, now);
+    return <div>{header}<div className="mt-6"><OverviewView data={overview} weeks={W} /></div></div>;
+  }
+
+  // Randonnée : volume par mois, rythme en montée, records
+  if (S === "HIKE") {
+    const hiking = await getHikingAnalysis(session.user.id, TZ, W, now);
+    return <div>{header}<div className="mt-6"><HikingView data={hiking} weeks={W} /></div></div>;
   }
 
   const acts = await prisma.activity.findMany({

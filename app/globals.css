@@ -13,6 +13,8 @@
     --z1: 138 138 149; --z2: 59 130 246; --z3: 34 197 94; --z4: 234 179 8; --z5: 239 68 68; --z6: 139 92 246;
     --sport-run: var(--brand); --sport-ride: var(--brand); --sport-swim: var(--brand);
     --sport-hike: var(--brand); --sport-workout: var(--brand); --sport-other: var(--brand);
+    /* Barres empilées par sport (Analyse > Tous) : une teinte par sport, identique en clair et en sombre. */
+    --stack-workout: 252 76 2; --stack-run: 59 130 246; --stack-ride: 139 92 246; --stack-hike: 34 197 94; --stack-other: 138 138 149;
     /* En sombre, une ombre portée ne se voit pas : on simule la lumière par un liseré clair en haut de la carte. */
     --shadow-card: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
     --font-display: var(--font-body);
