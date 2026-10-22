@@ -12,6 +12,11 @@ import { DisciplineRadar } from "@/components/analysis/discipline-radar";
 import { PowerCurveChart } from "@/components/activity/power-curve-chart";
 import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
 import { getAdvanced } from "@/lib/data/advanced";
+import { getStrengthAnalysis } from "@/lib/analytics/strength";
+import { StrengthView } from "@/components/analysis/strength-view";
+import { Section } from "@/components/ui/section";
+import { ui } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Analyse" };
@@ -25,6 +30,32 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   if (!session?.user?.id) redirect("/login");
   const now = new Date(), W = [4, 12, 26].includes(Number(searchParams.w)) ? Number(searchParams.w) : 12;
   const S = (MY_SPORTS as readonly string[]).includes(searchParams.s ?? "") ? searchParams.s! : "all";
+  const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ w: String(W), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
+  const chip = (on: boolean) => `inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-medium ${on ? "bg-brand text-brand-ink" : "bg-surface-2"}`;
+  const card = "rounded-xl border border-line bg-surface p-4", h2 = "mb-2 mt-6 font-display text-xl font-bold";
+  const header = (
+    <>
+      <h1 className="font-display text-3xl font-bold leading-none">Analyse</h1>
+      <div className="mt-4 flex gap-1 rounded-full bg-surface-2 p-1">{[4, 12, 26].map((n) => <Link key={n} href={qs({ w: String(n) })} className={`flex min-h-10 flex-1 items-center justify-center rounded-full text-sm ${n === W ? "bg-surface font-bold shadow" : "text-ink-soft"}`}>{n} sem.</Link>)}</div>
+      <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">{[["all", "Tous"], ...MY_SPORTS.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}</div>
+    </>
+  );
+
+  // Musculation : aucun bloc d'endurance, et donc aucune de leurs requêtes
+  if (S === "WORKOUT") {
+    const [strength, adv] = await Promise.all([getStrengthAnalysis(session.user.id, TZ, W, now), getAdvanced(session.user.id, TZ)]);
+    return (
+      <div>
+        {header}
+        <div className="mt-6 space-y-8">
+          <StrengthView data={strength} weeks={W} />
+          {adv.hasMuscle && <Section title="Muscles sollicités (7 jours)"><div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div></Section>}
+          {adv.profiles.WORKOUT && <Section title="Profil musculation"><div className={cn(ui.card, "p-4")}><DisciplineRadar profiles={adv.profiles} sport={S} /></div></Section>}
+        </div>
+      </div>
+    );
+  }
+
   const acts = await prisma.activity.findMany({
     where: { userId: session.user.id, startedAt: { gte: new Date(+now - (Math.max(2 * W, 26) * 7 + 14) * 864e5) } }, orderBy: { startedAt: "asc" },
     select: { id: true, type: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
@@ -51,15 +82,10 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const wd = [0, 1, 2, 3, 4, 5, 6].map((r) => sum(cur.filter((a) => dow(dayKey(a.startedAt, TZ)) === r), (a) => a.distanceM) / 1000 / W), wm = Math.max(...wd, 0.1), fav = Math.max(0, wd.indexOf(wm));
   const best = Math.max(0, ...weekly.map((x) => x.km)), longest = Math.max(0, ...cur.map((a) => a.distanceM)) / 1000, days = new Set(cur.map((a) => dayKey(a.startedAt, TZ))).size;
   const recent = acts.filter(hit).slice(-14).reverse(), A = recent.find((a) => a.id === searchParams.a) ?? recent[0], B = recent.find((a) => a.id === searchParams.b) ?? recent[1];
-  const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ w: String(W), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
-  const chip = (on: boolean) => `inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-medium ${on ? "bg-brand text-brand-ink" : "bg-surface-2"}`;
-  const card = "rounded-xl border border-line bg-surface p-4", h2 = "mb-2 mt-6 font-display text-xl font-bold";
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold leading-none">Analyse</h1>
-      <div className="mt-4 flex gap-1 rounded-full bg-surface-2 p-1">{[4, 12, 26].map((n) => <Link key={n} href={qs({ w: String(n) })} className={`flex min-h-10 flex-1 items-center justify-center rounded-full text-sm ${n === W ? "bg-surface font-bold shadow" : "text-ink-soft"}`}>{n} sem.</Link>)}</div>
-      <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">{[["all", "Tous"], ...MY_SPORTS.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}</div>
+      {header}
       <div className="mt-4 grid grid-cols-2 gap-2.5">{kpis.map((k) => { const d = k.p > 0 ? Math.round(((k.c - k.p) / k.p) * 100) : null; return <div key={k.l} className="rounded-xl border border-line bg-surface p-3.5"><p className="text-sm text-ink-soft">{k.l}</p><p className="font-display text-3xl font-bold leading-tight tabular-nums">{k.f(k.c)}</p>{d != null && <p className={`text-xs font-semibold ${d >= 0 ? "text-brand" : "text-ink-soft"}`}>{d > 0 ? "+" : ""}{d} % vs période préc.</p>}</div>; })}</div>
 
       <h2 className={h2}>Distance par semaine</h2><div className={card}><WeeklyBars data={weekly} /></div>
@@ -88,7 +114,6 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
           <div className={card}><PowerCurveChart record={adv.record} recent={adv.last30} />
             <p className="mt-1 text-xs text-ink-soft">Meilleure puissance moyenne maintenue sur chaque durée : record absolu (gris) et 30 derniers jours (orange).</p></div></>
       )}
-      {S === "WORKOUT" && <><h2 className={h2}>Muscles sollicités (7 jours)</h2><div className={card}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div></>}
       {A && B && <>
         <h2 className={h2}>Comparer deux sorties</h2>
         <form className={card} action="/analysis"><input type="hidden" name="w" value={W} /><input type="hidden" name="s" value={S} />

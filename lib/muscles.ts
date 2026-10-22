@@ -31,10 +31,15 @@ const LAFAY: Record<string, [Group, number][]> = {
   i: [["dorsaux", 1]], // tractions (dos)
 };
 // Lettre + chiffres (« a1 », « b2 dips ») ou lettre seule / suivie d'un séparateur (« f », « c - tractions ») ; « a la barre » n'en est pas un
-const LAFAY_CODE = /^([a-i])(?:\d{1,2}(?=$|[\s\-–:.])|(?=$|\s*[-–:.]))/;
+const LAFAY_CODE = /^([a-i])(?:(\d{1,2})(?=$|[\s\-–:.])|(?=$|\s*[-–:.]))/;
+/** Code Lafay d'un nom d'exercice : « B2 - dips » → { letter: "b", digits: 2 } ; null si le nom n'est pas un code. */
+export const lafayCode = (name: string) => {
+  const m = LAFAY_CODE.exec(flat(name).trim());
+  return m ? { letter: m[1], digits: m[2] ? Number(m[2]) : null } : null;
+};
 export const musclesOf = (name: string) => {
-  const n = flat(name).trim(), code = LAFAY_CODE.exec(n);
-  return code ? LAFAY[code[1]] : RULES.find(([re]) => re.test(n))?.[1] ?? [];
+  const code = lafayCode(name);
+  return code ? LAFAY[code.letter] : RULES.find(([re]) => re.test(flat(name).trim()))?.[1] ?? [];
 };
 
 type Ex = { name: string; sets: number; reps: number; loadKg: number | null };
