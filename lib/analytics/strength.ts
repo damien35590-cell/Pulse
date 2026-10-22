@@ -1,26 +1,26 @@
 /**
  * Analyse de la musculation : volume, progression par exercice, régularité, phrases « à retenir ».
  * La page Analyse l'appelle quand le sport choisi est la muscu. buildStrengthAnalysis est pure (tests : tools/test-strength.ts) ;
- * la progression réutilise lib/progression.ts (réussite, échecs d'affilée, objectif) et les codes Lafay de lib/muscles.ts.
+ * la progression suit les règles Lafay (total de reps, variante suivante) avec les codes de lib/muscles.ts.
  */
 import { prisma } from "../prisma";
 import { dayKey, shiftDay, weekKeys } from "../dates";
-import { exerciseKey, type Past, type SetDetail } from "../exercises";
+import { exerciseKey, type SetDetail } from "../exercises";
 import { lafayCode, musclesOf } from "../muscles";
-import { stallsOf, suggestGoal } from "../progression";
 
 export type StrengthRow = { activityId: string; startedAt: Date; name: string; sets: number; reps: number; loadKg: number | null; setsDetail: SetDetail[] | null };
-export type StrengthStatus = "progress" | "stall1" | "stall2";
+export type StrengthStatus = "progress" | "stall1" | "stall2" | "evolve";
 export type ExerciseProgress = {
   key: string; name: string;
-  variant: string | null;          // « B2 » pour un code Lafay avec variante, sinon null
+  variant: string | null;          // « B2 », « B » (forme finale) pour un code Lafay à échelle, sinon null
   level: string;                   // « 6×12 » : séries × répétitions visées à la dernière séance
-  status: StrengthStatus;          // progrès / blocage 1 (dernière séance ratée) / blocage 2 (deux ratées d'affilée ou plus)
+  status: StrengthStatus;          // progrès / blocage 1 (une séance sans progrès) / blocage 2 (deux de suite ou plus) / à faire évoluer (plafond atteint)
   sessions: number;
   repsPerSession: number[];        // du plus ancien au plus récent
   lastDay: string;                 // AAAA-MM-JJ
-  hint: string | null;             // phrase de l'objectif suivant quand l'exercice est bloqué
-  easierVariant: string | null;    // variante d'un cran plus facile (B2 → B1) quand l'exercice est bloqué
+  hint: string | null;             // conseil quand l'exercice est en blocage 2 ou à faire évoluer
+  nextVariant: string | null;      // variante suivante (plus difficile) de l'échelle, null si dernière ou inconnue
+  restartTarget: number | null;    // répétitions visées pour repartir : arrondi(N × 0,7)
 };
 export type StrengthAnalysis = {
   empty: boolean;
@@ -50,7 +50,50 @@ function groupKey(name: string) {
   const c = lafayCode(name);
   return c ? `lafay:${c.letter}` : exerciseKey(name);
 }
-const variantOf = (name: string) => { const c = lafayCode(name); return c?.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : null; };
+
+/** Échelles Lafay, de la plus facile à la plus difficile. Une variante change l'exercice : le compteur de blocage repart de zéro. */
+const LADDERS: string[][] = [["B1", "B2", "B"], ["C1", "C2", "C3", "C"], ["A1", "A2"], ["A3", "A4", "A5", "A6"]];
+const nextVariant = (v: string | null) => { for (const l of LADDERS) { const i = l.indexOf(v ?? ""); if (i >= 0) return l[i + 1] ?? null; } return null; };
+/** « B2 » ; « B » seul quand la lettre est la forme finale d'une échelle ; null pour les autres exercices. */
+const variantOf = (name: string) => {
+  const c = lafayCode(name);
+  if (!c) return null;
+  const v = c.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : c.letter.toUpperCase();
+  return LADDERS.some((l) => l.includes(v)) ? v : null;
+};
+/** Plafond de répétitions par série : 12, ou 20 pour F (squat sauté). */
+const isJump = (name: string) => lafayCode(name)?.letter === "f" || /squat.*saut/i.test(name);
+const capOf = (name: string) => (isJump(name) ? 20 : 12);
+
+/** Une séance d'un exercice dans une variante : total de reps, cible N, toutes les séries à la cible ou plus. */
+type Entry = { variant: string | null; total: number; n: number; sets: number; met: boolean };
+function entriesOf(list: StrengthRow[]): Entry[] {
+  const out: (Entry & { id: string })[] = [];
+  for (const r of list) { // du plus récent au plus ancien
+    const d = doneSets(r), variant = variantOf(r.name);
+    if (!d.length) continue;
+    const met = d.length >= r.sets && d.every((x) => x.reps >= r.reps), total = sumReps(d), same = out.find((e) => e.id === r.activityId && e.variant === variant);
+    if (same) { same.total += total; same.met = same.met && met; } else out.push({ id: r.activityId, variant, total, n: r.reps, sets: r.sets, met });
+  }
+  return out;
+}
+/** Progrès = total supérieur à la séance précédente de la même variante, ou toutes les séries à la cible. Première séance d'une variante : progrès. */
+function stallsOf(entries: Entry[]): number {
+  const run: Entry[] = []; // séances consécutives de la variante actuelle
+  for (const e of entries) { if (e.variant !== entries[0].variant) break; run.push(e); }
+  let n = 0;
+  for (let i = 0; i < run.length; i++) {
+    const prev = run[i + 1];
+    if (!prev || run[i].total > prev.total || run[i].met) break;
+    n++;
+  }
+  return n;
+}
+function advice(e: Entry, name: string): { hint: string; next: string | null; restart: number } {
+  const restart = Math.round(e.n * 0.7), next = nextVariant(e.variant);
+  if (isJump(name) && e.n >= capOf(name)) return { hint: "saute plus haut", next: null, restart };
+  return { hint: next ? `passe à ${next} à ${e.sets}×${restart}` : `repars à ${e.sets}×${restart} sur ${e.variant ?? "le même exercice"}`, next, restart };
+}
 
 export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: string, now = new Date()): StrengthAnalysis {
   const mon = weekKeys(now, tz)[0], first = shiftDay(mon, -7 * (weeks - 1));
@@ -77,16 +120,16 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
   const exercises: ExerciseProgress[] = [];
   for (const [key, list] of by) {
     if (!list.some((r) => weekOf(r.startedAt) >= 0 && doneSets(r).length > 0)) continue;
-    const past: Past[] = list.map((r) => ({ date: r.startedAt.toISOString(), sets: r.sets, reps: r.reps, loadKg: r.loadKg, restS: null, setsDetail: r.setsDetail }));
-    const stalls = stallsOf(past), last = list[0], v = variantOf(last.name), c = lafayCode(last.name);
+    const ents = entriesOf(list), cur = ents[0] ?? { variant: null, total: 0, n: list[0].reps, sets: list[0].sets, met: false };
+    const stalls = stallsOf(ents), last = list[0], evolve = cur.n >= capOf(last.name);
+    const adv = stalls >= 2 || evolve ? advice(cur, last.name) : null;
     const perSession = new Map<string, number>();
     for (const r of [...list].reverse()) if (weekOf(r.startedAt) >= 0) perSession.set(r.activityId, (perSession.get(r.activityId) ?? 0) + sumReps(doneSets(r)));
     exercises.push({
-      key, name: last.name.trim(), variant: v, level: `${last.sets}×${last.reps}`,
-      status: stalls === 0 ? "progress" : stalls === 1 ? "stall1" : "stall2",
+      key, name: last.name.trim(), variant: cur.variant, level: `${cur.sets}×${cur.n}`,
+      status: evolve ? "evolve" : stalls === 0 ? "progress" : stalls === 1 ? "stall1" : "stall2",
       sessions: perSession.size, repsPerSession: [...perSession.values()], lastDay: dayKey(last.startedAt, tz),
-      hint: stalls ? suggestGoal(past)?.text ?? null : null,
-      easierVariant: stalls >= 2 && c?.digits && c.digits > 1 ? `${c.letter.toUpperCase()}${c.digits - 1}` : null,
+      hint: adv?.hint ?? null, nextVariant: adv?.next ?? null, restartTarget: adv?.restart ?? null,
     });
   }
   exercises.sort((a, b) => b.lastDay.localeCompare(a.lastDay));
@@ -127,7 +170,7 @@ function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: 
   const stuck = exercises.find((e) => e.status === "stall2");
   if (stuck) {
     const n = `${stuck.name}${stuck.variant && !stuck.name.toUpperCase().startsWith(stuck.variant) ? ` (${stuck.variant})` : ""}`;
-    out.push(`${n} est bloqué depuis 2 séances : ${stuck.easierVariant ? `repasse sur ${stuck.easierVariant}, ou ` : ""}${stuck.hint ? `garde l'objectif ${stuck.hint}` : "garde le même objectif"}.`);
+    out.push(`${n} est bloqué depuis 2 séances : ${stuck.hint}.`);
   }
 
   // Meilleure série de la période : la plus lourde (charge × reps) s'il y a des charges, sinon la plus longue

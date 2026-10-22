@@ -12,6 +12,7 @@ const STATUS: Record<StrengthStatus, { label: string; cls: string }> = {
   progress: { label: "Progrès", cls: "bg-good/15 text-good" },
   stall1: { label: "Blocage 1", cls: "bg-warn/15 text-warn" },
   stall2: { label: "Blocage 2", cls: "bg-bad/15 text-bad" },
+  evolve: { label: "À faire évoluer", cls: "bg-brand/15 text-brand" },
 };
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 
@@ -57,7 +58,7 @@ export function StrengthView({ data, weeks }: { data: StrengthAnalysis; weeks: n
               {e.repsPerSession.length > 1
                 ? <div className="mt-3"><Sparkline values={e.repsPerSession} className="text-brand" /><p className="mt-1 text-xs text-ink-mute">Total de reps par séance ({e.repsPerSession[0]} → {e.repsPerSession[e.repsPerSession.length - 1]})</p></div>
                 : <p className="mt-3 text-xs text-ink-mute">1 séance sur la période : {e.repsPerSession[0] ?? 0} reps au total.</p>}
-              {e.status === "stall2" && <p className="mt-2 text-sm text-ink-soft">{e.easierVariant ? `Essaie ${e.easierVariant}` : "Même variante"}{e.hint ? ` · objectif ${e.hint}` : ""}</p>}
+              {e.hint && <p className="mt-2 text-sm text-ink-soft">{e.hint.charAt(0).toUpperCase() + e.hint.slice(1)}.</p>}
             </article>
           ))}
         </div>

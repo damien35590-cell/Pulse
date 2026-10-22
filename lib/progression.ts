@@ -11,9 +11,6 @@ export const succeeded = (p: Past) => !p.setsDetail || (p.setsDetail.length >= p
 /** Séances réussies d'affilée, de la plus récente à la plus ancienne. */
 export const streakOf = (sessions: Past[]) => { let n = 0; while (n < sessions.length && succeeded(sessions[n])) n++; return n; };
 
-/** Séances ratées d'affilée, de la plus récente à la plus ancienne (0 si la dernière est réussie). */
-export const stallsOf = (sessions: Past[]) => { let n = 0; while (n < sessions.length && !succeeded(sessions[n])) n++; return n; };
-
 /**
  * - échec la dernière fois → même objectif ;
  * - charge : +1 rep par série, ou +2,5 kg une fois à 12 reps ou plus ;

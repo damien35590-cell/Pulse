@@ -11,7 +11,7 @@ const row = (activityId: string, day: string, name: string, sets: number, reps: 
 // Vide
 assert.equal(buildStrengthAnalysis([], 4, tz, now).empty, true);
 
-// B2 raté deux fois d'affilée (cible 6×10, 6 séries à 8) → blocage 2, variante plus facile B1
+// B2 raté deux fois d'affilée (cible 6×10, 6 séries à 8) → 60, 53, 53 : blocage 2, variante suivante B (échelle B1 → B2 → B), cible 6×7
 const rows = [
   row("a1", "2026-10-05", "C1 - tractions", 6, 8, [8, 8, 8, 8, 8, 8]),
   row("a2", "2026-10-12", "B2 - dips", 6, 10, [10, 10, 10, 10, 10, 10]),
@@ -26,14 +26,53 @@ const b = r.exercises.find((e) => e.key === "lafay:b")!;
 assert.equal(b.status, "stall2");
 assert.equal(b.variant, "B2");
 assert.equal(b.level, "6×10");
-assert.equal(b.easierVariant, "B1");
+assert.equal(b.nextVariant, "B");
+assert.equal(b.restartTarget, 7);
 assert.equal(b.sessions, 3);
 assert.equal(r.exercises[0].lastDay, "2026-10-19", "tri par dernière séance");
-assert.ok(r.insights.some((t) => t.includes("bloqué depuis 2 séances") && t.includes("B1")), r.insights.join(" | "));
+assert.ok(r.insights.some((t) => t.includes("bloqué depuis 2 séances") && t.includes("passe à B à 6×7")), r.insights.join(" | "));
 assert.ok(r.insights.some((t) => t.startsWith("Meilleure série : 5 × 80 kg sur Squat")), r.insights.join(" | "));
 
 // Sans aucune charge : pas de tonnage
 assert.equal(buildStrengthAnalysis(rows.slice(0, 3), 4, tz, now).summary.tonnage, null);
 // Semaines vides gardées à 0
 assert.equal(r.weekly.length, 4);
+// ── Règles Lafay ──
+const status = (rs: StrengthRow[]) => buildStrengthAnalysis(rs, 12, tz, now).exercises[0];
+// 42 au total, puis 8+8+8+8+6+5 = 43 : total supérieur = progrès, même sans atteindre la cible 8 partout
+let e = status([row("p1", "2026-10-05", "B1 - dips", 6, 8, [7, 7, 7, 7, 7, 7]), row("p2", "2026-10-12", "B1 - dips", 6, 8, [8, 8, 8, 8, 6, 5])]);
+assert.equal(e.status, "progress");
+// Toutes les séries à la cible = progrès, même à total égal ou inférieur
+e = status([row("q1", "2026-10-05", "B1 - dips", 6, 9, [9, 9, 9, 9, 9, 9]), row("q2", "2026-10-12", "B1 - dips", 6, 8, [8, 8, 8, 8, 8, 8])]);
+assert.equal(e.status, "progress", "cible atteinte partout");
+// Deux séances à total égal après la référence : blocage 2, B1 → B2 à arrondi(8 × 0,7) = 6
+const flat = [0, 1, 2].map((i) => row("f" + i, `2026-10-0${5 + i * 2}`, "B1 - dips", 6, 8, [8, 8, 8, 8, 5, 5]));
+e = status(flat);
+assert.equal(e.status, "stall2");
+assert.equal(e.nextVariant, "B2");
+assert.equal(e.restartTarget, 6);
+assert.equal(status(flat.slice(0, 2)).status, "stall1", "une seule séance sans progrès : blocage 1");
+// Un changement de variante remet le compteur à zéro (B1 bloqué, puis B2 première séance)
+e = status([...flat, row("g", "2026-10-14", "B2 - dips", 6, 6, [6, 6, 5, 5, 4, 4])]);
+assert.equal(e.variant, "B2");
+assert.equal(e.status, "progress");
+// Dernière variante de l'échelle ou exercice inconnu : on repart à arrondi(N × 0,7) sur la même variante
+e = status([0, 1, 2].map((i) => row("c" + i, `2026-10-0${5 + i * 2}`, "C - tractions", 6, 5, [5, 4, 4, 3, 3, 3])));
+assert.equal(e.status, "stall2");
+assert.equal(e.nextVariant, null);
+assert.equal(e.restartTarget, 4);
+assert.ok(e.hint!.startsWith("repars à 6×4"), e.hint!);
+// Échelle des pompes : A2 est la fin de la première, A3 → A4
+assert.equal(status([0, 1, 2].map((i) => row("a" + i, `2026-10-0${5 + i * 2}`, "A2 - pompes", 6, 10, [9, 9, 9, 9, 9, 9]))).nextVariant, null);
+assert.equal(status([0, 1, 2].map((i) => row("a" + i, `2026-10-0${5 + i * 2}`, "A3 - pompes", 6, 10, [9, 9, 9, 9, 9, 9]))).nextVariant, "A4");
+// Plafond : N = 12 → à faire évoluer, variante suivante ; F (20) → « saute plus haut »
+e = status([row("m", "2026-10-12", "C2 - tractions", 6, 12, [12, 12, 12, 12, 12, 12])]);
+assert.equal(e.status, "evolve");
+assert.equal(e.nextVariant, "C3");
+assert.ok(e.hint!.includes("C3") && e.hint!.includes("6×8"), e.hint!);
+assert.equal(status([row("j", "2026-10-12", "F", 6, 19, Array(6).fill(19))]).status, "progress", "F : plafond à 20, pas 12");
+e = status([row("j", "2026-10-12", "F", 6, 20, Array(6).fill(20))]);
+assert.equal(e.status, "evolve");
+assert.equal(e.hint, "saute plus haut");
+
 console.log("test-strength : ok");
