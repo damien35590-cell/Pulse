@@ -77,10 +77,10 @@ function UnlinkedRow({ item, options }: { item: UnlinkedName; options: ExerciseO
         </button>
       )}
       <div className="grid grid-cols-2 gap-2">
-        <button aria-expanded={mode === "link"} onClick={() => { tap(); setMode(mode === "link" ? null : "link"); }} className={cn(btn, "border px-2 text-sm", mode === "link" ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface")}>
+        <button aria-expanded={mode === "link"} onClick={() => { tap(); setMode(mode === "link" ? null : "link"); }} className={cn(btn, "border px-2 text-sm", mode === "link" ? "border-brand bg-brand-soft text-brand" : "border-line bg-surface")}>
           <Search className="h-4 w-4" aria-hidden />Rattacher à…
         </button>
-        <button aria-expanded={mode === "custom"} onClick={() => { tap(); setMode(mode === "custom" ? null : "custom"); }} className={cn(btn, "border px-2 text-sm", mode === "custom" ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface")}>
+        <button aria-expanded={mode === "custom"} onClick={() => { tap(); setMode(mode === "custom" ? null : "custom"); }} className={cn(btn, "border px-2 text-sm", mode === "custom" ? "border-brand bg-brand-soft text-brand" : "border-line bg-surface")}>
           <Plus className="h-4 w-4" aria-hidden />Exercice perso
         </button>
       </div>

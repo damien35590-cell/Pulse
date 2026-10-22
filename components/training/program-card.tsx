@@ -19,7 +19,7 @@ function cheer(done: number, target: number) {
 }
 
 export function KeyBadge() {
-  return <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">Séance clé</span>;
+  return <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand">Séance clé</span>;
 }
 
 /** Points de la semaine du programme : faite (plein), passée (gris), prochaine (anneau), à venir (contour). */
@@ -58,7 +58,7 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
   const paused = p.status === "PAUSED", msg = cheer(p.weekDone, p.sessionsPerWeek), n = p.next;
   return (
     <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4")}>
-      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand-soft blur-3xl" />
       <div className="relative flex items-center justify-between gap-3">
         <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"} · {p.name}</p>
         <Link href="/plan" className="shrink-0 text-sm font-semibold text-brand active:opacity-60">Programme</Link>
@@ -97,7 +97,7 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
 export function StartProgramCard() {
   return (
     <Link href="/plan" className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-4")}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><Rocket className="size-5" aria-hidden /></span>
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"><Rocket className="size-5" aria-hidden /></span>
       <span className="min-w-0 flex-1"><b className="block text-[15px] font-semibold">Lance ton programme course</b><span className="text-sm text-ink-soft">Reprise & VMA : 12 semaines, 2 ou 3 séances, à ton rythme</span></span>
       <ChevronRight className="size-4 shrink-0 text-ink-mute" aria-hidden />
     </Link>

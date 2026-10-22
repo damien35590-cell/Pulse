@@ -12,6 +12,8 @@ type Props = {
   back?: string | (() => void);
   backLabel?: string;
   actions?: React.ReactNode;
+  /** Ligne d'accroche (ex. la date) à gauche de la barre, sur la même ligne que `actions`. Cède la place au titre replié au défilement. */
+  eyebrow?: string;
   /** Grand titre sous la barre, qui se replie dans la barre au défilement (comme les apps natives). */
   large?: boolean;
 };
@@ -20,7 +22,7 @@ const backCls =
   "grid size-12 place-items-center rounded-full text-ink select-none touch-manipulation transition duration-150 ease-snappy active:scale-90 active:bg-surface-2";
 
 /** En-tête collant : safe area du haut, fond flouté une fois la page défilée, grand titre repliable. */
-export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, large = true }: Props) {
+export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, eyebrow, large = true }: Props) {
   const [compact, setCompact] = useState(!large);
   const bar = useRef<HTMLElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -56,9 +58,16 @@ export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, l
             <span className="w-3" aria-hidden />
           )}
           {large ? (
-            <p aria-hidden className={cn("min-w-0 flex-1 truncate text-[17px] font-semibold transition duration-200 first-letter:uppercase", compact ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0")}>
-              {title}
-            </p>
+            <div className="relative min-w-0 flex-1 self-stretch">
+              {eyebrow && (
+                <p className={cn("absolute inset-0 flex items-center text-[15px] font-medium text-ink-soft transition duration-200 first-letter:uppercase", compact ? "-translate-y-1 opacity-0" : "translate-y-0 opacity-100")}>
+                  <span className="truncate">{eyebrow}</span>
+                </p>
+              )}
+              <p aria-hidden className={cn("absolute inset-0 flex items-center text-[17px] font-semibold transition duration-200 first-letter:uppercase", compact ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0")}>
+                <span className="truncate">{title}</span>
+              </p>
+            </div>
           ) : (
             <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold first-letter:uppercase">{title}</h1>
           )}

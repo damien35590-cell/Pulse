@@ -14,7 +14,7 @@ export function NextRaceHero({ race: r, now }: { race: RaceView; now: string }) 
   const platform = PLATFORM_LABEL[r.platform];
   return (
     <section aria-label="Prochaine course" className="overflow-hidden rounded-2xl border border-brand/30 bg-surface">
-      <div className="bg-gradient-to-br from-brand/15 via-brand/5 to-transparent p-5">
+      <div className="bg-gradient-to-br from-brand-soft to-transparent p-5">
         <p className="text-xs font-bold uppercase tracking-wider text-brand">Prochaine course</p>
         <Link href={`/events/${r.id}`} className="group mt-1 block">
           <h2 className="font-display text-2xl font-bold leading-tight">{r.name}<ChevronRight className="ml-0.5 inline h-5 w-5 text-brand transition group-hover:translate-x-0.5" aria-hidden /></h2>

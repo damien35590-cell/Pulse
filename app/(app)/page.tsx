@@ -50,7 +50,8 @@ export default async function DashboardPage() {
   return (
     <>
       <TopBar
-        title={today}
+        eyebrow={today}
+        title="Aujourd’hui"
         subtitle={`Semaine du ${d.range} · ${d.weekCount} séance${d.weekCount > 1 ? "s" : ""}`}
         actions={<Link href="/import" aria-label="Importer un fichier" className={ui.iconBtn}><Upload className="size-5" aria-hidden /></Link>}
       />

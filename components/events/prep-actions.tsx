@@ -31,7 +31,7 @@ export function RaceGoalButton({ id, km, sportLabel, active }: { id: string; km:
   if (msg) return <p role="status" className="flex min-h-11 items-center gap-1.5 text-sm font-semibold text-ink-soft"><Check className="h-4 w-4 text-brand" aria-hidden />{msg}</p>;
   return (
     <button disabled={pending} onClick={() => start(async () => { tap(6); const r = await createRaceGoal(id); setMsg(r.ok ? `${r.updated ? "Objectif mis à jour" : "Objectif ajouté"} : ${r.km} km/semaine, visible sur l’accueil.` : r.error); })}
-      className={cn("flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand/5 font-semibold text-brand", pending && "opacity-60")}>
+      className={cn("flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand-soft font-semibold text-brand", pending && "opacity-60")}>
       <Target className="h-4 w-4" aria-hidden />{pending ? "Ajout…" : `Objectif hebdo : ${km} km en ${sportLabel}`}
     </button>
   );

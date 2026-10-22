@@ -20,7 +20,7 @@ const empty = (): Day => ({ sessions: [], races: [], runs: [], workouts: [] });
 const isEmpty = (d: Day) => !d.sessions.length && !d.races.length && !d.runs.length && !d.workouts.length;
 
 const dot = "h-2 w-2 rounded-full";
-const sessionDot = (s: CalSession) => (s.status === "COMPLETED" || s.status === "PARTIAL" ? "bg-emerald-500" : s.status === "SKIPPED" ? "bg-ink-soft/30" : s.isKey ? "bg-orange-500" : "bg-ink-soft/60");
+const sessionDot = (s: CalSession) => (s.status === "COMPLETED" || s.status === "PARTIAL" ? "bg-emerald-500" : s.status === "SKIPPED" ? "bg-ink-soft/30" : s.isKey ? "bg-brand" : "bg-ink-soft/60");
 const statusLabel: Record<SessionStatus, string> = { PLANNED: "Prévue", COMPLETED: "Faite", PARTIAL: "Partielle", MOVED: "Déplacée", SKIPPED: "Passée" };
 const raceLabel = { REGISTERED: "Inscrit", COMPLETED: "Courue", DNS: "Absent", DNF: "Abandon" } as const;
 const StarIcon = ({ className }: { className?: string }) => <Star className={cn("fill-amber-400 text-amber-500", className)} aria-hidden />;
@@ -81,7 +81,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
               return (
                 <button key={k} type="button" onClick={() => toggle(k)} aria-label={longDay(k)} aria-pressed={isSel}
                   className={cn("flex min-h-11 min-w-0 flex-col items-center justify-start gap-0.5 rounded-lg border py-1 text-sm tabular-nums",
-                    isSel ? "border-brand bg-brand/10" : "border-transparent bg-surface-2", out && "opacity-40", k === today && "ring-2 ring-brand")}>
+                    isSel ? "border-brand bg-brand-soft" : "border-transparent bg-surface-2", out && "opacity-40", k === today && "ring-2 ring-brand")}>
                   <span className={cn("leading-none", k === today && "font-bold text-brand")}>{+k.slice(8)}</span>
                   <span className="flex min-h-3 flex-wrap items-center justify-center gap-0.5">
                     {d.races.length > 0 && <StarIcon className="h-3 w-3" />}
@@ -101,7 +101,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
             return (
               <li key={k}>
                 <button type="button" onClick={() => toggle(k)} aria-pressed={selected === k}
-                  className={cn("flex min-h-11 w-full gap-3 rounded-xl border p-2 text-left", selected === k ? "border-brand bg-brand/10" : "border-transparent bg-surface-2", k === today && "ring-2 ring-brand")}>
+                  className={cn("flex min-h-11 w-full gap-3 rounded-xl border p-2 text-left", selected === k ? "border-brand bg-brand-soft" : "border-transparent bg-surface-2", k === today && "ring-2 ring-brand")}>
                   <span className="w-12 shrink-0 text-xs font-semibold capitalize text-ink-soft">{shortDay(k)}</span>
                   <span className="min-w-0 flex-1 space-y-1">
                     {isEmpty(d) && <span className="text-sm text-ink-soft">—</span>}
@@ -118,7 +118,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
       )}
 
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-soft" aria-label="Légende">
-        <Leg c="bg-orange-500" t="Séance clé" /><Leg c="bg-ink-soft/60" t="Séance prévue" /><Leg c="bg-emerald-500" t="Course faite" /><Leg c="bg-violet-500" t="Muscu" />
+        <Leg c="bg-brand" t="Séance clé" /><Leg c="bg-ink-soft/60" t="Séance prévue" /><Leg c="bg-emerald-500" t="Course faite" /><Leg c="bg-violet-500" t="Muscu" />
         <li className="flex items-center gap-1"><StarIcon className="h-3 w-3" />Course objectif</li>
       </ul>
 

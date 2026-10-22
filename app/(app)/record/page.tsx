@@ -129,7 +129,7 @@ export default function RecordPage() {
                   <p className="text-xs text-ink-soft">Dernière fois : {describe(h.sessions[0])}, {daysAgo(h.sessions[0].date)}</p>
                   {g && cur !== `${g.sets}|${g.reps}|${g.loadKg ?? ""}` && (
                     <button type="button" onClick={() => { tap(); patch(x.id, { sets: String(g.sets), reps: String(g.reps), loadKg: g.loadKg == null ? "" : String(g.loadKg), detail: null }); }}
-                      className="flex min-h-12 w-full flex-col items-start justify-center rounded-xl bg-brand/10 px-3 py-1.5 text-left text-brand">
+                      className="flex min-h-12 w-full flex-col items-start justify-center rounded-xl bg-brand-soft px-3 py-1.5 text-left text-brand">
                       <span className="text-sm font-semibold">Objectif du jour : {g.text}</span>
                       {g.hint && <span className="text-xs">{g.hint}</span>}
                     </button>)}

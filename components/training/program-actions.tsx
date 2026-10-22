@@ -84,7 +84,7 @@ export function VmaTestPrompt({ sessionId }: { sessionId: string }) {
   // Une fois enregistrée, la carte disparaît et la nouvelle VMA s'affiche avec les allures recalculées.
   return (
     <form onSubmit={(e) => { e.preventDefault(); run(() => saveVmaTest(sessionId, Number(m.replace(/\s/g, ""))), celebrate); }}
-      className="space-y-2 rounded-xl border border-brand/40 bg-brand/5 p-3">
+      className="space-y-2 rounded-xl border border-brand/40 bg-brand-soft p-3">
       <label className="block text-sm font-semibold" htmlFor={`cooper-${sessionId}`}>Test VMA bouclé 💪 Distance parcourue en 6 minutes (m)</label>
       <div className="flex gap-2">
         <input id={`cooper-${sessionId}`} value={m} onChange={(e) => setM(e.target.value)} inputMode="numeric" placeholder="ex. 1450" className={input} />

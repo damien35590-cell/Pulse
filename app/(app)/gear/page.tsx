@@ -42,7 +42,7 @@ function Head({ g, small }: { g: GearUsage; small?: boolean }) {
   const K = GEAR_KINDS[g.kind], I = K.icon;
   return (
     <div className="mb-2 flex items-start gap-3">
-      <span className={cn("grid shrink-0 place-items-center rounded-lg bg-brand/10 text-brand", small ? "h-8 w-8" : "h-10 w-10")}><I className={small ? "h-4 w-4" : "h-5 w-5"} aria-hidden /></span>
+      <span className={cn("grid shrink-0 place-items-center rounded-lg bg-brand-soft text-brand", small ? "h-8 w-8" : "h-10 w-10")}><I className={small ? "h-4 w-4" : "h-5 w-5"} aria-hidden /></span>
       <div className="min-w-0 flex-1">
         <p className={cn("truncate font-bold", !small && "text-lg")}>{g.name}</p>
         <p className="text-xs text-ink-soft">

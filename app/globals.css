@@ -7,7 +7,9 @@
   :root {
     --bg: 10 10 12; --surface: 20 20 23; --surface-2: 30 30 34; --surface-3: 42 42 48;
     --ink: 245 245 247; --ink-soft: 161 161 170; --ink-mute: 138 138 149; --line: 38 38 43;
-    --brand: 252 76 2; --brand-ink: 10 10 12;
+    --brand: 232 128 79; --brand-ink: 10 10 12;
+    /* Fond teinté (pastille active, chip sélectionné) : brand à 14 %. Suit --brand dans les deux thèmes. */
+    --brand-soft: color-mix(in oklab, rgb(var(--brand)) 14%, transparent);
     --good: 34 197 94; --warn: 245 158 11; --bad: 239 68 68;
     /* Zones (cardio et puissance) : mêmes teintes qu'avant, désormais en tokens (bg-z4, text-z2…). */
     --z1: 138 138 149; --z2: 59 130 246; --z3: 34 197 94; --z4: 234 179 8; --z5: 239 68 68; --z6: 139 92 246;

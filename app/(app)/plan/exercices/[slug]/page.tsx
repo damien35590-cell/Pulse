@@ -78,7 +78,7 @@ export default async function ExercisePage({ params }: { params: { slug: string 
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
           <span className="rounded-full bg-surface-2 px-2.5 py-1">{LOAD_TYPE_LABELS[ex.loadType]}</span>
           {ex.isCustom && <span className="rounded-full bg-surface-2 px-2.5 py-1">{EQUIPMENT_LABELS[ex.equipment]}</span>}
-          {ex.difficulty && <span className="rounded-full bg-brand/15 px-2.5 py-1 text-brand">Difficulté {ex.difficulty}/10</span>}
+          {ex.difficulty && <span className="rounded-full bg-brand-soft px-2.5 py-1 text-brand">Difficulté {ex.difficulty}/10</span>}
           {ex.mechanic && <span className="rounded-full bg-surface-2 px-2.5 py-1">{ex.mechanic === "COMPOUND" ? "Polyarticulaire" : "Isolation"}</span>}
         </div>
       </header>
@@ -108,7 +108,7 @@ export default async function ExercisePage({ params }: { params: { slug: string 
             {ladder.map((l) => {
               const p = practiced.get(l.slug), here = l.slug === ex.slug, cur = l.slug === current;
               return (
-                <li key={l.slug} className={cn(cur && "bg-brand/10")}>
+                <li key={l.slug} className={cn(cur && "bg-brand-soft")}>
                   <Link href={`/plan/exercices/${l.slug}`} aria-current={here ? "page" : undefined} className="flex min-h-14 items-center gap-3 px-3 py-2">
                     <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums", cur ? "bg-brand text-brand-ink" : p ? "border-2 border-brand text-brand" : "bg-surface-2 text-ink-soft")}>{l.difficulty}</span>
                     <span className="min-w-0 flex-1">

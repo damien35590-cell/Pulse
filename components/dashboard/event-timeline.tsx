@@ -23,7 +23,7 @@ export function EventTimeline({ events, pendingResult }: { events: EventView[]; 
 
       {pendingResult && (
         <Link href={`/events/${pendingResult.id}`} className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-3")}>
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><Trophy className="size-5" aria-hidden /></span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"><Trophy className="size-5" aria-hidden /></span>
           <span className="min-w-0 flex-1 text-sm">Comment s’est passé <b>{pendingResult.name}</b> ? <span className="font-semibold text-brand">Ajoute ton résultat</span></span>
           <ChevronRight className="size-4 shrink-0 text-brand" aria-hidden />
         </Link>
@@ -31,7 +31,7 @@ export function EventTimeline({ events, pendingResult }: { events: EventView[]; 
 
       {!next ? (
         <Link href="/events?import=1" className={cn(ui.card, ui.pressCard, "flex items-center gap-3 p-4")}>
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><Plus className="size-5" aria-hidden /></span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"><Plus className="size-5" aria-hidden /></span>
           <span className="min-w-0 flex-1"><b className="block">Ajoute ta prochaine course</b><span className="text-sm text-ink-soft">Colle un lien NextRun ou Klikego</span></span>
           <ChevronRight className="size-4 shrink-0 text-ink-mute" aria-hidden />
         </Link>

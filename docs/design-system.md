@@ -24,8 +24,9 @@ Cible : PWA installée sur Pixel, sombre par défaut, lisible en plein effort.
 | `ink` | #F5F5F7 | valeurs, titres | 16,9:1 |
 | `ink-soft` | #A1A1AA | unités, phrases | 7,2:1 |
 | `ink-mute` | #8A8A95 | libellés, dates | 5,4:1 |
-| `brand` | #FC4C02 | action principale, lien, mise en avant (une seule par écran) | 5,4:1 |
-| `brand-ink` | #0A0A0C | texte sur fond orange (5,8:1 ; le blanc ne fait que 3,4:1) | |
+| `brand` | #E8804F | action principale, lien, mise en avant (une seule par écran) ; orange corail adouci | 6,7:1 |
+| `brand-ink` | #0A0A0C | texte sur fond orange (7,2:1) | |
+| `brand-soft` | brand à 14 % | fonds teintés : pastille active, chip sélectionné (remplace `bg-brand/xx`) | |
 | `good` / `warn` / `bad` | vert / ambre / rouge | progrès, vigilance, baisse | ≥ 4,9:1 |
 | `z1` … `z6` | gris, bleu, vert, jaune, rouge, violet | zones cardio / puissance uniquement | |
 
