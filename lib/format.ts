@@ -23,3 +23,6 @@ export const fmtClock = (sec: number) => {
   const s = Math.round(sec), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60; // arrondi d'abord : jamais « 0:60 »
   return h ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 };
+
+/** « 2026-10-12 » → « 12 oct. » (clé de jour calendaire, sans décalage de fuseau). */
+export const fmtDayKey = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });

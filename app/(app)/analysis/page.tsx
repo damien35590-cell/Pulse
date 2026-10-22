@@ -14,6 +14,8 @@ import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
 import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { StrengthView } from "@/components/analysis/strength-view";
+import { getCyclingAnalysis } from "@/lib/analytics/cycling";
+import { CyclingView } from "@/components/analysis/cycling-view";
 import { Section } from "@/components/ui/section";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -54,6 +56,12 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
         </div>
       </div>
     );
+  }
+
+  // Vélo : puissance, meilleurs efforts, zones ; vélotafs exclus. Aucun bloc ni calcul de course à pied.
+  if (S === "RIDE") {
+    const cycling = await getCyclingAnalysis(session.user.id, TZ, W, now);
+    return <div>{header}<div className="mt-6"><CyclingView data={cycling} weeks={W} /></div></div>;
   }
 
   const acts = await prisma.activity.findMany({
