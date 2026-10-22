@@ -8,7 +8,7 @@ import { GoalTimeInline, RaceGoalButton } from "./prep-actions";
 const fr = (n: number, d = 1) => n.toLocaleString("fr-FR", { maximumFractionDigits: d });
 export const STATE_STYLE: Record<PrepState, string> = {
   "En avance": "bg-[#22C55E]/15 text-green-700 dark:text-green-400",
-  "Dans le rythme": "bg-brand-soft text-brand",
+  "Dans le rythme": "bg-brand/10 text-brand",
   "À relancer": "bg-amber-500/15 text-amber-700 dark:text-amber-400",
 };
 

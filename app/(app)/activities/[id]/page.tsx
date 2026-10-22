@@ -83,7 +83,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       <Link href="/activities" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="h-5 w-5" aria-hidden />Activités</Link>
       <header>
         <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt)}</p>
-        {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center rounded-full bg-brand-soft px-3 text-sm font-semibold text-brand">🏁 Course · {a.raceEvent.name}</Link>}
+        {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand">🏁 Course · {a.raceEvent.name}</Link>}
         <EditableTitle activityId={a.id} title={a.title} />
         {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
       </header>

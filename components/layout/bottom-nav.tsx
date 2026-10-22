@@ -46,7 +46,7 @@ export function BottomNav() {
                     <span
                       className={cn(
                         "grid h-8 w-14 place-items-center rounded-full transition-colors duration-200",
-                        active ? "bg-brand-soft text-brand" : "text-ink-mute group-active:bg-surface-2",
+                        active ? "bg-brand/15 text-brand" : "text-ink-mute group-active:bg-surface-2",
                       )}
                     >
                       <Icon className="size-[22px] transition-transform duration-150 group-active:scale-90" strokeWidth={active ? 2.4 : 2} aria-hidden />

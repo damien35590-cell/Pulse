@@ -240,7 +240,7 @@ function LiftDetail({ back }: { back: () => void }) {
                         key={i}
                         className={cn(
                           "rounded-lg px-2 py-1 font-num text-[15px] font-medium tabular-nums",
-                          i === best && scores[best] > 0 ? "bg-brand-soft text-brand" : "bg-surface-2 text-ink",
+                          i === best && scores[best] > 0 ? "bg-brand/15 text-brand" : "bg-surface-2 text-ink",
                         )}
                       >
                         {e.bodyweight ? (x.kg ? `+${fmtNum(x.kg, 1)}` : "PDC") : fmtNum(x.kg, 1)} × {x.reps}
@@ -310,7 +310,7 @@ function Tokens() {
 
         <Section title="Accent et états">
           <div className="grid grid-cols-4 gap-2">
-            {swatch("brand", "bg-brand", "#E8804F")}
+            {swatch("brand", "bg-brand", "#FC4C02")}
             {swatch("good", "bg-good", "progrès")}
             {swatch("warn", "bg-warn", "vigilance")}
             {swatch("bad", "bg-bad", "baisse")}

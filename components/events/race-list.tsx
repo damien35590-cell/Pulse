@@ -20,7 +20,7 @@ function Row({ r, now, past }: { r: RaceView; now: Date; past: boolean }) {
   return (
     <li>
       <Link href={`/events/${r.id}`} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 transition hover:border-brand/40 active:scale-[.99] active:bg-surface-2">
-        <span className={cn("grid h-14 w-14 shrink-0 place-content-center rounded-xl text-center leading-none", past ? "bg-surface-2 text-ink-soft" : "bg-brand-soft text-brand")}>
+        <span className={cn("grid h-14 w-14 shrink-0 place-content-center rounded-xl text-center leading-none", past ? "bg-surface-2 text-ink-soft" : "bg-brand/10 text-brand")}>
           <span className="font-display text-xl font-bold">{p.d}</span><span className="mt-0.5 text-[10px] font-bold tracking-wide">{p.m}</span>
         </span>
         <span className="min-w-0 flex-1">

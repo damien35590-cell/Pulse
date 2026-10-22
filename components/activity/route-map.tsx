@@ -49,7 +49,7 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
     });
     m.attributionControl.setPrefix(false);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(m);
-    const brand = token("brand", "#E8804F"), good = token("good", "#22C55E"), ring = token("surface", "#141417");
+    const brand = token("brand", "#FC4C02"), good = token("good", "#22C55E"), ring = token("surface", "#141417");
     const line = L.polyline(points, { color: brand, weight: still ? 4 : 5, opacity: 0.95, lineJoin: "round", interactive: false }).addTo(m);
     const dot = (p: [number, number], c: string) => L.circleMarker(p, { radius: still ? 5 : 7, color: ring, weight: 3, fillColor: c, fillOpacity: 1, interactive: false }).addTo(m);
     const first = points[0], last = points[points.length - 1];

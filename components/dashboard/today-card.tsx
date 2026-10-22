@@ -25,7 +25,7 @@ export function TodayCard({ program, title, exercises, sets, estMin, href, onSta
   return (
     <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4")}>
       {/* halo discret : la carte la plus importante de l'écran se repère sans cri */}
-      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand-soft blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/20 blur-3xl" />
       <p className="relative text-label uppercase text-brand">Aujourd’hui · {program}</p>
       <h2 className="relative mt-1.5 text-[28px] font-bold leading-tight tracking-tight">{title}</h2>
       <p className="relative mt-1 font-num text-base tabular-nums text-ink-soft">

@@ -38,7 +38,7 @@ export default function HeatMap({ lat0, cellM, cells, junctions, highlight, focu
     m.attributionControl.setPrefix(false);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(m);
     const renderer = L.canvas({ padding: 0.3 });
-    const brand = token("brand", "#E8804F");
+    const brand = token("brand", "#FC4C02");
     const ky = 110_540, kx = 111_320 * Math.cos((lat0 * Math.PI) / 180);
     const list = cells.length > MAX_CELLS ? [...cells].sort((a, b) => b[2] - a[2]).slice(0, MAX_CELLS) : cells;
     const max = Math.max(2, ...list.map((c) => c[2]));

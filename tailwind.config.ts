@@ -18,7 +18,7 @@ const config: Config = {
       colors: {
         bg: c("bg"), surface: c("surface"), "surface-2": c("surface-2"), "surface-3": c("surface-3"),
         ink: c("ink"), "ink-soft": c("ink-soft"), "ink-mute": c("ink-mute"), line: c("line"),
-        brand: c("brand"), "brand-ink": c("brand-ink"), "brand-soft": "var(--brand-soft)",
+        brand: c("brand"), "brand-ink": c("brand-ink"),
         good: c("good"), warn: c("warn"), bad: c("bad"),
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
       },
@@ -45,7 +45,7 @@ const config: Config = {
       boxShadow: {
         card: "var(--shadow-card)",
         pop: "0 24px 48px -12px rgb(0 0 0 / 0.6)",
-        glow: "0 6px 20px 0 rgb(var(--brand) / 0.25)",
+        glow: "0 10px 28px -10px rgb(var(--brand) / 0.65)",
       },
       transitionTimingFunction: { snappy: "cubic-bezier(.2,.8,.2,1)" },
       keyframes: {

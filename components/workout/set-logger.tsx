@@ -131,7 +131,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
                 {fmtClock(elapsed)} · {doneSets}/{totalSets} séries
               </p>
             </div>
-            <button type="button" onClick={() => { tap(10); setFinished(true); }} className="h-10 touch-manipulation rounded-full px-3.5 text-sm font-semibold text-brand transition active:scale-95 active:bg-brand-soft">
+            <button type="button" onClick={() => { tap(10); setFinished(true); }} className="h-10 touch-manipulation rounded-full px-3.5 text-sm font-semibold text-brand transition active:scale-95 active:bg-brand/10">
               Terminer
             </button>
           </div>

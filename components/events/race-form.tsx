@@ -37,7 +37,7 @@ export function RaceFields({ f, set, dateCheck }: { f: Form; set: (k: keyof Form
     <div className="grid grid-cols-2 gap-3 text-sm text-ink-soft">
       <label className="col-span-2">Épreuve<input value={f.name} onChange={set("name")} required className={field} /></label>
       <label className="col-span-2">Événement<input value={f.eventName} onChange={set("eventName")} className={field} placeholder="Facultatif" /></label>
-      {dateCheck && <p role="note" className="col-span-2 rounded-xl border border-brand bg-brand-soft px-3 py-2 font-semibold text-brand">Vérifie la date et l’heure sur la page Klikego.</p>}
+      {dateCheck && <p role="note" className="col-span-2 rounded-xl border border-brand bg-brand/10 px-3 py-2 font-semibold text-brand">Vérifie la date et l’heure sur la page Klikego.</p>}
       <label>Date<input type="date" value={f.date} onChange={set("date")} required className={field} /></label>
       <label>Heure<input type="time" value={f.startTime} onChange={set("startTime")} className={field} /></label>
       <label className="col-span-2">Lieu<input value={f.location} onChange={set("location")} className={field} /></label>

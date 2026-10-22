@@ -45,7 +45,7 @@ export default function PickMap({ center, value, onPick, className }: Props) {
     if (!m) return;
     if (!value) { pin.current?.remove(); pin.current = null; return; }
     const ll: L.LatLngTuple = [value.lat, value.lng];
-    if (!pin.current) pin.current = L.circleMarker(ll, { radius: 9, color: token("surface", "#141417"), weight: 3, fillColor: token("brand", "#E8804F"), fillOpacity: 1, interactive: false }).addTo(m);
+    if (!pin.current) pin.current = L.circleMarker(ll, { radius: 9, color: token("surface", "#141417"), weight: 3, fillColor: token("brand", "#FC4C02"), fillOpacity: 1, interactive: false }).addTo(m);
     else pin.current.setLatLng(ll);
     if (!m.getBounds().pad(-0.15).contains(ll) || m.getZoom() < 12) m.setView(ll, Math.max(m.getZoom(), 15));
   }, [value?.lat, value?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
