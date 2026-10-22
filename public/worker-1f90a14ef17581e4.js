@@ -1,1 +1,0 @@
-self.addEventListener("message",i=>{var n;(null===(n=i.data)||void 0===n?void 0:n.type)==="SKIP_WAITING"&&self.skipWaiting()}),self.addEventListener("notificationclick",i=>{var n,t;i.notification.close(),i.waitUntil(self.clients.openWindow(null!==(t=null===(n=i.notification.data)||void 0===n?void 0:n.url)&&void 0!==t?t:"/"))});

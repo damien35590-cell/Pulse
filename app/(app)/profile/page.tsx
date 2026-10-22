@@ -12,6 +12,7 @@ import { ThemePicker } from "@/components/profile/theme-picker";
 import { NotificationSettings } from "@/components/profile/notification-settings";
 import { getPrefs } from "@/lib/notify/prefs";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { EditProfile } from "@/components/profile/edit-profile";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
 import { prisma } from "@/lib/prisma";
@@ -26,7 +27,7 @@ export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const [zones, gear, notifyPrefs, raceRows] = await Promise.all([getZones(userId), getGear(userId), getPrefs(userId), prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 })]);
+  const [me, zones, gear, notifyPrefs, raceRows] = await Promise.all([prisma.user.findUnique({ where: { id: userId }, select: { name: true, image: true, email: true } }), getZones(userId), getGear(userId), getPrefs(userId), prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 })]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
   const { acts, rec, stats } = await loadBadgeStats(userId, TZ);
@@ -45,10 +46,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center gap-4">
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-brand font-display text-3xl font-bold text-brand-ink">{(s.user.name ?? s.user.email ?? "P")[0].toUpperCase()}</span>
-        <div className="min-w-0"><h1 className="truncate font-display text-3xl font-bold leading-none">{s.user.name ?? "Vous"}</h1><p className="truncate text-sm text-ink-soft">{s.user.email}</p></div>
-      </header>
+      <EditProfile name={me?.name ?? s.user.email?.split("@")[0] ?? "Vous"} image={me?.image ?? null} email={me?.email ?? null} />
       <dl className="grid grid-cols-2 gap-2.5">
         {[[fmtNum(st.km, 0), "km au total"], [String(st.count), "sorties"], [fmtNum(st.elevation, 0), "m de D+"], [fmtNum(st.hours, 0), "heures en mouvement"]].map(([v, l]) => (
           <div key={l} className="rounded-xl border border-line bg-surface px-4 py-3"><dd className="font-display text-3xl font-bold tabular-nums">{v}</dd><dt className="text-[13px] text-ink-soft">{l}</dt></div>
