@@ -858,6 +858,7 @@ model NotificationPrefs {
   morning   Boolean  @default(true) // coach du matin
   reminder  Boolean  @default(true) // rappel avant la séance du programme
   weekly    Boolean  @default(true) // bilan du dimanche soir
+  morningCoachTime String @default("06:00") // heure Paris « HH:mm » à partir de laquelle part le coach du matin
   updatedAt DateTime @updatedAt
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

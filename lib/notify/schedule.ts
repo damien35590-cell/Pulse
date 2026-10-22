@@ -4,7 +4,8 @@
  * Vercel Hobby : chaque cron tourne au plus une fois par jour, à l'heure près (déclenché entre HH:00 et HH:59), en UTC ;
  * jusqu'à 100 crons par projet. D'où un cron par usage, et un cron quotidien par heure pour le rappel :
  *
- *   /api/cron/notify/matin      0 5 * * *       Paris été 7 h – 8 h, hiver 6 h – 7 h (toujours avant le vélo de 8 h)
+ *   /api/cron/notify/matin      cron-job.org, toutes les 15 min de 5 h à 9 h 45 (Europe/Paris), pas dans vercel.json :
+ *                               la route décide d'envoyer (morningGate : heure réglée atteinte, avant 10 h)
  *   /api/cron/notify/rappel-HH  0 HH * * *      HH = 06 … 20 UTC : Paris été 8 h – 23 h, hiver 7 h – 22 h
  *   /api/cron/notify/bilan      0 18 * * 0      dimanche, Paris été 20 h – 21 h, hiver 19 h – 20 h
  *
@@ -29,10 +30,27 @@ export function parseJob(job: string): NotifyJob | null {
 /** Les entrées « crons » de vercel.json pour les notifications (gardées en phase par le test). */
 export function notifyCrons() {
   return [
-    { path: "/api/cron/notify/matin", schedule: "0 5 * * *" },
     ...REMINDER_HOURS_UTC.map((h) => ({ path: `/api/cron/notify/rappel-${String(h).padStart(2, "0")}`, schedule: `0 ${h} * * *` })),
     { path: "/api/cron/notify/bilan", schedule: "0 18 * * 0" },
   ];
+}
+
+/** Heure de fin du coach du matin (heure locale) : plus rien n'est envoyé à partir de là. */
+export const MORNING_CUTOFF = "10:00";
+
+/** « HH:mm » actuelle dans le fuseau donné (Intl, sans calcul d'offset à la main). */
+export function clockTime(now: Date, tz: string) {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const get = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
+  return `${get("hour")}:${get("minute")}`;
+}
+
+/** Le coach du matin peut-il partir maintenant ? null = oui, sinon la raison (comparaison de « HH:mm » zéro-complétés). */
+export function morningGate(now: Date, tz: string, time: string): string | null {
+  const t = clockTime(now, tz);
+  if (t >= MORNING_CUTOFF) return "trop tard (après 10 h)";
+  if (t < time) return `pas encore l'heure (${time})`;
+  return null;
 }
 
 /** Jour ISO (1 = lundi … 7 = dimanche) dans le fuseau donné. */

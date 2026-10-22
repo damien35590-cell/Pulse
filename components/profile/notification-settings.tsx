@@ -5,15 +5,19 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { Section } from "@/components/ui/section";
 import { Switch } from "@/components/ui/switch";
-import type { Prefs } from "@/lib/notify/prefs";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { MORNING_TIMES, type AllPrefs, type Prefs } from "@/lib/notify/prefs";
 
 type State = "loading" | "unsupported" | "nosw" | "denied" | "off" | "on";
 
 const OPTIONS: { key: keyof Prefs; label: string; description: string }[] = [
-  { key: "morning", label: "Coach du matin", description: "Vers 7 h : la séance du jour et le meilleur créneau météo" },
+  { key: "morning", label: "Coach du matin", description: "La séance du jour et le meilleur créneau météo" },
   { key: "reminder", label: "Rappel de séance", description: "Avant le créneau choisi, si la séance du programme n’est pas faite" },
   { key: "weekly", label: "Bilan du dimanche", description: "Le soir : sorties, km, temps, D+ et programme" },
 ];
+
+/** « 06:00 » → « 6 h 00 » */
+const fmtTime = (t: string) => `${Number(t.slice(0, 2))} h ${t.slice(3)}`;
 
 const supported = () => typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
@@ -46,10 +50,11 @@ async function subscribe(reg: ServiceWorkerRegistration) {
 }
 
 /** Réglages → Notifications : activation sur cet appareil, trois interrupteurs, envoi d'un test. */
-export function NotificationSettings({ prefs: initial }: { prefs: Prefs }) {
+export function NotificationSettings({ prefs: initial }: { prefs: AllPrefs }) {
   const [state, setState] = useState<State>("loading");
   const [prefs, setPrefs] = useState(initial);
   const [busy, setBusy] = useState(false);
+  const [pickTime, setPickTime] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const detect = useCallback(async () => {
@@ -112,6 +117,15 @@ export function NotificationSettings({ prefs: initial }: { prefs: Prefs }) {
     if (!r?.ok) { setPrefs(before); setMsg("Réglage non enregistré, réessaie."); }
   };
 
+  const chooseTime = async (time: string) => {
+    const before = prefs.morningCoachTime;
+    setPickTime(false);
+    if (time === before) return;
+    setPrefs({ ...prefs, morningCoachTime: time }); setMsg(null);
+    const r = await fetch("/api/push/prefs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ morningCoachTime: time }) }).catch(() => null);
+    if (!r?.ok) { setPrefs((p) => ({ ...p, morningCoachTime: before })); setMsg("Heure non enregistrée, réessaie."); }
+  };
+
   const status: Record<State, { Icon: typeof Bell; title: string; text: string; tone?: string }> = {
     loading: { Icon: Bell, title: "Notifications", text: "Vérification…" },
     unsupported: { Icon: BellOff, title: "Non disponibles", text: "Ce navigateur ne gère pas les notifications push. Sur Android, ouvre Pulse dans Chrome ou depuis l’app installée.", tone: "text-ink-mute" },
@@ -142,6 +156,16 @@ export function NotificationSettings({ prefs: initial }: { prefs: Prefs }) {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={() => setPickTime(true)}
+          disabled={!prefs.morning}
+          className="flex min-h-12 w-full touch-manipulation items-center justify-between gap-3 border-t border-line/60 py-2 text-left active:opacity-60 disabled:opacity-40"
+        >
+          <span className="font-medium text-ink">Heure du coach du matin</span>
+          <span className="font-semibold tabular-nums text-ink-soft">{fmtTime(prefs.morningCoachTime)}</span>
+        </button>
+
         {state === "on" && (
           <div className="mt-3 grid gap-2">
             <button type="button" onClick={test} disabled={busy} className={ui.btnSecondary}>Envoyer un test</button>
@@ -151,6 +175,23 @@ export function NotificationSettings({ prefs: initial }: { prefs: Prefs }) {
 
         <p aria-live="polite" className={cn("text-sm text-ink-soft", msg ? "mt-3" : "sr-only")}>{msg}</p>
       </div>
+
+      <BottomSheet open={pickTime} onClose={() => setPickTime(false)} title="Heure du coach du matin">
+        <p className="mt-1 text-sm text-ink-soft">La notification part à cette heure (heure de Paris), ou juste après.</p>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {MORNING_TIMES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => chooseTime(t)}
+              aria-pressed={t === prefs.morningCoachTime}
+              className={cn(t === prefs.morningCoachTime ? ui.btnPrimary : cn(ui.btnSecondary, "bg-surface-3"), "tabular-nums")}
+            >
+              {fmtTime(t)}
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
     </Section>
   );
 }

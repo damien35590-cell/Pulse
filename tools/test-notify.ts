@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { coachToday, type CoachInput } from "../lib/coach/today";
 import { morningMessage, reminderMessage, slotShort, trend, weeklyMessage, weekTotals, REMINDER_LEAD_MAX_MIN, testMessage } from "../lib/notify/content";
-import { isoDow, notifyCrons, parseJob, REMINDER_HOURS_UTC } from "../lib/notify/schedule";
+import { clockTime, isoDow, morningGate, notifyCrons, parseJob, REMINDER_HOURS_UTC } from "../lib/notify/schedule";
 
 const tz = "Europe/Paris";
 const day = 864e5, min = 6e4;
@@ -130,6 +130,7 @@ assert.equal(slotShort({ ...noon, at: noon.at + day, rainPct: 70, night: true },
 assert.equal(testMessage().url, "/profile");
 
 // ── Planification ──
+const vercelHasMatin = () => (JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as { crons: { path: string }[] }).crons.some((c) => c.path.endsWith("/matin"));
 {
   assert.deepEqual(parseJob("matin"), { kind: "morning", job: "matin" });
   assert.deepEqual(parseJob("bilan"), { kind: "weekly", job: "bilan" });
@@ -137,6 +138,17 @@ assert.equal(testMessage().url, "/profile");
   assert.equal(parseJob("rappel-03"), null, "heure hors plage");
   assert.equal(parseJob("rappel-1"), null);
   assert.equal(parseJob("autre"), null);
+
+  // Coach du matin : heure de Paris, été comme hiver, rien après 10 h.
+  assert.equal(clockTime(new Date("2026-10-22T04:00:00Z"), "Europe/Paris"), "06:00", "été (UTC+2)");
+  assert.equal(clockTime(new Date("2026-11-02T05:00:00Z"), "Europe/Paris"), "06:00", "hiver (UTC+1)");
+  assert.equal(clockTime(new Date("2026-10-21T22:30:00Z"), "Europe/Paris"), "00:30");
+  assert.ok(morningGate(new Date("2026-10-22T03:59:00Z"), "Europe/Paris", "06:00"), "5 h 59 : trop tôt");
+  assert.equal(morningGate(new Date("2026-10-22T04:00:00Z"), "Europe/Paris", "06:00"), null);
+  assert.equal(morningGate(new Date("2026-10-22T04:15:00Z"), "Europe/Paris", "06:30") === null, false, "6 h 15 < 6 h 30");
+  assert.equal(morningGate(new Date("2026-10-22T07:59:00Z"), "Europe/Paris", "06:00"), null, "9 h 59");
+  assert.ok(morningGate(new Date("2026-10-22T08:00:00Z"), "Europe/Paris", "06:00"), "10 h 00 : fini");
+  assert.ok(!vercelHasMatin(), "le coach du matin n'est plus un cron Vercel");
 
   // vercel.json contient exactement les crons attendus (et garde la synchro Intervals).
   const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as { crons: { path: string; schedule: string }[] };
@@ -154,10 +166,6 @@ assert.equal(testMessage().url, "/profile");
   const parisMin = (iso: string) => { const d = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso)); return Number(d.slice(0, 2)) * 60 + Number(d.slice(3)); };
   for (const date of ["2026-07-15", "2026-12-15"]) {
     const h = (cron: string) => cron.split(" ")[1].padStart(2, "0");
-    const matin = notifyCrons().find((c) => c.path.endsWith("/matin"))!.schedule;
-    // Le coach du matin part toujours avant le départ à vélo de 8 h, et pas avant 6 h.
-    assert.ok(parisMin(`${date}T${h(matin)}:00:00Z`) >= 6 * 60, date);
-    assert.ok(parisMin(`${date}T${h(matin)}:59:00Z`) < 8 * 60, date);
     // Le bilan tombe le dimanche soir, entre 19 h et 21 h.
     const bilan = notifyCrons().find((c) => c.path.endsWith("/bilan"))!.schedule;
     assert.equal(bilan.split(" ")[4], "0", "dimanche (UTC) = dimanche à Paris à cette heure-là");

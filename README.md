@@ -80,12 +80,25 @@ Sur le téléphone : **Vous** > **Notifications** > **Activer les notifications*
 
 Rien à configurer : la paire de clés VAPID est créée au premier besoin et gardée en base (table `AppSecret`). Pour imposer vos propres clés, ajoutez `VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY` dans Vercel (les appareils se réabonnent seuls à la visite suivante de la page Vous). Facultatif : `VAPID_SUBJECT` (`mailto:…`), sinon `ALLOWED_EMAIL` est utilisé. Les envois planifiés utilisent le même `CRON_SECRET` que la synchro.
 
-Horaires (crons Vercel, en UTC ; l'offre gratuite déclenche chaque cron une fois par jour, n'importe quand dans l'heure prévue) :
+Horaires du rappel et du bilan (crons Vercel, en UTC ; le coach du matin est à part, voir plus bas ; l'offre gratuite déclenche chaque cron une fois par jour, n'importe quand dans l'heure prévue) :
 
 | Envoi | Cron (UTC) | Heure de Paris, été (UTC+2) | Heure de Paris, hiver (UTC+1) |
 |---|---|---|---|
-| Coach du matin | `0 5 * * *` | 7 h – 8 h | 6 h – 7 h |
 | Rappel de séance | `0 6 * * *` … `0 20 * * *` (un cron par heure) | 8 h – 23 h | 7 h – 22 h |
 | Bilan de la semaine | `0 18 * * 0` (dimanche) | 20 h – 21 h | 19 h – 20 h |
 
 Le rappel part au premier passage tombant moins de 100 minutes avant le créneau choisi par le coach (le plus souvent 30 à 90 min avant), seulement si une séance du programme est prévue et pas encore faite (Pulse resynchronise Intervals.icu juste avant pour le vérifier). Sans domicile renseigné (pas de créneau météo), le rappel part vers 17 h. Chaque type part au plus une fois par jour.
+
+### Coach du matin
+
+Il est déclenché par un service externe, [cron-job.org](https://cron-job.org) (gratuit), et non par Vercel : les crons Vercel sont en UTC (donc décalés d'une heure au changement d'heure) et, en offre Hobby, ne sont précis qu'à l'heure près. cron-job.org appelle la route toutes les 15 minutes et c'est le code qui décide d'envoyer : heure de Paris ≥ l'heure choisie dans **Vous** > **Notifications** > **Heure du coach du matin** (6 h 00 par défaut, de 5 h 00 à 9 h 00 par pas de 15 min), pas déjà envoyé aujourd'hui, et jamais après 10 h 00.
+
+Réglage de la tâche dans cron-job.org :
+
+- **URL** : `https://pulse-bay-eight.vercel.app/api/cron/notify/matin`
+- **En-tête** : `Authorization: Bearer <CRON_SECRET>` (la valeur de `CRON_SECRET` dans Vercel)
+- **Méthode** : GET (POST fonctionne aussi)
+- **Fuseau horaire** : Europe/Paris
+- **Fréquence** : toutes les 15 minutes, de 5 h à 9 h 45 (minutes 0, 15, 30, 45 ; heures 5 à 9)
+
+La route répond `{ "sent": true|false, "reason": "…" }`. Un double appel ne produit jamais deux notifications (la table `NotificationLog` réserve le créneau du jour avant l'envoi).

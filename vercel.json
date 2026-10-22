@@ -1,7 +1,6 @@
 {
   "crons": [
     { "path": "/api/cron/sync-intervals", "schedule": "0 22 * * *" },
-    { "path": "/api/cron/notify/matin", "schedule": "0 5 * * *" },
     { "path": "/api/cron/notify/rappel-06", "schedule": "0 6 * * *" },
     { "path": "/api/cron/notify/rappel-07", "schedule": "0 7 * * *" },
     { "path": "/api/cron/notify/rappel-08", "schedule": "0 8 * * *" },

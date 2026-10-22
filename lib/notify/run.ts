@@ -13,7 +13,7 @@ import { syncIntervals } from "@/lib/sync/intervals";
 import { sendToUser } from "@/lib/push/send";
 import type { PushOptions } from "@/lib/push/webpush";
 import { morningMessage, reminderMessage, weeklyMessage, weekTotals, type NotifyKind, type PushMessage } from "./content";
-import { isoDow } from "./schedule";
+import { isoDow, morningGate } from "./schedule";
 import { getPrefs } from "./prefs";
 
 /** Durée de vie côté service push (téléphone hors réseau) et urgence, par type. */
@@ -75,6 +75,10 @@ export async function runNotify(userId: string, kind: NotifyKind, now = new Date
   if (!prefs[kind]) return skip("désactivée dans les réglages");
   if (!subs) return skip("aucun appareil abonné");
   if (already && !force) return skip("déjà envoyée aujourd'hui");
+  if (kind === "morning" && !force) {
+    const wait = morningGate(now, tz, prefs.morningCoachTime);
+    if (wait) return skip(wait);
+  }
 
   let msg: PushMessage | null = null;
   if (kind === "morning") {
