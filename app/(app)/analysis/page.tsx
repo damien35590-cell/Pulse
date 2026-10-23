@@ -22,6 +22,9 @@ import { getHikingAnalysis } from "@/lib/analytics/hiking";
 import { HikingView } from "@/components/analysis/hiking-view";
 import { PeriodPicker } from "@/components/analysis/period-picker";
 import { parsePeriod, periodParams } from "@/lib/analysis/period";
+import { CoachNotes } from "@/components/analysis/coach-notes";
+import { runNotes, strengthNotes } from "@/lib/analytics/coach-notes";
+import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
 import { Section } from "@/components/ui/section";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -37,7 +40,9 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   // Période choisie : `now` = fin de la période (aujourd'hui, ou le dimanche de la semaine choisie)
-  const period = parsePeriod(searchParams, TZ), now = period.now, W = period.weeks;
+  const period = parsePeriod(searchParams, TZ), now = period.now, W = period.weeks, todayKey = dayKey(new Date(), TZ);
+  const coachPeriod = { weeks: W, tz: TZ, now, current: period.current };
+  const uid = session.user.id, plansOf = (sport?: "RUN" | "WORKOUT") => getPlanAdherence(uid, period.startKey, period.endKey, todayKey, sport);
   const S = (MY_SPORTS as readonly string[]).includes(searchParams.s ?? "") ? searchParams.s! : "all";
   const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ ...periodParams(period), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
   const chip = (on: boolean) => `inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-medium ${on ? "bg-brand text-brand-ink" : "bg-surface-2"}`;
@@ -45,18 +50,19 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const header = (
     <>
       <h1 className="font-display text-3xl font-bold leading-none">Analyse</h1>
-      <PeriodPicker weeks={W} current={period.current} endKey={period.endKey} startKey={period.startKey} preset={period.preset} today={dayKey(new Date(), TZ)} />
+      <PeriodPicker weeks={W} current={period.current} endKey={period.endKey} startKey={period.startKey} preset={period.preset} today={todayKey} />
       <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">{[["all", "Tous"], ...MY_SPORTS.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}</div>
     </>
   );
 
   // Musculation : aucun bloc d'endurance, et donc aucune de leurs requêtes
   if (S === "WORKOUT") {
-    const [strength, adv] = await Promise.all([getStrengthAnalysis(session.user.id, TZ, W, now), getAdvanced(session.user.id, TZ)]);
+    const [strength, adv, plans] = await Promise.all([getStrengthAnalysis(session.user.id, TZ, W, now), getAdvanced(session.user.id, TZ), plansOf("WORKOUT")]);
     return (
       <div>
         {header}
         <div className="mt-6 space-y-8">
+          <CoachNotes notes={strengthNotes({ data: strength, period: coachPeriod, plans })} />
           <StrengthView data={strength} weeks={W} />
           {adv.hasMuscle && <Section title="Muscles sollicités (7 jours)"><div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div></Section>}
           {adv.profiles.WORKOUT && <Section title="Profil musculation"><div className={cn(ui.card, "p-4")}><DisciplineRadar profiles={adv.profiles} sport={S} /></div></Section>}
@@ -73,8 +79,8 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   // Tous les sports : séances d'entraînement seulement, ni distance cumulée ni allure
   if (S === "all") {
-    const overview = await getOverview(session.user.id, TZ, W, now);
-    return <div>{header}<div className="mt-6"><OverviewView data={overview} weeks={W} /></div></div>;
+    const overview = await getOverview(session.user.id, TZ, W, now, { current: period.current, plans: await plansOf() });
+    return <div>{header}<div className="mt-6 space-y-8"><CoachNotes notes={overview.notes} /><OverviewView data={overview} weeks={W} /></div></div>;
   }
 
   // Randonnée : volume par mois, rythme en montée, records
@@ -85,9 +91,10 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   const acts = await prisma.activity.findMany({
     where: { userId: session.user.id, startedAt: { gte: new Date(+now - (Math.max(2 * W, 26) * 7 + 14) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
-    select: { id: true, type: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
+    select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
   });
-  const adv = await getAdvanced(session.user.id, TZ);
+  const [adv, runGoal, runPlans] = await Promise.all([getAdvanced(session.user.id, TZ), S === "RUN" ? getRunGoal(uid) : null, S === "RUN" ? plansOf("RUN") : []]);
+  const notes = S === "RUN" ? runNotes({ acts, period: coachPeriod, goal: runGoal, plans: runPlans }) : [];
   const mon = weekKeys(now, TZ)[0], today = dayKey(now, TZ);
   const ago = (d: Date) => { const diff = (Date.parse(mon) - Date.parse(dayKey(d, TZ))) / 864e5; return diff <= 0 ? 0 : Math.ceil(diff / 7); };
   const hit = (a: { type: string }) => S === "all" || a.type === S, sum = <T,>(l: T[], f: (x: T) => number) => l.reduce((s, x) => s + f(x), 0);
@@ -114,6 +121,8 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     <div>
       {header}
       <div className="mt-4 grid grid-cols-2 gap-2.5">{kpis.map((k) => { const d = k.p > 0 ? Math.round(((k.c - k.p) / k.p) * 100) : null; return <div key={k.l} className="rounded-xl border border-line bg-surface p-3.5"><p className="text-sm text-ink-soft">{k.l}</p><p className="font-display text-3xl font-bold leading-tight tabular-nums">{k.f(k.c)}</p>{d != null && <p className={`text-xs font-semibold ${d >= 0 ? "text-brand" : "text-ink-soft"}`}>{d > 0 ? "+" : ""}{d} % vs période préc.</p>}</div>; })}</div>
+
+      {notes.length > 0 && <div className="mt-6"><CoachNotes notes={notes} /></div>}
 
       <h2 className={h2}>Distance par semaine</h2><div className={card}><WeeklyBars data={weekly} /></div>
       <h2 className={h2}>Allure en running</h2><div className={card}>{pace.length > 2 ? <><PaceArea data={pace} /><p className="text-xs text-ink-soft">Plus la courbe monte, plus vous allez vite.</p></> : <p className="text-sm text-ink-soft">Pas assez de sorties running sur cette période.</p>}</div>
