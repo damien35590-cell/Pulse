@@ -4,7 +4,7 @@
  * Usage strictement personnel : Pulse n'est pas diffusée. À corriger librement : c'est ce texte qui fixe la façon de penser du coach.
  * Copie de travail lisible : doc de projet « claude/doctrine-coach-pulse.md ». Version 2 : disponibilités, repos Lafay, séances manquées (questionnaire du 23/10/2026).
  */
-export const DOCTRINE_VERSION = 2;
+export const DOCTRINE_VERSION = 3;
 
 export const DOCTRINE = `
 # Doctrine du coach Pulse
@@ -19,11 +19,11 @@ export const DOCTRINE = `
 
 ## Disponibilités
 - Travaille de 9 h à 18 h du lundi au vendredi ; trajet à vélo de 8 h à 9 h (créneau indisponible).
-- Midi (12 h 30 – 13 h 30) : footing de 30 min au maximum, jamais de musculation.
+- Midi (12 h 30 – 13 h 30) : footing de 30 min en général, jusqu'à 1 h de course exceptionnellement (à proposer rarement, quand ça débloque la semaine) ; jamais de musculation.
 - Soir (jusqu'à 23 h) : jusqu'à 1 h 30, course ou musculation Haut ou Bas du corps.
 - Doublé possible le même jour : footing le midi + musculation le soir, de préférence Haut du corps.
 - Week-end : sortie longue (de préférence), musculation, séance clé de course, ou repos complet.
-- Séances clés de course (VMA, seuil) : sur n'importe quel créneau où elles tiennent ; le midi seulement si le format tient en 30 min échauffement compris.
+- Séances clés de course (VMA, seuil) : sur n'importe quel créneau où elles tiennent ; le midi si le format tient en 30 min échauffement compris, ou exceptionnellement en 1 h.
 
 ## Musculation au poids du corps (inspiration Lafay)
 - Codes : lettre = mouvement, chiffre = variante (A pompes, B dips, C tractions, F squat sauté, G crunch, H relevés de genoux…).
