@@ -93,7 +93,7 @@ export function buildOverview(input: { acts: OverviewAct[]; insights: SportInsig
 export async function getOverview(userId: string, tz: string, weeks: number, now = new Date()): Promise<OverviewAnalysis> {
   const [acts, strength, cycling, hiking] = await Promise.all([
     prisma.activity.findMany({
-      where: { userId, startedAt: { gte: new Date(+now - HISTORY_DAYS * 864e5) } },
+      where: { userId, startedAt: { gte: new Date(+now - HISTORY_DAYS * 864e5), lte: now } },
       select: { type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, load: true },
     }),
     getStrengthAnalysis(userId, tz, weeks, now),

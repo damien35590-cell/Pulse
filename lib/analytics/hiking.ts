@@ -77,10 +77,10 @@ export async function getHikingAnalysis(userId: string, tz: string, weeks: numbe
   const first = shiftDay(weekKeys(now, tz)[0], -7 * (weeks - 1));
   const [found, last] = await Promise.all([
     prisma.activity.findMany({
-      where: { userId, type: "HIKE", startedAt: { gte: new Date(Date.parse(first) - 864e5) } },
+      where: { userId, type: "HIKE", startedAt: { gte: new Date(Date.parse(first) - 864e5), lte: now } },
       select: { id: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgHr: true },
     }),
-    prisma.activity.findFirst({ where: { userId, type: "HIKE" }, orderBy: { startedAt: "desc" }, select: { id: true, title: true, startedAt: true } }),
+    prisma.activity.findFirst({ where: { userId, type: "HIKE", startedAt: { lte: now } }, orderBy: { startedAt: "desc" }, select: { id: true, title: true, startedAt: true } }),
   ]);
   // Altitude max par rando, calculée en base ; si la requête échoue, le record d'altitude disparaît simplement
   const maxEle = new Map<string, number>();
