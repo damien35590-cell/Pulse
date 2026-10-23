@@ -28,6 +28,16 @@ export async function addGoal(fd: FormData) {
   await prisma.goal.create({ data: { userId, metric: metric as GoalMetric, period: period as GoalPeriod, type: MY.includes(type) ? (type as ActivityType) : null, target: t * METRICS[metric as keyof typeof METRICS].base } });
   revalidatePath("/goals");
 }
+/** Valide un palier de badge gagné (retire la pastille « Nouveau »). Idempotent : sans effet s'il est déjà validé ou inconnu. */
+export async function acknowledgeBadge(key: string): Promise<Res> {
+  const userId = await uid();
+  if (typeof key !== "string" || !/^[\w-]{1,40}:[1-9]$/.test(key)) return { ok: false, error: "Badge inconnu." };
+  await prisma.userBadge.updateMany({ where: { userId, badgeId: key, acknowledgedAt: null }, data: { acknowledgedAt: new Date() } });
+  revalidatePath("/"); revalidatePath("/profile"); revalidatePath("/profile/badges");
+  revalidatePath("/", "layout"); // pastille de la barre du bas (layout)
+  return { ok: true };
+}
+
 export async function deleteGoal(id: string) { const userId = await uid(); await prisma.goal.deleteMany({ where: { id, userId } }); revalidatePath("/goals"); }
 
 export async function saveProfile(fd: FormData) {

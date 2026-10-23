@@ -248,10 +248,13 @@ model UserBadge {
   userId   String
   badgeId  String
   earnedAt DateTime @default(now())
+  /// null = obtenu mais pas encore validé par l'utilisateur (« Nouveau »)
+  acknowledgedAt DateTime?
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@id([userId, badgeId])
+  @@index([userId, acknowledgedAt])
 }
 
 // ───────── Programme d'entraînement — ANCIENNE VERSION (remplacée par Program, à supprimer une fois l'UI migrée) ─────────

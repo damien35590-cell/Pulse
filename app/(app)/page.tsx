@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDashboard } from "@/lib/data/dashboard";
 import { gearAlerts } from "@/lib/data/gear";
+import { getPendingBadges } from "@/lib/data/badges";
 import { getRunProgram } from "@/lib/data/training";
 import { fmtNum } from "@/lib/format";
 import { SPORTS } from "@/lib/sports";
@@ -20,6 +21,7 @@ import { GearAlert } from "@/components/gear/gear-alert";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ProgramCard, StartProgramCard } from "@/components/training/program-card";
 import { PlanRouteCard } from "@/components/routes/plan-route-card";
+import { PendingBadgesCard } from "@/components/profile/pending-badges-card";
 import { CoachCard } from "@/components/dashboard/coach-card";
 import { getCoach } from "@/lib/coach/load";
 
@@ -33,7 +35,10 @@ const LIFT = ["Durée", "Séries", "Volume"];
 export default async function DashboardPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
-  const [d, worn, run] = await Promise.all([getDashboard(s.user.id), gearAlerts(s.user.id), getRunProgram(s.user.id)]);
+  const [d, worn, run, pendingBadges] = await Promise.all([
+    getDashboard(s.user.id), gearAlerts(s.user.id), getRunProgram(s.user.id),
+    getPendingBadges(s.user.id).catch((e) => { console.error("[badges] accueil", e); return []; }),
+  ]);
   // Le coach ne bloque jamais l'accueil : en cas de souci, la carte n'apparaît pas.
   const coach = await getCoach(s.user.id, run).catch((e) => { console.error("[coach]", e); return null; });
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: TZ }).format(new Date());
@@ -55,6 +60,7 @@ export default async function DashboardPage() {
         actions={<Link href="/import" aria-label="Importer un fichier" className={ui.iconBtn}><Upload className="size-5" aria-hidden /></Link>}
       />
       <div className="space-y-8">
+        <PendingBadgesCard items={pendingBadges} />
         {coach && !d.empty && <CoachCard c={coach} />}
         {run ? <ProgramCard p={run} /> : <StartProgramCard />}
 

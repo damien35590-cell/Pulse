@@ -228,3 +228,37 @@ export function bestStreakDays(keys: Iterable<string>) {
   }
   return best;
 }
+
+// ───────── Validation manuelle des paliers obtenus ─────────
+
+export const TIER_NAMES = ["Bronze", "Argent", "Or", "Diamant"] as const;
+
+/** Un palier obtenu (ligne UserBadge, identifiant « <badge>:<palier> »), sérialisable pour les composants client. */
+export type BadgeItem = {
+  key: string; badgeId: string; discipline: Discipline; tier: number; tierName: string;
+  name: string; desc: string; criterion: string; icon: BadgeIcon;
+  earnedAt: string; // ISO
+  acknowledged: boolean;
+};
+
+const BY_ID = new Map(BADGES.map((b) => [b.id, b]));
+
+/** Identifiant « g-km:2 » → palier. null si le badge ou le palier n'existe plus dans BADGES. */
+export function badgeItemFrom(row: { badgeId: string; earnedAt: Date; acknowledgedAt: Date | null }): BadgeItem | null {
+  const [id, t] = row.badgeId.split(":");
+  const def = BY_ID.get(id), tier = Number(t);
+  if (!def || !Number.isInteger(tier) || tier < 1 || tier > def.tiers.length) return null;
+  const target = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: def.decimals }).format(def.tiers[tier - 1]);
+  return {
+    key: row.badgeId, badgeId: id, discipline: def.discipline, tier, tierName: TIER_NAMES[tier - 1],
+    name: def.name, desc: def.desc, criterion: `${target} ${def.unit}`, icon: def.icon,
+    earnedAt: row.earnedAt.toISOString(), acknowledged: row.acknowledgedAt !== null,
+  };
+}
+
+/** Du plus ancien au plus récent ; à date égale (import en lot) : ordre du catalogue puis palier croissant. */
+export function sortBadgeItems(items: BadgeItem[]): BadgeItem[] {
+  const order = new Map(BADGES.map((b, i) => [b.id, i]));
+  return [...items].sort((a, b) =>
+    a.earnedAt.localeCompare(b.earnedAt) || (order.get(a.badgeId) ?? 0) - (order.get(b.badgeId) ?? 0) || a.tier - b.tier);
+}

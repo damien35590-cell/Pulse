@@ -1,27 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Bike, BookOpen, CalendarCheck, Check, Clock, CloudRain, Compass, Dumbbell, Flag, Flame, Footprints, Heart, Layers,
-  Lock, Moon, Mountain, Repeat, Route, Smile, Snowflake, Sparkles, Sun, Sunrise, Thermometer, Timer, TrendingUp, Trophy,
-  Weight, X, Zap, type LucideIcon,
-} from "lucide-react";
-import type { BadgeIcon, Discipline, EvaluatedBadge } from "@/lib/badges";
-
-const ICONS: Record<BadgeIcon, LucideIcon> = {
-  foot: Footprints, flag: Flag, mountain: Mountain, flame: Flame, clock: Clock, route: Route, bike: Bike, dumbbell: Dumbbell,
-  zap: Zap, calendar: CalendarCheck, repeat: Repeat, sunrise: Sunrise, moon: Moon, sun: Sun, snow: Snowflake, rain: CloudRain,
-  thermo: Thermometer, smile: Smile, heart: Heart, book: BookOpen, sparkles: Sparkles, weight: Weight, layers: Layers,
-  compass: Compass, timer: Timer, trend: TrendingUp, trophy: Trophy,
-};
+import { Check, Lock, X } from "lucide-react";
+import type { BadgeItem, Discipline, EvaluatedBadge } from "@/lib/badges";
+import { cn } from "@/lib/utils";
+import { tap } from "@/lib/haptics";
+import { useBadgeReview } from "./badge-celebration";
+import { DISC_LABEL, ICONS, TIER_COLORS } from "./badge-meta";
 
 type Tab = "ALL" | Discipline;
 const TABS: { key: Tab; label: string }[] = [
   { key: "ALL", label: "Tous" }, { key: "GLOBAL", label: "Général" }, { key: "RIDE", label: "Vélo" },
   { key: "RUN", label: "Running" }, { key: "HIKE", label: "Rando" }, { key: "WORKOUT", label: "Muscu" },
 ];
-const DISC_LABEL: Record<Discipline, string> = { GLOBAL: "Général", RIDE: "Vélo", RUN: "Running", HIKE: "Randonnée", WORKOUT: "Musculation" };
-const TIER_COLORS = ["#b87333", "#aab2bd", "#f2b705", "#4cc9f0"];
 const TIER_NAMES = ["Bronze", "Argent", "Or", "Diamant"];
 
 const fmt = (n: number, dec = 0) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: dec }).format(n);
@@ -36,12 +27,28 @@ const progressToNext = (b: EvaluatedBadge) => {
   return Math.max(0, Math.min(1, (b.value - lo) / (b.next - lo)));
 };
 
-export function BadgeGrid({ badges }: { badges: EvaluatedBadge[] }) {
+export function BadgeGrid({ badges, items }: { badges: EvaluatedBadge[]; items: BadgeItem[] }) {
+  const review = useBadgeReview(items);
   const [tab, setTab] = useState<Tab>("ALL");
   const [openId, setOpenId] = useState<string | null>(null);
   const close = useCallback(() => setOpenId(null), []);
 
-  const list = useMemo(() => (tab === "ALL" ? badges : badges.filter((b) => b.discipline === tab)), [badges, tab]);
+  // Badges à valider d'abord (tri stable : le reste garde l'ordre du catalogue).
+  const pendingIds = useMemo(() => new Set(review.pending.map((p) => p.badgeId)), [review.pending]);
+  const list = useMemo(() => {
+    const l = tab === "ALL" ? badges : badges.filter((b) => b.discipline === tab);
+    return [...l].sort((a, b) => Number(pendingIds.has(b.id)) - Number(pendingIds.has(a.id)));
+  }, [badges, tab, pendingIds]);
+
+  /** À valider → feuille de célébration au plus ancien palier en attente ; validé → lecture seule ; sinon détail. */
+  const onBadge = (b: EvaluatedBadge) => {
+    tap();
+    const firstPending = review.pending.find((p) => p.badgeId === b.id);
+    if (firstPending) return review.openPending(firstPending.key);
+    const top = review.all.filter((i) => i.badgeId === b.id).sort((x, y) => y.tier - x.tier)[0];
+    if (top) return review.openRead(top.key);
+    setOpenId(b.id);
+  };
   const earned = list.filter((b) => b.tier > 0).length;
   const medals = list.reduce((n, b) => n + b.tier, 0);
   const maxMedals = list.length * 4;
@@ -124,13 +131,14 @@ export function BadgeGrid({ badges }: { badges: EvaluatedBadge[] }) {
       <ul className="grid grid-cols-2 gap-2.5">
         {list.map((b) => {
           const I = ICONS[b.icon];
-          const on = b.tier > 0;
+          const on = b.tier > 0, isNew = pendingIds.has(b.id);
           return (
-            <li key={b.id}>
+            <li key={b.id} className="relative">
               <button
                 type="button"
-                onClick={() => setOpenId(b.id)}
-                className={`h-full w-full rounded-xl border border-line bg-surface p-3 text-left ${on ? "" : "opacity-70"}`}
+                onClick={() => onBadge(b)}
+                aria-label={isNew ? `${b.name}, nouveau, à valider` : undefined}
+                className={cn("min-h-12 h-full w-full rounded-xl border border-line bg-surface p-3 text-left", !on && "opacity-70", isNew && "border-brand shadow-glow")}
               >
                 <div className="flex items-center justify-between">
                   <span
@@ -154,11 +162,15 @@ export function BadgeGrid({ badges }: { badges: EvaluatedBadge[] }) {
                   {b.next === null ? "Diamant atteint" : `${fmt(b.value, b.decimals)} / ${fmt(b.next, b.decimals)} ${b.unit}`}
                 </p>
               </button>
+              {isNew && (
+                <span className="pointer-events-none absolute -top-2 right-3 rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-brand-ink">Nouveau</span>
+              )}
             </li>
           );
         })}
       </ul>
 
+      {review.sheet}
       {open && <BadgeSheet b={open} onClose={close} />}
     </section>
   );

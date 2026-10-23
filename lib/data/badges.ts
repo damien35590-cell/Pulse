@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { BADGES, buildBadgeStats, evaluateBadges } from "@/lib/badges";
+import { BADGES, badgeItemFrom, buildBadgeStats, evaluateBadges, sortBadgeItems, type BadgeItem } from "@/lib/badges";
 
 const TIER_NAMES = ["Bronze", "Argent", "Or", "Diamant"];
 
@@ -43,4 +43,21 @@ export async function awardBadges(userId: string, tz: string) {
   });
   const res = await prisma.userBadge.createMany({ data: reached.map((badgeId) => ({ userId, badgeId })), skipDuplicates: true });
   return res.count;
+}
+
+/** Tous les paliers obtenus (validés ou non), du plus ancien au plus récent. */
+export async function getEarnedBadges(userId: string): Promise<BadgeItem[]> {
+  const rows = await prisma.userBadge.findMany({ where: { userId }, select: { badgeId: true, earnedAt: true, acknowledgedAt: true } });
+  return sortBadgeItems(rows.flatMap((r) => badgeItemFrom(r) ?? []));
+}
+
+/** Paliers obtenus mais pas encore validés, du plus ancien au plus récent (nom, critère, icône, date d'obtention). */
+export async function getPendingBadges(userId: string): Promise<BadgeItem[]> {
+  const rows = await prisma.userBadge.findMany({ where: { userId, acknowledgedAt: null }, select: { badgeId: true, earnedAt: true, acknowledgedAt: true } });
+  return sortBadgeItems(rows.flatMap((r) => badgeItemFrom(r) ?? []));
+}
+
+/** Pastille de la barre du bas. Ne bloque jamais l'affichage : 0 en cas d'erreur. */
+export async function countPendingBadges(userId: string): Promise<number> {
+  return (await getPendingBadges(userId).catch((e) => { console.error("[badges] pending", e); return []; })).length;
 }
