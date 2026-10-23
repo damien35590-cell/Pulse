@@ -24,6 +24,8 @@ export type LiftExercise = {
   restAfterS?: number;
   /** Poids du corps : kg = lest (0 = PDC). */
   bodyweight?: boolean;
+  /** Exercice tenu (gainage, chaise, essuie-glace…) : « reps » = secondes. */
+  timed?: boolean;
   /** Séance précédente, série par série. */
   prev: LiftSet[];
   done: LiftSet[];
@@ -200,7 +202,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
           <p className={ui.label}>{program ? `${program} · ` : ""}Exercice {idx + 1}/{exs.length}</p>
           <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-tight">{ex.name}</h1>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <span className={ui.chip}><Target className="size-3.5" aria-hidden />{ex.sets} × {ex.reps} · {kgTxt(ex.kg, ex.bodyweight)}{ex.bodyweight ? "" : " kg"}</span>
+            <span className={ui.chip}><Target className="size-3.5" aria-hidden />{ex.sets} × {ex.reps}{ex.timed ? " s" : ""} · {kgTxt(ex.kg, ex.bodyweight)}{ex.bodyweight ? "" : " kg"}</span>
             <span className={ui.chip}><Timer className="size-3.5" aria-hidden />Repos {fmtClock(ex.restS)}</span>
             {gain > 0 && <span className={cn(ui.chip, "bg-good/15 text-good")}><TrendingUp className="size-3.5" aria-hidden />+{fr(gain)} kg vs dernière fois</span>}
           </div>
@@ -259,7 +261,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
                 unit={ex.bodyweight ? (draft.kg ? "kg de lest" : "poids du corps") : "kg"}
                 onChange={(kg) => setDraft((s) => ({ ...s, kg }))}
               />
-              <NumberStepper label="Répétitions" value={draft.reps} max={100} unit="reps" onChange={(reps) => setDraft((s) => ({ ...s, reps }))} />
+              <NumberStepper label={ex.timed ? "Durée" : "Répétitions"} value={draft.reps} max={ex.timed ? 600 : 100} step={ex.timed ? 5 : 1} unit={ex.timed ? "s" : "reps"} onChange={(reps) => setDraft((s) => ({ ...s, reps }))} />
               {ex.prev[edit ?? k] && (
                 <button
                   type="button"

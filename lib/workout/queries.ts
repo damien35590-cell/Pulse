@@ -13,9 +13,9 @@ import { KIND_TITLE, kindOfNames, nextKind } from "./kind";
 import type { Draft, DraftExercise, Kind, RecentSession, StartOptions, Suggestion, TemplateItem } from "./types";
 
 type History = Awaited<ReturnType<typeof loadHistory>>;
-const plan = (s: Structure, h: History) => planExercise(s, h.get(historyKey(s.code)) ?? []);
-/** Un même exercice ne figure qu'une fois dans un brouillon (B1 puis B2 dans la même séance → un seul bloc). */
-const unique = (list: DraftExercise[]) => list.filter((e, i) => list.findIndex((x) => historyKey(x.code) === historyKey(e.code)) === i);
+const plan = (s: Structure, h: History) => planExercise(s, h.get(historyKey(s.code, s.variant)) ?? []);
+/** Un même exercice ne figure qu'une fois dans un brouillon (B1 puis B2 dans la même séance → un seul bloc ; A2 et A3, deux échelles, restent deux blocs). */
+const unique = (list: DraftExercise[]) => list.filter((e, i) => list.findIndex((x) => historyKey(x.code, x.variant) === historyKey(e.code, e.variant)) === i);
 
 /** Ligne d'exercice enregistrée → structure : le prévu (séries, reps visées, repos), pas le réalisé. */
 function structureOf(e: { name: string; sets: number; reps: number; loadKg: number | null; restS: number | null }): Structure {
