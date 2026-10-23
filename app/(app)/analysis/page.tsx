@@ -20,6 +20,8 @@ import { getOverview } from "@/lib/analytics/overview";
 import { OverviewView } from "@/components/analysis/overview-view";
 import { getHikingAnalysis } from "@/lib/analytics/hiking";
 import { HikingView } from "@/components/analysis/hiking-view";
+import { PeriodPicker } from "@/components/analysis/period-picker";
+import { parsePeriod, periodParams } from "@/lib/analysis/period";
 import { Section } from "@/components/ui/section";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -29,20 +31,21 @@ export const metadata = { title: "Analyse" };
 const TZ = "Europe/Paris", DAYS = "LMMJVSD", FULL = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const dow = (k: string) => (new Date(k + "T00:00:00Z").getUTCDay() + 6) % 7;
-type Sp = { w?: string; s?: string; a?: string; b?: string };
+type Sp = { w?: string; to?: string; s?: string; a?: string; b?: string };
 
 export default async function AnalysisPage({ searchParams }: { searchParams: Sp }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  const now = new Date(), W = [4, 12, 26].includes(Number(searchParams.w)) ? Number(searchParams.w) : 12;
+  // Période choisie : `now` = fin de la période (aujourd'hui, ou le dimanche de la semaine choisie)
+  const period = parsePeriod(searchParams, TZ), now = period.now, W = period.weeks;
   const S = (MY_SPORTS as readonly string[]).includes(searchParams.s ?? "") ? searchParams.s! : "all";
-  const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ w: String(W), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
+  const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ ...periodParams(period), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
   const chip = (on: boolean) => `inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-medium ${on ? "bg-brand text-brand-ink" : "bg-surface-2"}`;
   const card = "rounded-xl border border-line bg-surface p-4", h2 = "mb-2 mt-6 font-display text-xl font-bold";
   const header = (
     <>
       <h1 className="font-display text-3xl font-bold leading-none">Analyse</h1>
-      <div className="mt-4 flex gap-1 rounded-full bg-surface-2 p-1">{[4, 12, 26].map((n) => <Link key={n} href={qs({ w: String(n) })} className={`flex min-h-10 flex-1 items-center justify-center rounded-full text-sm ${n === W ? "bg-surface font-bold shadow" : "text-ink-soft"}`}>{n} sem.</Link>)}</div>
+      <PeriodPicker weeks={W} current={period.current} endKey={period.endKey} startKey={period.startKey} preset={period.preset} today={dayKey(new Date(), TZ)} />
       <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">{[["all", "Tous"], ...MY_SPORTS.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}</div>
     </>
   );
@@ -81,7 +84,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   }
 
   const acts = await prisma.activity.findMany({
-    where: { userId: session.user.id, startedAt: { gte: new Date(+now - (Math.max(2 * W, 26) * 7 + 14) * 864e5) } }, orderBy: { startedAt: "asc" },
+    where: { userId: session.user.id, startedAt: { gte: new Date(+now - (Math.max(2 * W, 26) * 7 + 14) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
     select: { id: true, type: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
   });
   const adv = await getAdvanced(session.user.id, TZ);
@@ -140,7 +143,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
       )}
       {A && B && <>
         <h2 className={h2}>Comparer deux sorties</h2>
-        <form className={card} action="/analysis"><input type="hidden" name="w" value={W} /><input type="hidden" name="s" value={S} />
+        <form className={card} action="/analysis"><input type="hidden" name="w" value={W} />{!period.current && <input type="hidden" name="to" value={period.endKey} />}<input type="hidden" name="s" value={S} />
           <div className="grid grid-cols-2 gap-3 text-sm text-ink-soft">{(["a", "b"] as const).map((n) => <label key={n}>Sortie {n.toUpperCase()}<select name={n} defaultValue={(n === "a" ? A : B).id} className="mt-1 min-h-12 w-full rounded-xl border border-line bg-surface px-2 text-base text-ink">{recent.map((a) => <option key={a.id} value={a.id}>{lab(dayKey(a.startedAt, TZ))}, {SPORTS[a.type].label} {fmtNum(a.distanceM / 1000, 1)} km</option>)}</select></label>)}</div>
           <button className="mt-3 min-h-11 w-full rounded-xl bg-surface-2 font-semibold">Comparer</button>
           <div className="mt-4 grid grid-cols-[80px_1fr] items-center gap-x-3 gap-y-3 text-sm">{[["Distance", A.distanceM / 1000, B.distanceM / 1000, (v: number) => `${fmtNum(v, 1)} km`], ["Durée", A.movingTimeS, B.movingTimeS, fmtDuration], ["Dénivelé +", A.elevationGainM, B.elevationGainM, (v: number) => `${fmtNum(v, 0)} m`]].map(([l, a, b, f]) => { const m = Math.max(a as number, b as number, 0.01), fn = f as (v: number) => string; return <div key={l as string} className="contents"><span className="text-ink-soft">{l as string}</span><div><div className="h-3 rounded-md bg-brand" style={{ width: `${((a as number) / m) * 100}%` }} /><div className="mt-1 h-3 rounded-md bg-ink-soft/50" style={{ width: `${((b as number) / m) * 100}%` }} /><p className="mt-1 font-semibold">{fn(a as number)} / {fn(b as number)}</p></div></div>; })}</div>

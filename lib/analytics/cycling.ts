@@ -131,7 +131,7 @@ export async function getCyclingAnalysis(userId: string, tz: string, weeks: numb
   const first = shiftDay(weekKeys(now, tz)[0], -7 * (weeks - 1)), prevFirst = shiftDay(first, -7 * weeks);
   const [found, z] = await Promise.all([
     prisma.activity.findMany({
-      where: { userId, type: { in: ["RIDE", "EBIKE"] }, startedAt: { gte: new Date(Date.parse(prevFirst) - 864e5) } },
+      where: { userId, type: { in: ["RIDE", "EBIKE"] }, startedAt: { gte: new Date(Date.parse(prevFirst) - 864e5), lte: now } },
       select: { id: true, startedAt: true, type: true, title: true, source: true, dedupeKey: true, polyline: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgPower: true, avgHr: true, load: true, stream: { select: { curve: true, avgCad: true } } },
     }),
     getZones(userId),

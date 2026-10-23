@@ -189,7 +189,7 @@ export async function getStrengthAnalysis(userId: string, tz: string, weeks: num
   // Au moins 8 semaines d'historique : la comparaison « 4 semaines contre 4 semaines » en a besoin, même sur une période de 4
   const since = new Date(Date.parse(shiftDay(weekKeys(now, tz)[0], -7 * (Math.max(weeks, 8) - 1))) - 864e5);
   const found = await prisma.workoutExercise.findMany({
-    where: { activity: { userId, type: "WORKOUT", startedAt: { gte: since } } },
+    where: { activity: { userId, type: "WORKOUT", startedAt: { gte: since, lte: now } } },
     select: { activityId: true, name: true, sets: true, reps: true, loadKg: true, setsDetail: true, activity: { select: { startedAt: true } } },
   });
   const rows: StrengthRow[] = found.map((e) => ({
