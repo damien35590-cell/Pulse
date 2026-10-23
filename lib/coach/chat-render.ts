@@ -12,3 +12,9 @@ export function renderCoachText(text: string): Rich[] {
   }
   return out;
 }
+
+/** Réponse coupée par la limite de longueur : on s'arrête à la dernière phrase complète. */
+export function trimToSentence(text: string): string {
+  const t = text.trimEnd(), i = Math.max(t.lastIndexOf(". "), t.lastIndexOf(".\n"), t.lastIndexOf("!"), t.lastIndexOf("?"), t.endsWith(".") ? t.length - 1 : -1);
+  return i > t.length * 0.4 ? t.slice(0, i + 1).trimEnd() : `${t}…`;
+}

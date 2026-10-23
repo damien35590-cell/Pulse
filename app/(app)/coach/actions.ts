@@ -5,6 +5,7 @@ import { dayKey } from "@/lib/dates";
 import { endOfDay } from "@/lib/analysis/period";
 import { CoachAiError } from "@/lib/coach/ai";
 import { askCoachChat, chatContext, CHAT_HISTORY, CHAT_MAX_CHARS } from "@/lib/coach/chat";
+import { trimToSentence } from "@/lib/coach/chat-render";
 
 const TZ = "Europe/Paris";
 /** Garde-fou de coût : questions au plus par jour. */
@@ -35,10 +36,11 @@ export async function sendCoachMessage(input: { chatId: string | null; text: str
     const context = await chatContext(userId, TZ);
     const r = await askCoachChat(history, context);
     if (!r.text) throw new CoachAiError("Le coach n'a rien répondu, réessaie.");
+    const answer = r.truncated ? trimToSentence(r.text) : r.text;
 
     const [userMsg, reply] = await prisma.$transaction([
       prisma.coachMessage.create({ data: { chatId, role: "user", content: text }, select: { id: true, role: true, content: true } }),
-      prisma.coachMessage.create({ data: { chatId, role: "assistant", content: r.text, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens }, select: { id: true, role: true, content: true } }),
+      prisma.coachMessage.create({ data: { chatId, role: "assistant", content: answer, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens }, select: { id: true, role: true, content: true } }),
       prisma.coachChat.update({ where: { id: chatId }, data: { updatedAt: new Date() }, select: { id: true } }),
     ]);
     return { ok: true, chatId, userMsg: userMsg as ChatMsg, reply: reply as ChatMsg };

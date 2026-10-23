@@ -57,7 +57,7 @@ export async function chatContext(userId: string, tz: string) {
 /** Réponse du coach à la dernière question de `history` (ordre chronologique, la dernière est la question). */
 export async function askCoachChat(history: { role: "user" | "assistant"; content: string }[], context: unknown) {
   return callClaude({
-    maxTokens: 700,
+    maxTokens: 2000, // plafond large : seuls les tokens écrits sont facturés
     system: [
       { type: "text", text: `${RULES}\n\n${DOCTRINE}`, cache_control: { type: "ephemeral" } },
       // Contexte en cache lui aussi : les questions suivantes de la conversation le relisent à prix réduit
