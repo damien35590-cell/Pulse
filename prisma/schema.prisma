@@ -108,6 +108,9 @@ model User {
   pushSubscriptions PushSubscription[]
   notificationPrefs NotificationPrefs?
   notificationLogs  NotificationLog[]
+
+  // Coach IA (page Analyse)
+  coachDebriefs CoachDebrief[]
 }
 
 model Account {
@@ -876,4 +879,24 @@ model NotificationLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, kind, day])
+}
+
+/// Debrief du coach IA (page Analyse), un par onglet et par période ; régénéré quand les faits changent.
+model CoachDebrief {
+  id           String   @id @default(cuid())
+  userId       String
+  scope        String   // "all" | "RUN" | "WORKOUT"
+  periodKey    String   // "<semaines>:<AAAA-MM-JJ de fin>"
+  factsHash    String   // empreinte des faits envoyés (+ version de la doctrine et modèle)
+  data         Json     // Debrief (lib/coach/ai.ts)
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  cachedTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scope, periodKey])
+  @@index([userId, updatedAt])
 }

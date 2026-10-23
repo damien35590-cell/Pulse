@@ -25,6 +25,8 @@ import { parsePeriod, periodParams } from "@/lib/analysis/period";
 import { CoachNotes } from "@/components/analysis/coach-notes";
 import { runNotes, strengthNotes } from "@/lib/analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
+import { AiDebrief } from "@/components/analysis/ai-debrief";
+import { lastDebrief } from "@/lib/coach/store";
 import { Section } from "@/components/ui/section";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,11 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   // Période choisie : `now` = fin de la période (aujourd'hui, ou le dimanche de la semaine choisie)
   const period = parsePeriod(searchParams, TZ), now = period.now, W = period.weeks, todayKey = dayKey(new Date(), TZ);
   const coachPeriod = { weeks: W, tz: TZ, now, current: period.current };
+  // Coach IA : dernier debrief enregistré pour cet onglet et cette période (aucun appel à l'IA au chargement)
+  const aiProps = async (scope: "all" | "RUN" | "WORKOUT") => ({
+    params: { w: String(W), ...(period.current ? {} : { to: period.endKey }), s: scope },
+    initial: await lastDebrief(uid, scope, W, period.endKey).catch(() => null), configured: !!process.env.ANTHROPIC_API_KEY?.trim(),
+  });
   const uid = session.user.id, plansOf = (sport?: "RUN" | "WORKOUT") => getPlanAdherence(uid, period.startKey, period.endKey, todayKey, sport);
   const S = (MY_SPORTS as readonly string[]).includes(searchParams.s ?? "") ? searchParams.s! : "all";
   const qs = (o: Partial<Sp>) => { const p = new URLSearchParams({ ...periodParams(period), s: S, ...o } as Record<string, string>); return `/analysis?${p}`; };
@@ -57,12 +64,13 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   // Musculation : aucun bloc d'endurance, et donc aucune de leurs requêtes
   if (S === "WORKOUT") {
-    const [strength, adv, plans] = await Promise.all([getStrengthAnalysis(session.user.id, TZ, W, now), getAdvanced(session.user.id, TZ), plansOf("WORKOUT")]);
+    const [strength, adv, plans, ai] = await Promise.all([getStrengthAnalysis(session.user.id, TZ, W, now), getAdvanced(session.user.id, TZ), plansOf("WORKOUT"), aiProps("WORKOUT")]);
     return (
       <div>
         {header}
         <div className="mt-6 space-y-8">
           <CoachNotes notes={strengthNotes({ data: strength, period: coachPeriod, plans })} />
+          {!strength.empty && <AiDebrief {...ai} />}
           <StrengthView data={strength} weeks={W} />
           {adv.hasMuscle && <Section title="Muscles sollicités (7 jours)"><div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={adv.muscles} hasData={adv.hasMuscle} /></div></Section>}
           {adv.profiles.WORKOUT && <Section title="Profil musculation"><div className={cn(ui.card, "p-4")}><DisciplineRadar profiles={adv.profiles} sport={S} /></div></Section>}
@@ -79,8 +87,8 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   // Tous les sports : séances d'entraînement seulement, ni distance cumulée ni allure
   if (S === "all") {
-    const overview = await getOverview(session.user.id, TZ, W, now, { current: period.current, plans: await plansOf() });
-    return <div>{header}<div className="mt-6 space-y-8"><CoachNotes notes={overview.notes} /><OverviewView data={overview} weeks={W} /></div></div>;
+    const [overview, ai] = await Promise.all([plansOf().then((plans) => getOverview(session.user.id, TZ, W, now, { current: period.current, plans })), aiProps("all")]);
+    return <div>{header}<div className="mt-6 space-y-8"><CoachNotes notes={overview.notes} />{!overview.empty && <AiDebrief {...ai} />}<OverviewView data={overview} weeks={W} /></div></div>;
   }
 
   // Randonnée : volume par mois, rythme en montée, records
@@ -93,7 +101,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     where: { userId: session.user.id, startedAt: { gte: new Date(+now - (Math.max(2 * W, 26) * 7 + 14) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
     select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
   });
-  const [adv, runGoal, runPlans] = await Promise.all([getAdvanced(session.user.id, TZ), S === "RUN" ? getRunGoal(uid) : null, S === "RUN" ? plansOf("RUN") : []]);
+  const [adv, runGoal, runPlans, ai] = await Promise.all([getAdvanced(session.user.id, TZ), S === "RUN" ? getRunGoal(uid) : null, S === "RUN" ? plansOf("RUN") : [], S === "RUN" ? aiProps("RUN") : null]);
   const notes = S === "RUN" ? runNotes({ acts, period: coachPeriod, goal: runGoal, plans: runPlans }) : [];
   const mon = weekKeys(now, TZ)[0], today = dayKey(now, TZ);
   const ago = (d: Date) => { const diff = (Date.parse(mon) - Date.parse(dayKey(d, TZ))) / 864e5; return diff <= 0 ? 0 : Math.ceil(diff / 7); };
@@ -123,6 +131,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
       <div className="mt-4 grid grid-cols-2 gap-2.5">{kpis.map((k) => { const d = k.p > 0 ? Math.round(((k.c - k.p) / k.p) * 100) : null; return <div key={k.l} className="rounded-xl border border-line bg-surface p-3.5"><p className="text-sm text-ink-soft">{k.l}</p><p className="font-display text-3xl font-bold leading-tight tabular-nums">{k.f(k.c)}</p>{d != null && <p className={`text-xs font-semibold ${d >= 0 ? "text-brand" : "text-ink-soft"}`}>{d > 0 ? "+" : ""}{d} % vs période préc.</p>}</div>; })}</div>
 
       {notes.length > 0 && <div className="mt-6"><CoachNotes notes={notes} /></div>}
+      {ai && cur.length > 0 && <div className="mt-6"><AiDebrief {...ai} /></div>}
 
       <h2 className={h2}>Distance par semaine</h2><div className={card}><WeeklyBars data={weekly} /></div>
       <h2 className={h2}>Allure en running</h2><div className={card}>{pace.length > 2 ? <><PaceArea data={pace} /><p className="text-xs text-ink-soft">Plus la courbe monte, plus vous allez vite.</p></> : <p className="text-sm text-ink-soft">Pas assez de sorties running sur cette période.</p>}</div>
