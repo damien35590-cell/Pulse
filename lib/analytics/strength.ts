@@ -39,14 +39,14 @@ const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR"
 const pct = (a: number, b: number) => Math.round((a / b) * 100);
 
 /** Séries réellement faites, échauffement exclu. Sans détail série par série, on suppose le prévu réalisé (comme progression.ts). */
-function doneSets(r: StrengthRow): Det[] {
+export function doneSets(r: StrengthRow): Det[] {
   if (!r.setsDetail) return Array.from({ length: r.sets }, () => ({ reps: r.reps, loadKg: r.loadKg, done: true }));
   return (r.setsDetail as Det[]).filter((s) => s.done && !s.isWarmup);
 }
-const sumReps = (sets: Det[]) => sets.reduce((s, x) => s + x.reps, 0);
+export const sumReps = (sets: Det[]) => sets.reduce((s, x) => s + x.reps, 0);
 
 /** Un exercice Lafay = sa lettre (B1 et B2 sont le même exercice à deux niveaux) ; sinon le nom normalisé. */
-function groupKey(name: string) {
+export function groupKey(name: string) {
   const c = lafayCode(name);
   return c ? `lafay:${c.letter}` : exerciseKey(name);
 }
@@ -55,7 +55,7 @@ function groupKey(name: string) {
 const LADDERS: string[][] = [["B1", "B2", "B"], ["C1", "C2", "C3", "C"], ["A1", "A2"], ["A3", "A4", "A5", "A6"]];
 const nextVariant = (v: string | null) => { for (const l of LADDERS) { const i = l.indexOf(v ?? ""); if (i >= 0) return l[i + 1] ?? null; } return null; };
 /** « B2 » ; « B » seul quand la lettre est la forme finale d'une échelle ; null pour les autres exercices. */
-const variantOf = (name: string) => {
+export const variantOf = (name: string) => {
   const c = lafayCode(name);
   if (!c) return null;
   const v = c.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : c.letter.toUpperCase();
