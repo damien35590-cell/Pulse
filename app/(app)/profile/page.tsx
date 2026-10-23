@@ -8,6 +8,8 @@ import { getZones } from "@/lib/data/zones";
 import { ZonesForm } from "@/components/profile/zones-form";
 import { Section } from "@/components/ui/section";
 import { ThemePicker } from "@/components/profile/theme-picker";
+import { EquipmentSettings } from "@/components/profile/equipment-settings";
+import { getEquipment } from "@/lib/workout/library-db";
 import { NotificationSettings } from "@/components/profile/notification-settings";
 import { getPrefs } from "@/lib/notify/prefs";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
@@ -63,7 +65,7 @@ export default async function ProfilePage() {
         <ChevronRight className="h-5 w-5 text-ink-soft" aria-hidden />
       </Link>
       <ZonesForm zones={zones} />
-      <Section title="Réglages"><ThemePicker /></Section>
+      <Section title="Réglages"><ThemePicker /><EquipmentSettings initial={await getEquipment(userId)} /></Section>
       <NotificationSettings prefs={notifyPrefs} />
       <InstallPrompt variant="card" />
       <SignOut />

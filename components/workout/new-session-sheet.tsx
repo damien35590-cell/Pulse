@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Trash2 } from "lucide-react";
+import { Copy, Dumbbell, Library, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { BottomSheet, ConfirmSheet } from "@/components/ui/bottom-sheet";
 import { Segmented } from "@/components/ui/segmented";
-import { removeTemplate, startOptions } from "@/app/(app)/record/session/actions";
+import { copyTemplate, removeTemplate, startOptions } from "@/app/(app)/record/session/actions";
+import { LibrarySheet } from "@/components/workout/library-sheet";
 import { KIND_TITLE } from "@/lib/workout/kind";
 import type { RecentSession, StartOptions, TemplateItem } from "@/lib/workout/types";
 
@@ -41,11 +42,14 @@ export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () 
   const [filter, setFilter] = useState<Filter>("ALL");
   const [drop, setDrop] = useState<TemplateItem | null>(null);
   const [busy, setBusy] = useState(false);
+  const [library, setLibrary] = useState(false);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setBusy(false);
     setFailed(false);
+    setNotice("");
     startOptions().then(setData).catch(() => setFailed(true));
   }, [open]);
 
@@ -55,6 +59,14 @@ export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () 
     setBusy(true);
     router.push(`${SESSION}${query}`);
   };
+
+  const refresh = () => startOptions().then(setData).catch(() => {});
+  async function duplicate(t: TemplateItem) {
+    tap(8);
+    const r = await copyTemplate(t.id).catch(() => ({ ok: false as const, error: "Impossible de dupliquer ce modèle : réessaie." }));
+    setNotice(r.ok ? `Copie créée : « ${r.name} ».` : r.error);
+    if (r.ok) refresh();
+  }
 
   const sug = data?.suggestion;
   const recent = (data?.recent ?? []).filter((r) => filter === "ALL" || r.kind === filter).slice(0, 10);
@@ -115,6 +127,9 @@ export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () 
                         <span className="block text-sm text-ink-mute">{t.exercises} exercice{t.exercises > 1 ? "s" : ""}{t.isBuiltIn ? " · intégré" : ""}</span>
                       </span>
                     </button>
+                    <button type="button" onClick={() => duplicate(t)} aria-label={`Dupliquer le modèle ${t.name}`} className={cn(ui.iconBtn, "text-ink-soft")}>
+                      <Copy className="size-5" aria-hidden />
+                    </button>
                     {!t.isBuiltIn && (
                       <button type="button" onClick={() => { tap(6); setDrop(t); }} aria-label={`Supprimer le modèle ${t.name}`} className={cn(ui.iconBtn, "text-ink-soft")}>
                         <Trash2 className="size-5" aria-hidden />
@@ -123,6 +138,10 @@ export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () 
                   </li>
                 ))}
               </ul>
+              {notice && <p role="status" className="mt-2 text-sm text-ink-soft">{notice}</p>}
+              <button type="button" onClick={() => { tap(6); setLibrary(true); }} className={cn(ui.btnSecondary, "mt-3 w-full")}>
+                <Library className="size-5" aria-hidden />Bibliothèque de modèles
+              </button>
             </section>
           </>
         )}
@@ -131,6 +150,12 @@ export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () 
           Séance vide
         </button>
       </BottomSheet>
+
+      <LibrarySheet
+        open={library}
+        onClose={() => setLibrary(false)}
+        onAdded={(names) => { setLibrary(false); setNotice(names.length > 1 ? `${names.length} modèles ajoutés : ${names.join(", ")}.` : `Modèle ajouté : « ${names[0]} ».`); refresh(); }}
+      />
 
       <ConfirmSheet
         open={drop != null}

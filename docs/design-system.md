@@ -78,6 +78,10 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours (repos entre séries et après exercice, `onSave` asynchrone, option « Enregistrer comme modèle ») |
 | `NewSessionSheet`, `NewSessionButton` | `components/workout/new-session-sheet.tsx` | démarrer une séance : suggestion du jour (seule carte `bg-brand` de l'écran), refaire une séance, modèles, séance vide |
 | `PrepScreen` | `components/workout/prep-screen.tsx` | préparer la séance : réordonner (flèches 48 px), modifier, retirer, ajouter ; « Démarrer » en `h-16` |
+| `AddExerciseSheet` | `components/workout/add-exercise-sheet.tsx` | sélecteur d'exercices : recherche, filtres source / muscle / « Mon matériel », récents, familles Lafay → sous-catégories → variantes, fiche |
+| `ExerciseDetail`, `CodeBadge`, `LevelBars` | `components/workout/catalog-bits.tsx` | fiche d'exercice du catalogue, pastille de code Lafay, niveau 1 à 4 barres (jamais en couleur de marque) |
+| `LibrarySheet` | `components/workout/library-sheet.tsx` | bibliothèque de modèles (Lafay T1/T2, mes programmes, SuperPhysique) → « Ajouter à mes modèles » |
+| `EquipmentSettings` | `components/profile/equipment-settings.tsx` | réglage « Mon matériel » (page Vous) |
 | `SessionFlow` | `components/workout/session-flow.tsx` | parcours `/record/session` : feuille → préparation → SetLogger → enregistrement ; reprise de la séance en cours |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
 | `RouteCard` | `components/routes/route-card.tsx` | boucle proposée (Itinéraires) : nom, temps / km / D+, vignette, phrase « pourquoi » |

@@ -17,7 +17,7 @@ assert.deepEqual(resolveName("c - tractions"), { code: "C", variant: "C", name: 
 assert.deepEqual(resolveName("F"), { code: "F", variant: null, name: "F - squat sauté" });
 assert.deepEqual(resolveName(" Développé couché "), { code: "Développé couché", variant: null, name: "Développé couché" });
 assert.deepEqual(variantsOf("B"), ["B1", "B2", "B"]);
-assert.deepEqual(variantsOf("A"), ["A1", "A2", "A3", "A4", "A5", "A6"]);
+assert.deepEqual(variantsOf("A"), ["A", "A1", "A2", "A3", "A4", "A5", "A6", "A9", "A12", "A8", "A7", "A10", "A11"], "toutes les sous-catégories du catalogue");
 assert.deepEqual(variantsOf("G"), []);
 assert.equal(defaultVariant("C"), "C1");
 assert.equal(defaultVariant("F"), null);

@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { DEFAULT_REPS, DEFAULT_SETS, REST_AFTER_S, REST_BETWEEN_S, defaultVariant } from "./catalog";
 import { applyLafayProgress } from "./lafay";
-import { loadHistory, historyKey } from "./history";
+import { loadHistory, latestKeyOf } from "./history";
 import type { Structure } from "./draft";
 import type { Kind } from "./types";
 
@@ -18,7 +18,7 @@ export const BUILT_IN: readonly { name: string; kind: Exclude<Kind, "LIBRE">; co
  */
 export function builtInStructure(codes: readonly string[], history: Awaited<ReturnType<typeof loadHistory>>): Structure[] {
   return codes.map((code) => {
-    const p = applyLafayProgress(history.get(historyKey(code)) ?? []);
+    const p = applyLafayProgress(history.get(latestKeyOf(code, history)) ?? []);
     return { code, variant: p ? p.variant : defaultVariant(code), sets: DEFAULT_SETS, reps: p?.reps ?? DEFAULT_REPS, restSec: REST_BETWEEN_S, restAfterSec: REST_AFTER_S, loadKg: null, note: null };
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Play, Plus, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Info, Minus, Pencil, Play, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
@@ -8,7 +8,8 @@ import { fmtNum } from "@/lib/format";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { AddExerciseSheet } from "@/components/workout/add-exercise-sheet";
-import { displayName, isLafayCode, variantsOf } from "@/lib/workout/catalog";
+import { LAFAY_FAMILIES, catalogExercise, catalogFor, displayName, isLafayCode, nextInLadder, prevInLadder } from "@/lib/workout/catalog";
+import { ExerciseDetail } from "@/components/workout/catalog-bits";
 import type { Draft, DraftExercise } from "@/lib/workout/types";
 
 /** « 8·8·8·7·6·5 = 42 » */
@@ -20,6 +21,9 @@ const lastTxt = (e: DraftExercise) => {
   return `dernière fois${where} : ${l.reps.join("·")} = ${l.total}${load}`;
 };
 const loadTxt = (e: DraftExercise) => (e.loadKg == null ? "PDC" : `${fmtNum(e.loadKg, 2)} kg`);
+const timed = (e: DraftExercise) => catalogFor(e.code, e.variant)?.mode === "time";
+/** Sous-catégories d'une lettre Lafay qui ont plusieurs variantes : « Pompes serrées : A3 A4 A5 A6 A9 A12 ». */
+const groupsOf = (code: string) => (LAFAY_FAMILIES.find((f) => f.letter === code)?.groups ?? []).filter((g) => g.progression.length > 1);
 
 /**
  * Écran de préparation : on réordonne, retire, change de niveau, ajoute, puis « Démarrer » ouvre le SetLogger avec ces cibles.
@@ -29,9 +33,12 @@ export function PrepScreen({ draft, onStart, onBack }: { draft: Draft; onStart: 
   const [list, setList] = useState(draft.exercises);
   const [editId, setEditId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [infoId, setInfoId] = useState<string | null>(null);
 
   const edit = list.find((e) => e.id === editId) ?? null;
   const patch = (id: string, p: Partial<DraftExercise>) => setList((l) => l.map((e) => (e.id === id ? { ...e, ...p } : e)));
+  const setVariant = (e: DraftExercise, v: string) => { tap(8); patch(e.id, { variant: v, name: displayName(e.code, v), hint: null }); };
+  const info = catalogExercise(infoId);
   const move = (i: number, to: number) => {
     tap(8);
     setList((l) => { const n = [...l]; const [x] = n.splice(i, 1); n.splice(to, 0, x); return n; });
@@ -62,12 +69,13 @@ export function PrepScreen({ draft, onStart, onBack }: { draft: Draft; onStart: 
                 </div>
                 <div className="min-w-0 flex-1 self-center py-2">
                   <p className="truncate font-semibold">{e.name}</p>
-                  <p className="font-num text-sm tabular-nums">{e.sets} × {e.reps} · {loadTxt(e)}</p>
+                  {catalogFor(e.code, e.variant)?.subtitle && <p className="truncate text-sm text-ink-soft">{catalogFor(e.code, e.variant)!.subtitle}</p>}
+                  <p className="font-num text-sm tabular-nums">{e.sets} × {e.reps}{timed(e) ? " s" : ""} · {loadTxt(e)}</p>
                   <p className="text-sm text-ink-mute">{lastTxt(e)}</p>
                   {e.hint && <p className="text-sm text-brand">{e.hint}</p>}
                 </div>
                 <div className="flex flex-col justify-center">
-                  <button type="button" onClick={() => { tap(6); setEditId(e.id); }} aria-label={`Modifier ${e.name}`} className={ui.iconBtn}><Pencil className="size-5" aria-hidden /></button>
+                  <button type="button" onClick={() => { tap(6); setInfoId(null); setEditId(e.id); }} aria-label={`Modifier ${e.name}`} className={ui.iconBtn}><Pencil className="size-5" aria-hidden /></button>
                   <button type="button" onClick={() => { tap(8); setList((l) => l.filter((x) => x.id !== e.id)); }} aria-label={`Retirer ${e.name}`} className={cn(ui.iconBtn, "text-ink-soft")}><X className="size-5" aria-hidden /></button>
                 </div>
               </li>
@@ -85,42 +93,72 @@ export function PrepScreen({ draft, onStart, onBack }: { draft: Draft; onStart: 
         </footer>
       </div>
 
-      <BottomSheet open={edit != null} onClose={() => setEditId(null)} title={edit?.name}>
+      <BottomSheet open={edit != null} onClose={() => { setEditId(null); setInfoId(null); }} title={edit?.name}>
         {edit && (
           <div className="mt-4 space-y-3">
-            {variantsOf(edit.code).length > 0 && (
-              <div role="radiogroup" aria-label="Variante" className="flex flex-wrap gap-2">
-                {variantsOf(edit.code).map((v) => {
-                  const on = edit.variant === v;
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => { tap(8); patch(edit.id, { variant: v, name: displayName(edit.code, v), hint: null }); }}
-                      className={cn("h-12 min-w-14 touch-manipulation rounded-full px-4 font-num text-metric-sm tabular-nums transition active:scale-95", on ? "bg-ink text-bg" : "bg-surface text-ink-soft")}
-                    >
-                      {v}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <NumberStepper label="Séries" value={edit.sets} min={1} max={30} onChange={(sets) => patch(edit.id, { sets })} />
-            <NumberStepper label="Répétitions par série" value={edit.reps} min={1} max={100} onChange={(reps) => patch(edit.id, { reps, hint: null })} />
-            {!isLafayCode(edit.code) && (
-              <NumberStepper
-                label="Charge"
-                value={edit.loadKg ?? 0}
-                step={2.5}
-                max={400}
-                unit="kg"
-                format={(v) => (v === 0 ? "PDC" : fmtNum(v, 2))}
-                onChange={(kg) => patch(edit.id, { loadKg: kg === 0 ? null : kg })}
+            {info ? (
+              <ExerciseDetail
+                ex={info}
+                onBack={() => setInfoId(null)}
+                onOpen={setInfoId}
+                onAdd={info.code && info.family === edit.code ? (x) => { setVariant(edit, x.code!); setInfoId(null); } : undefined}
+                addLabel="Choisir cette variante"
               />
+            ) : (
+              <>
+                {catalogFor(edit.code, edit.variant) && (
+                  <button type="button" onClick={() => { tap(6); setInfoId(catalogFor(edit.code, edit.variant)!.id); }} className="inline-flex h-12 items-center gap-2 rounded-full bg-surface px-4 text-sm font-semibold text-ink-soft active:bg-surface-2">
+                    <Info className="size-5" aria-hidden />Fiche de l’exercice
+                  </button>
+                )}
+                {isLafayCode(edit.code) && (prevInLadder(edit.variant) || nextInLadder(edit.variant)) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" disabled={!prevInLadder(edit.variant)} onClick={() => setVariant(edit, prevInLadder(edit.variant)!)} className={cn(ui.btnSecondary, "px-3")}>
+                      <Minus className="size-5" aria-hidden />Plus facile{prevInLadder(edit.variant) ? ` (${prevInLadder(edit.variant)})` : ""}
+                    </button>
+                    <button type="button" disabled={!nextInLadder(edit.variant)} onClick={() => setVariant(edit, nextInLadder(edit.variant)!)} className={cn(ui.btnSecondary, "px-3")}>
+                      <Plus className="size-5" aria-hidden />Plus dur{nextInLadder(edit.variant) ? ` (${nextInLadder(edit.variant)})` : ""}
+                    </button>
+                  </div>
+                )}
+                {groupsOf(edit.code).map((g) => (
+                  <div key={g.name}>
+                    {groupsOf(edit.code).length > 1 && <p className="mb-1.5 text-sm font-semibold text-ink-soft">{g.name}</p>}
+                    <div role="radiogroup" aria-label={g.name} className="flex flex-wrap gap-2">
+                      {g.progression.map((v) => {
+                        const on = edit.variant === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            onClick={() => setVariant(edit, v)}
+                            className={cn("h-12 min-w-14 touch-manipulation rounded-full px-4 font-num text-metric-sm tabular-nums transition active:scale-95", on ? "bg-ink text-bg" : "bg-surface text-ink-soft")}
+                          >
+                            {v}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                <NumberStepper label="Séries" value={edit.sets} min={1} max={30} onChange={(sets) => patch(edit.id, { sets })} />
+                <NumberStepper label={timed(edit) ? "Durée par série" : "Répétitions par série"} value={edit.reps} min={1} max={timed(edit) ? 600 : 100} step={timed(edit) ? 5 : 1} unit={timed(edit) ? "s" : undefined} onChange={(reps) => patch(edit.id, { reps, hint: null })} />
+                {!isLafayCode(edit.code) && (
+                  <NumberStepper
+                    label="Charge"
+                    value={edit.loadKg ?? 0}
+                    step={2.5}
+                    max={400}
+                    unit="kg"
+                    format={(v) => (v === 0 ? "PDC" : fmtNum(v, 2))}
+                    onChange={(kg) => patch(edit.id, { loadKg: kg === 0 ? null : kg })}
+                  />
+                )}
+                <button type="button" onClick={() => setEditId(null)} className={cn(ui.btnPrimary, "w-full")}>Terminé</button>
+              </>
             )}
-            <button type="button" onClick={() => setEditId(null)} className={cn(ui.btnPrimary, "w-full")}>Terminé</button>
           </div>
         )}
       </BottomSheet>
@@ -128,7 +166,7 @@ export function PrepScreen({ draft, onStart, onBack }: { draft: Draft; onStart: 
       <AddExerciseSheet
         open={adding}
         onClose={() => setAdding(false)}
-        taken={list.map((e) => e.code)}
+        taken={list.map((e) => e.variant ?? e.code)}
         onAdd={(ex) => { setList((l) => [...l, ex]); setAdding(false); }}
       />
     </div>

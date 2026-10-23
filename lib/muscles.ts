@@ -31,12 +31,33 @@ const LAFAY: Record<string, [Group, number][]> = {
   g: [["abdominaux", 1]], // abdominaux
   h: [["abdominaux", 1]], // abdominaux
   i: [["dorsaux", 1]], // tractions (dos)
+  j: [["épaules", 1], ["pectoraux", 0.4], ["triceps", 0.4]], // pompes piquées
+  k: [["triceps", 1]], // triceps
+  l: [["pectoraux", 1], ["épaules", 0.4], ["triceps", 0.4]], // pompes en rotation
+  m: [["dorsaux", 0.6], ["ischio-jambiers", 0.4]], // lombaires
+  n: [["abdominaux", 1]], // obliques
+  o: [["abdominaux", 1]], // crunch rotation
+  p: [["abdominaux", 1]], // relevé de buste
+  q: [["épaules", 1], ["triceps", 0.6], ["pectoraux", 0.6]], // pompes à un bras
+  r: [["épaules", 0.5]], // abaissement des épaules (trapèzes)
+  s: [], // nuque
+  t: [["abdominaux", 0.6]], // rotations assis
+  u: [["abdominaux", 0.6]], // enroulement
+  v: [["abdominaux", 0.6]], // essuie-glace
+  w: [["mollets", 1]], // mollets
+  x: [["abdominaux", 0.4]], // rotations debout
+  y: [], // cou
+  z: [["dorsaux", 0.3], ["épaules", 0.3]], // pont
 };
 // Lettre + chiffres (« a1 », « b2 dips ») ou lettre seule / suivie d'un séparateur (« f », « c - tractions ») ; « a la barre » n'en est pas un
 const LAFAY_CODE = /^([a-i])(?:(\d{1,2})(?=$|[\s\-–:.])|(?=$|\s*[-–:.]))/;
+// Lettres J à Z (catalogue complet) : plus strict, pour ne pas confondre « L-sit », « T-bar », « V-ups » avec un code.
+// Lettre + chiffres suivis d'un espace ou de la fin (« k2 », « w - mollets » n'a pas de chiffres), lettre seule, ou « l - … » avec espaces.
+const LAFAY_CODE_EXT = /^([j-z])(?:(\d{1,2})(?=$|\s)|(?=$|\s+[-–]\s))/;
 /** Code Lafay d'un nom d'exercice : « B2 - dips » → { letter: "b", digits: 2 } ; null si le nom n'est pas un code. */
 export const lafayCode = (name: string) => {
-  const m = LAFAY_CODE.exec(flat(name).trim());
+  const n = flat(name).trim();
+  const m = LAFAY_CODE.exec(n) ?? LAFAY_CODE_EXT.exec(n);
   return m ? { letter: m[1], digits: m[2] ? Number(m[2]) : null } : null;
 };
 export const musclesOf = (name: string) => {

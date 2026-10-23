@@ -7,7 +7,7 @@ import { prisma } from "../prisma";
 import { dayKey, shiftDay, weekKeys } from "../dates";
 import { exerciseKey, type SetDetail } from "../exercises";
 import { lafayCode, musclesOf, UPPER_GROUPS } from "../muscles";
-import { LADDERS } from "../workout/catalog";
+import { isVariantCode, ladderKey, nextInLadder } from "../workout/catalog";
 
 export type StrengthRow = { activityId: string; startedAt: Date; name: string; sets: number; reps: number; loadKg: number | null; setsDetail: SetDetail[] | null };
 export type StrengthStatus = "progress" | "stall1" | "stall2" | "evolve";
@@ -46,20 +46,24 @@ export function doneSets(r: StrengthRow): Det[] {
 }
 export const sumReps = (sets: Det[]) => sets.reduce((s, x) => s + x.reps, 0);
 
-/** Un exercice Lafay = sa lettre (B1 et B2 sont le même exercice à deux niveaux) ; sinon le nom normalisé. */
+/**
+ * Un exercice Lafay = son échelle (B1 et B2 sont le même exercice à deux niveaux ; A2 et A3 sont deux échelles distinctes
+ * de la famille A, cf. lib/workout/catalog.ts) ; sinon le nom normalisé.
+ */
 export function groupKey(name: string) {
   const c = lafayCode(name);
-  return c ? `lafay:${c.letter}` : exerciseKey(name);
+  if (!c) return exerciseKey(name);
+  return ladderKey(c.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : c.letter.toUpperCase());
 }
 
 /** Échelles Lafay, de la plus facile à la plus difficile. Une variante change l'exercice : le compteur de blocage repart de zéro. */
-export const nextVariant = (v: string | null) => { for (const l of LADDERS) { const i = l.indexOf(v ?? ""); if (i >= 0) return l[i + 1] ?? null; } return null; };
+export const nextVariant = (v: string | null) => nextInLadder(v);
 /** « B2 » ; « B » seul quand la lettre est la forme finale d'une échelle ; null pour les autres exercices. */
 export const variantOf = (name: string) => {
   const c = lafayCode(name);
   if (!c) return null;
   const v = c.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : c.letter.toUpperCase();
-  return LADDERS.some((l) => l.includes(v)) ? v : null;
+  return isVariantCode(v) ? v : null;
 };
 /** Plafond de répétitions par série : 12, ou 20 pour F (squat sauté). */
 export const isJump = (name: string) => lafayCode(name)?.letter === "f" || /squat.*saut/i.test(name);
