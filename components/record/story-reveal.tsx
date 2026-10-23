@@ -21,13 +21,13 @@ export function StoryReveal({ story, record, alerts = [], onClose }: { story: st
       <motion.div initial={reduce ? false : { scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 380, damping: 26 }}
         className="relative w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
         <p className="font-display text-4xl font-bold leading-none text-brand">{record ? "Record battu" : "Sortie enregistrée"}</p>
-        <p className="mt-4 text-lg leading-snug">{story}</p>
+        {story && <p className="mt-4 text-lg leading-snug">{story}</p>}
         {alerts.length > 0 && (
           <div role="alert" className="mt-4 space-y-1.5 rounded-xl bg-red-600/10 p-3 text-left text-sm text-red-700 dark:text-red-300">
             {alerts.map((a) => <p key={a} className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{a}</p>)}
           </div>
         )}
-        <button onClick={onClose} className="mt-6 min-h-14 w-full rounded-xl bg-brand font-display text-xl font-semibold text-brand-ink active:scale-[.98]">{record ? "Quelle journée" : "Parfait"}</button>
+        <button onClick={onClose} className="mt-6 min-h-14 w-full rounded-xl bg-brand font-display text-xl font-semibold text-brand-ink active:scale-[.98]">Continuer</button>
       </motion.div>
     </div>
   );

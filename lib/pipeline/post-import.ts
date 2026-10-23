@@ -1,8 +1,8 @@
 import type { ActivityType, Prisma, RecordKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { bestEffort, type Pt } from "@/lib/geo";
-import { activityStory, workoutStory } from "@/lib/insights/engine";
-import type { Act, Story } from "@/lib/insights/types";
+import { commentForActivity } from "@/lib/coach/session-comment";
+import type { Story } from "@/lib/insights/types";
 import { awardBadges } from "@/lib/data/badges";
 import { refreshLoad } from "@/lib/data/load";
 import { linkActivityToPlannedSession } from "@/lib/data/training";
@@ -144,29 +144,13 @@ async function updateRecords(a: Full, points?: Pt[]): Promise<RecordUpdate[]> {
   return out;
 }
 
-/** Étape d : anecdote, seulement si l'activité n'en a pas encore. */
+/** Étape d : commentaire de séance (verdict déterministe, ton sobre), seulement si l'activité n'en a pas encore. Aucun commentaire pour les activités douces. */
 async function writeStory(a: Full, records: RecordUpdate[]): Promise<Story | null> {
   if (a.story) return null;
-  const self: Act = {
-    id: `${a.userId}-${+a.startedAt}`, type: a.type, startedAt: a.startedAt, distanceM: a.distanceM, movingTimeS: a.movingTimeS,
-    elevationGainM: a.elevationGainM, startLat: a.startLat, startLng: a.startLng, weather: a.weather as Act["weather"],
-  };
-  let story: Story;
-  if (a.type === "WORKOUT" && a._count.exercises > 0) {
-    const ex = await prisma.workoutExercise.findMany({ where: { activityId: a.id }, select: { sets: true, reps: true, loadKg: true } });
-    story = workoutStory({ volumeKg: ex.reduce((s, e) => s + e.sets * e.reps * (e.loadKg ?? 0), 0), exercises: ex.length, sets: ex.reduce((s, e) => s + e.sets, 0) }, self.id);
-  } else {
-    const [user, hist, life] = await Promise.all([
-      prisma.user.findUnique({ where: { id: a.userId }, select: { timezone: true } }),
-      prisma.activity.findMany({ where: { userId: a.userId, id: { not: a.id }, startedAt: { gte: new Date(+a.startedAt - 30 * 864e5), lt: a.startedAt } }, select: { id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true } }),
-      prisma.activity.aggregate({ where: { userId: a.userId, startedAt: { lt: a.startedAt } }, _sum: { distanceM: true } }),
-    ]);
-    // On n'annonce un record que s'il y avait un ancien temps à battre (10 km d'abord, puis 5 km, puis semi).
-    const pr = records.find((r) => r.beaten && r.label);
-    story = activityStory(self, hist, { tz: user?.timezone ?? "Europe/Paris", lifetimeKmBefore: (life._sum.distanceM ?? 0) / 1000, pr: pr?.label ? { label: pr.label } : null });
-  }
-  await prisma.activity.update({ where: { id: a.id }, data: { story: story.text } });
-  return story;
+  const c = await commentForActivity(a.id, records);
+  if (!c) return null;
+  await prisma.activity.update({ where: { id: a.id }, data: { story: c.text } });
+  return { tag: c.kind, text: c.text };
 }
 
 export type ProcessResult = {
@@ -181,7 +165,7 @@ export type ProcessResult = {
 
 /**
  * Traitement commun après chaque création d'activité, quelle que soit la source : doublons, charge d'entraînement, records, badges, anecdote,
- * puis liaison à la prochaine séance du programme RUN actif.
+ * puis liaison à la prochaine séance du programme RUN actif, puis commentaire de séance (qui s'appuie sur cette liaison).
  * Chaque étape est isolée : une erreur est journalisée et renvoyée, jamais levée, pour ne pas bloquer l'import.
  * `hint.points` : trace complète si l'appelant l'a encore en mémoire (plus précise pour les records que la trace compactée en base).
  */
@@ -213,11 +197,12 @@ export async function processActivity(activityId: string, hint?: { points?: Pt[]
     res.badges = await awardBadges(a.userId, user?.timezone ?? "Europe/Paris");
   } catch (e) { fail("badges", e); }
 
-  try { res.story = await writeStory(a, res.records); }
-  catch (e) { fail("anecdote", e); }
-
   try { await linkActivityToPlannedSession(a); }
   catch (e) { fail("programme", e); }
+
+  // Après la liaison au programme : le verdict compare la sortie à la cible de la séance prévue.
+  try { res.story = await writeStory(a, res.records); }
+  catch (e) { fail("anecdote", e); }
 
   return res;
 }

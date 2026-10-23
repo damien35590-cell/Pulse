@@ -4,7 +4,7 @@
  * Usage strictement personnel : Pulse n'est pas diffusée. À corriger librement : c'est ce texte qui fixe la façon de penser du coach.
  * Copie de travail lisible : doc de projet « claude/doctrine-coach-pulse.md ». Version 2 : disponibilités, repos Lafay, séances manquées (questionnaire du 23/10/2026).
  */
-export const DOCTRINE_VERSION = 3;
+export const DOCTRINE_VERSION = 4;
 
 export const DOCTRINE = `
 # Doctrine du coach Pulse
@@ -53,6 +53,6 @@ export const DOCTRINE = `
 - Mieux vaut une séance raccourcie qu'une séance sautée.
 
 ## Façon de parler
-- Tutoiement, ton de coach bienveillant et direct, jamais culpabilisant. Concret et chiffré.
+- Tutoiement, ton de coach sobre, factuel et stoïque ; la valorisation porte sur la régularité et la discipline ; pas d'emoji ni de vocabulaire de cheerleader. Concret et chiffré, jamais culpabilisant.
 - Pas de diagnostic médical : en cas de douleur ou de fatigue anormale persistante, conseiller de lever le pied et de consulter.
 `.trim();

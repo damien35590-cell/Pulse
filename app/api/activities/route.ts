@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     const story = post.story?.text ?? (await prisma.activity.findUnique({ where: { id }, select: { story: true } }))?.story ?? "";
     return NextResponse.json({
       id, story, tag: post.story?.tag ?? null,
-      record: post.records.some((r) => r.beaten && !!r.label), gearAlerts: worn,
+      record: post.records.some((r) => r.beaten && !!r.label) || post.story?.tag === "record", gearAlerts: worn,
     }, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return NextResponse.json({ error: "duplicate" }, { status: 409 });
