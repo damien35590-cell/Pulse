@@ -6,7 +6,8 @@
 import { prisma } from "../prisma";
 import { dayKey, shiftDay, weekKeys } from "../dates";
 import { exerciseKey, type SetDetail } from "../exercises";
-import { lafayCode, musclesOf } from "../muscles";
+import { lafayCode, musclesOf, UPPER_GROUPS } from "../muscles";
+import { LADDERS } from "../workout/catalog";
 
 export type StrengthRow = { activityId: string; startedAt: Date; name: string; sets: number; reps: number; loadKg: number | null; setsDetail: SetDetail[] | null };
 export type StrengthStatus = "progress" | "stall1" | "stall2" | "evolve";
@@ -35,8 +36,6 @@ export type StrengthAnalysis = {
 
 type Det = SetDetail & { isWarmup?: boolean };
 const TARGET = [2, 3] as const;
-/** Haut du corps / bas du corps + abdos, comme l'alternance Lafay du coach (lib/coach/today.ts). */
-const UPPER = new Set(["pectoraux", "dorsaux", "épaules", "biceps", "triceps"]);
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const pct = (a: number, b: number) => Math.round((a / b) * 100);
 
@@ -54,8 +53,7 @@ export function groupKey(name: string) {
 }
 
 /** Échelles Lafay, de la plus facile à la plus difficile. Une variante change l'exercice : le compteur de blocage repart de zéro. */
-const LADDERS: string[][] = [["B1", "B2", "B"], ["C1", "C2", "C3", "C"], ["A1", "A2"], ["A3", "A4", "A5", "A6"]];
-const nextVariant = (v: string | null) => { for (const l of LADDERS) { const i = l.indexOf(v ?? ""); if (i >= 0) return l[i + 1] ?? null; } return null; };
+export const nextVariant = (v: string | null) => { for (const l of LADDERS) { const i = l.indexOf(v ?? ""); if (i >= 0) return l[i + 1] ?? null; } return null; };
 /** « B2 » ; « B » seul quand la lettre est la forme finale d'une échelle ; null pour les autres exercices. */
 export const variantOf = (name: string) => {
   const c = lafayCode(name);
@@ -64,12 +62,12 @@ export const variantOf = (name: string) => {
   return LADDERS.some((l) => l.includes(v)) ? v : null;
 };
 /** Plafond de répétitions par série : 12, ou 20 pour F (squat sauté). */
-const isJump = (name: string) => lafayCode(name)?.letter === "f" || /squat.*saut/i.test(name);
-const capOf = (name: string) => (isJump(name) ? 20 : 12);
+export const isJump = (name: string) => lafayCode(name)?.letter === "f" || /squat.*saut/i.test(name);
+export const capOf = (name: string) => (isJump(name) ? 20 : 12);
 
 /** Une séance d'un exercice dans une variante : total de reps, cible N, toutes les séries à la cible ou plus. */
-type Entry = { variant: string | null; total: number; n: number; sets: number; met: boolean };
-function entriesOf(list: StrengthRow[]): Entry[] {
+export type Entry = { variant: string | null; total: number; n: number; sets: number; met: boolean };
+export function entriesOf(list: StrengthRow[]): Entry[] {
   const out: (Entry & { id: string })[] = [];
   for (const r of list) { // du plus récent au plus ancien
     const d = doneSets(r), variant = variantOf(r.name);
@@ -80,7 +78,7 @@ function entriesOf(list: StrengthRow[]): Entry[] {
   return out;
 }
 /** Progrès = total supérieur à la séance précédente de la même variante, ou toutes les séries à la cible. Première séance d'une variante : progrès. */
-function stallsOf(entries: Entry[]): number {
+export function stallsOf(entries: Entry[]): number {
   const run: Entry[] = []; // séances consécutives de la variante actuelle
   for (const e of entries) { if (e.variant !== entries[0].variant) break; run.push(e); }
   let n = 0;
@@ -91,7 +89,7 @@ function stallsOf(entries: Entry[]): number {
   }
   return n;
 }
-function advice(e: Entry, name: string): { hint: string; next: string | null; restart: number } {
+export function advice(e: Entry, name: string): { hint: string; next: string | null; restart: number } {
   const restart = Math.round(e.n * 0.7), next = nextVariant(e.variant);
   if (isJump(name) && e.n >= capOf(name)) return { hint: "saute plus haut", next: null, restart };
   return { hint: next ? `passe à ${next} à ${e.sets}×${restart}` : `repars à ${e.sets}×${restart} sur ${e.variant ?? "le même exercice"}`, next, restart };
@@ -142,7 +140,7 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
   let up = 0, low = 0;
   for (const r of inPeriod) {
     const best = [...musclesOf(r.name)].sort((a, b) => b[1] - a[1])[0];
-    if (best) (UPPER.has(best[0]) ? (up += doneSets(r).length) : (low += doneSets(r).length));
+    if (best) (UPPER_GROUPS.has(best[0]) ? (up += doneSets(r).length) : (low += doneSets(r).length));
   }
   const regularity = {
     perWeek: counted.reduce((s, w) => s + w.ids.size, 0) / counted.length, target: TARGET,

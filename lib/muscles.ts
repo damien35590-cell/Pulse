@@ -1,6 +1,8 @@
 export const GROUPS = ["pectoraux", "dorsaux", "épaules", "biceps", "triceps", "abdominaux", "quadriceps", "ischio-jambiers", "mollets"] as const;
 export type Group = (typeof GROUPS)[number];
 export type MuscleLoad = { tonnage: number; sets: number };
+/** Groupes du haut du corps ; les autres (jambes, abdominaux) forment « bas + abdos », comme l'alternance Lafay du coach. */
+export const UPPER_GROUPS: ReadonlySet<Group> = new Set<Group>(["pectoraux", "dorsaux", "épaules", "biceps", "triceps"]);
 
 /** Premier motif qui correspond gagne : (muscle, part de la charge). Le nom d'exercice est du texte libre, d'où ce dictionnaire. */
 const RULES: [RegExp, [Group, number][]][] = [

@@ -13,6 +13,7 @@ import { daysAgo, exerciseKey, suggestExercises, type ExerciseHistory } from "@/
 import { describe, suggestGoal } from "@/lib/progression";
 import { suggestCatalog } from "@/lib/training/match-exercise";
 import { EQUIPMENT_LABELS } from "@/lib/training/catalog/exercises";
+import { NewSessionButton } from "@/components/workout/new-session-sheet";
 
 const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
 const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
@@ -97,7 +98,7 @@ export default function RecordPage() {
       </div>
 
       {workout && (
-        <Link href="/record/session" onClick={() => tap(12)} className="flex min-h-14 w-full items-center justify-center rounded-xl bg-brand font-display text-lg font-semibold text-brand-ink">Mode séance plein écran</Link>
+        <NewSessionButton />
       )}
 
       {workout && (

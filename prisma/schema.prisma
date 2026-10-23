@@ -66,6 +66,12 @@ enum RaceStatus {
   DNS
   DNF
 }
+/// Moitié du corps travaillée par une séance de muscu (alternance Lafay) ; LIBRE = mélangée ou inconnue.
+enum WorkoutKind {
+  HAUT
+  BAS
+  LIBRE
+}
 
 // ───────── Auth (NextAuth + PrismaAdapter) ─────────
 model User {
@@ -94,6 +100,8 @@ model User {
   records    PersonalRecord[]
   badges     UserBadge[]
   gear       Gear[]
+
+  workoutTemplates WorkoutTemplate[]
 
   // Programmes v2
   programs        Program[]
@@ -181,10 +189,13 @@ model Activity {
   rpe            Int?                    // effort ressenti 1-10 (échelle de Borg CR-10)
   load           Float?                  // charge d'entraînement calculée (lib/load.ts), en points type TSS
   loadSource     String?                 // "power" | "hr" | "rpe" | "estimate"
+  kind           WorkoutKind?            // muscu : moitié du corps travaillée (null = séance d'avant ce champ, déduite des exercices)
+  templateId     String?                 // muscu : modèle dont la séance est partie
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template  WorkoutTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   photos    ActivityPhoto[]
   exercises WorkoutExercise[]
   stream    ActivityStream?
@@ -297,6 +308,40 @@ model WorkoutExercise {
 
   @@index([activityId, position])
   @@index([exerciseId])
+}
+
+/// Modèle de séance de muscu : la structure seulement (exercices, séries, repos), jamais les performances.
+/// Les deux modèles intégrés (« Haut du corps », « Bas + abdos ») sont créés pour chaque utilisateur (lib/workout/builtin.ts).
+model WorkoutTemplate {
+  id        String      @id @default(cuid())
+  userId    String
+  name      String
+  kind      WorkoutKind @default(LIBRE)
+  isBuiltIn Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises  WorkoutTemplateExercise[]
+  activities Activity[]
+
+  @@unique([userId, name])
+}
+
+model WorkoutTemplateExercise {
+  id           String  @id @default(cuid())
+  templateId   String
+  order        Int
+  exerciseCode String  // code Lafay en majuscule (« B ») ; pour un exercice libre, son nom
+  variant      String? // « B2 » ; null hors échelle Lafay
+  sets         Int
+  targetReps   Int
+  restSec      Int     // entre deux séries
+  restAfterSec Int     // avant l'exercice suivant
+  loadKg       Float?
+  note         String?
+  template WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, order])
 }
 
 // ───────── Séries complètes à 1 Hz (puissance, cardio, cadence) : courbe de puissance, zones, intervalles ─────────

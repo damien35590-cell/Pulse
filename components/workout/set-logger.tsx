@@ -8,6 +8,7 @@ import { fmtClock, fmtNum } from "@/lib/format";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { BottomSheet, ConfirmSheet } from "@/components/ui/bottom-sheet";
 import { Metric } from "@/components/ui/metric";
+import { Switch } from "@/components/ui/switch";
 
 export type LiftSet = { reps: number; kg: number };
 export type LiftExercise = {
@@ -17,7 +18,10 @@ export type LiftExercise = {
   kg: number;
   /** Pas du stepper de charge : 2 kg (paire d'haltères), 2,5 kg (barre), 1 kg… */
   step: number;
+  /** Repos entre deux séries. */
   restS: number;
+  /** Repos avant l'exercice suivant (par défaut restS). */
+  restAfterS?: number;
   /** Poids du corps : kg = lest (0 = PDC). */
   bodyweight?: boolean;
   /** Séance précédente, série par série. */
@@ -31,7 +35,15 @@ type Props = {
   exercises: LiftExercise[];
   startedAt?: number;
   onExit: () => void;
-  onSave?: (exercises: LiftExercise[]) => void;
+  /**
+   * Enregistre la séance. Si fournie, c'est elle qui termine (navigation comprise) ; une erreur levée garde la feuille ouverte.
+   * Sans elle, « Enregistrer » quitte simplement.
+   */
+  onSave?: (exercises: LiftExercise[], opts: { templateName?: string }) => Promise<void> | void;
+  /** Appelé à chaque série validée ou corrigée : de quoi reprendre la séance après un appel ou un rafraîchissement. */
+  onChange?: (exercises: LiftExercise[]) => void;
+  /** Nom proposé pour « Enregistrer comme modèle » ; sans lui, l'option n'apparaît pas. */
+  templateName?: string;
 };
 
 const fr = (v: number) => fmtNum(v, 2);
@@ -54,7 +66,7 @@ function useNow(active = true) {
  * - La série est pré-remplie (dernière série faite, sinon l'objectif) : la plupart du temps, 1 seul tap suffit.
  * - Retour immédiat : vibration + bouton qui passe au vert + coche qui « pop » dans le tableau, puis repos.
  */
-export function SetLogger({ title, program, exercises, startedAt, onExit, onSave }: Props) {
+export function SetLogger({ title, program, exercises, startedAt, onExit, onSave, onChange, templateName }: Props) {
   const [exs, setExs] = useState(() => exercises.map((e) => ({ ...e, done: [...e.done] })));
   const [idx, setIdx] = useState(() => Math.max(0, exercises.findIndex((e) => e.done.length < e.sets)));
   const [edit, setEdit] = useState<number | null>(null); // série déjà faite en cours de correction
@@ -63,6 +75,10 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
   const [rest, setRest] = useState<{ endsAt: number; total: number; next: string } | null>(null);
   const [quit, setQuit] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [tplOn, setTplOn] = useState(false);
+  const [tplName, setTplName] = useState(templateName ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState("");
   const start = useRef(startedAt ?? Date.now());
   const now = useNow();
 
@@ -72,8 +88,10 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
   const totalSets = exs.reduce((s, e) => s + e.sets, 0);
   const doneSets = exs.reduce((s, e) => s + e.done.length, 0);
   const volume = exs.reduce((s, e) => s + e.done.reduce((v, d) => v + d.reps * d.kg, 0), 0);
-  const prevBest = Math.max(...ex.prev.map((p) => p.kg));
-  const gain = ex.bodyweight ? 0 : ex.kg - prevBest;
+  const gain = ex.bodyweight || !ex.prev.length ? 0 : ex.kg - Math.max(...ex.prev.map((p) => p.kg));
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => { onChangeRef.current?.(exs); }, [exs]);
 
   // Pré-remplissage : dernière série faite, sinon l'objectif.
   useEffect(() => {
@@ -110,8 +128,23 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
       if (nextIdx < 0) { celebrate(); setFinished(true); return; }
       if (nextIdx !== idx) setIdx(nextIdx);
       const t = next[nextIdx];
-      if (cur.restS > 0) setRest({ endsAt: Date.now() + cur.restS * 1000, total: cur.restS * 1000, next: `${t.name} · série ${t.done.length + 1}/${t.sets}` });
+      // Dernière série de l'exercice : repos « après exercice » ; sinon repos entre séries.
+      const restS = nextIdx !== idx ? cur.restAfterS ?? cur.restS : cur.restS;
+      if (restS > 0) setRest({ endsAt: Date.now() + restS * 1000, total: restS * 1000, next: `${t.name} · série ${t.done.length + 1}/${t.sets}` });
     }, 600);
+  }
+
+  async function save() {
+    if (saving) return;
+    if (!onSave) return onExit();
+    setSaving(true);
+    setSaveErr("");
+    try {
+      await onSave(exs, { templateName: tplOn ? tplName.trim() || templateName : undefined });
+    } catch (e) {
+      setSaveErr(e instanceof Error && e.message ? e.message : "Impossible d’enregistrer. Tes séries sont conservées : réessaie.");
+    }
+    setSaving(false);
   }
 
   const elapsed = Math.max(0, Math.round((now - start.current) / 1000));
@@ -285,9 +318,28 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
           <Metric size="lg" label="Séries" value={doneSets} unit={`/ ${totalSets}`} />
           <Metric size="lg" label="Volume" value={fmtNum(volume / 1000, 1)} unit="t" />
         </dl>
+        {templateName !== undefined && (
+          <div className="mt-4">
+            <Switch checked={tplOn} onChange={setTplOn} label="Enregistrer comme modèle" description="Exercices, séries et repos, sans tes performances." />
+            {tplOn && (
+              <label className="mt-2 block">
+                <span className={ui.label}>Nom du modèle</span>
+                <input
+                  value={tplName}
+                  onChange={(e) => setTplName(e.target.value)}
+                  maxLength={60}
+                  autoComplete="off"
+                  enterKeyHint="done"
+                  className="mt-1 h-14 w-full rounded-tile bg-surface px-4 text-base font-semibold text-ink caret-brand outline-none ring-1 ring-inset ring-line focus:ring-brand"
+                />
+              </label>
+            )}
+          </div>
+        )}
+        {saveErr && <p role="alert" className="mt-3 text-sm font-medium text-bad">{saveErr}</p>}
         <div className="mt-6 grid gap-2">
-          <button type="button" onClick={() => { onSave?.(exs); onExit(); }} className={cn(ui.btnPrimary, "w-full")}>Enregistrer la séance</button>
-          <button type="button" onClick={() => setFinished(false)} className={cn(ui.btnSecondary, "w-full bg-surface-3")}>Revenir à la séance</button>
+          <button type="button" disabled={saving} onClick={save} className={cn(ui.btnPrimary, "w-full")}>{saving ? "Enregistrement…" : "Enregistrer la séance"}</button>
+          <button type="button" disabled={saving} onClick={() => setFinished(false)} className={cn(ui.btnSecondary, "w-full bg-surface-3")}>Revenir à la séance</button>
         </div>
       </BottomSheet>
     </div>

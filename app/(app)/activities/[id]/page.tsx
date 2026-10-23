@@ -21,6 +21,7 @@ import { FeelNote } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
 import { EditableTitle } from "@/components/activity/editable-title";
 import { GearPicker } from "@/components/gear/gear-picker";
+import { SaveTemplateButton } from "@/components/workout/save-template";
 import { getGear } from "@/lib/data/gear";
 import { selectableGear } from "@/lib/gear";
 
@@ -133,6 +134,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
               </li>
             ))}
           </ul>
+          {a.type === "WORKOUT" && <div className="mt-3"><SaveTemplateButton activityId={a.id} defaultName={a.title} /></div>}
         </section>
       )}
       

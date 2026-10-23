@@ -75,7 +75,10 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `TraceChart` | `components/activity/trace-chart.tsx` | courbe au doigt (FC, altitude, puissance), bandes de zones |
 | `ZoneBar` | `components/activity/zone-bar.tsx` | temps par zone (`compact` pour une carte) |
 | `Splits` | `components/activity/splits.tsx` | allure par km |
-| `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours |
+| `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours (repos entre séries et après exercice, `onSave` asynchrone, option « Enregistrer comme modèle ») |
+| `NewSessionSheet`, `NewSessionButton` | `components/workout/new-session-sheet.tsx` | démarrer une séance : suggestion du jour (seule carte `bg-brand` de l'écran), refaire une séance, modèles, séance vide |
+| `PrepScreen` | `components/workout/prep-screen.tsx` | préparer la séance : réordonner (flèches 48 px), modifier, retirer, ajouter ; « Démarrer » en `h-16` |
+| `SessionFlow` | `components/workout/session-flow.tsx` | parcours `/record/session` : feuille → préparation → SetLogger → enregistrement ; reprise de la séance en cours |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
 | `RouteCard` | `components/routes/route-card.tsx` | boucle proposée (Itinéraires) : nom, temps / km / D+, vignette, phrase « pourquoi » |
 | `WeatherBanner`, `WeatherAlerts`, `WeatherCredit` | `components/routes/weather.tsx` | météo d'une sortie (ressenti, pluie, vent fléché, coucher), alertes en `warn` / `bad`, crédit Open-Meteo obligatoire (CC BY 4.0) |

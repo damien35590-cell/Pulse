@@ -8,6 +8,7 @@ import { fetchWeather } from "@/lib/weather";
 import { autoGearIds, gearAlerts, ownGearIds } from "@/lib/data/gear";
 import { processActivity } from "@/lib/pipeline/post-import";
 import { exactExerciseIds } from "@/lib/data/exercises-catalog";
+import { kindOfNames } from "@/lib/workout/kind";
 
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
@@ -43,6 +44,9 @@ export async function POST(req: Request) {
     const ids = await exactExerciseIds(uid, exercises.map((e: { name: string }) => e.name)).catch(() => new Map<string, string>());
     for (const e of exercises as { name: string; exerciseId?: string }[]) e.exerciseId = ids.get(e.name);
   }
+  // Muscu : type de séance (haut / bas) et modèle d'origine. Le type est déduit des exercices quand le client ne le donne pas.
+  const kind = !isWorkout ? null : ["HAUT", "BAS", "LIBRE"].includes(b.kind) ? (b.kind as "HAUT" | "BAS" | "LIBRE") : kindOfNames(exercises.map((e: { name: string }) => e.name));
+  const templateId = isWorkout && typeof b.templateId === "string" && (await prisma.workoutTemplate.findFirst({ where: { id: b.templateId, userId: uid }, select: { id: true } })) ? (b.templateId as string) : null;
   const rpe = Number.isInteger(b.rpe) && b.rpe >= 1 && b.rpe <= 10 ? (b.rpe as number) : null;
 
   const pts: Pt[] = Array.isArray(b.trackPoints) ? b.trackPoints.slice(0, 20000) : [];
@@ -57,7 +61,7 @@ export async function POST(req: Request) {
   try {
     const a = await prisma.activity.create({
       data: {
-        userId: uid, type: b.type, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
+        userId: uid, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
         distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined,
         exercises: exercises.length ? { create: exercises } : undefined,
