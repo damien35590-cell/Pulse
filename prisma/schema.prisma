@@ -111,6 +111,7 @@ model User {
 
   // Coach IA (page Analyse)
   coachDebriefs CoachDebrief[]
+  coachChats    CoachChat[]
 }
 
 model Account {
@@ -899,4 +900,31 @@ model CoachDebrief {
 
   @@unique([userId, scope, periodKey])
   @@index([userId, updatedAt])
+}
+
+/// Conversation avec le coach IA (écran /coach). Seule la plus récente est affichée ; « Nouvelle conversation » en ouvre une autre.
+model CoachChat {
+  id        String         @id @default(cuid())
+  userId    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages CoachMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model CoachMessage {
+  id           String   @id @default(cuid())
+  chatId       String
+  role         String   // "user" | "assistant"
+  content      String
+  model        String?
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  cachedTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+  chat CoachChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
 }

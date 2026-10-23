@@ -1,6 +1,7 @@
 "use client";
+import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Loader2, RotateCw, Sparkles } from "lucide-react";
+import { Loader2, MessageCircle, RotateCw, Sparkles } from "lucide-react";
 import { Section } from "@/components/ui/section";
 import { generateDebrief } from "@/app/(app)/analysis/actions";
 import type { DebriefView } from "@/lib/coach/store";
@@ -61,6 +62,9 @@ export function AiDebrief({ params, initial, configured }: { params: { w: string
           </div>
         )}
         {error && <p role="alert" className="mt-3 text-sm text-bad">{error}</p>}
+        <Link href="/coach" className="-mb-2 mt-2 flex min-h-12 items-center gap-2 text-sm font-semibold text-brand active:opacity-60">
+          <MessageCircle className="size-4" aria-hidden />Poser une question au coach
+        </Link>
       </div>
     </Section>
   );
