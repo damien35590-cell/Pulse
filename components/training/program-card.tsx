@@ -5,6 +5,7 @@ import { fmtDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
+import { SessionCarousel } from "./session-carousel";
 
 /** « Bloc 1 · Semaine 2/4 — Base » */
 export const weekLabel = (p: RunProgramView) =>
@@ -52,6 +53,34 @@ export function NextSession({ s, paused }: { s: SessionView; paused?: boolean })
   );
 }
 
+/** Séances encore à faire après la prochaine, dans l'ordre du programme (au plus `max`). */
+function upcomingAfter(p: RunProgramView, max = 5) {
+  if (!p.next) return [];
+  const all = p.weeks.flatMap((w) => w.sessions).filter((s) => s.status === "PLANNED" && s.id !== p.next!.id);
+  const from = (s: SessionView) => s.weekNumber * 100 + s.orderInWeek;
+  const start = from(p.next);
+  return all.filter((s) => from(s) > start).sort((a, b) => from(a) - from(b)).slice(0, max);
+}
+
+/** « Cette semaine », « Semaine prochaine », « Semaine 5 ». */
+const whenLabel = (week: number, current: number) =>
+  week === current ? "Cette semaine" : week === current + 1 ? "Semaine prochaine" : `Semaine ${week}`;
+
+/** Aperçu d'une séance à venir (diapo du carrousel) : lecture seule, les actions restent sur la prochaine. */
+function UpcomingSlide({ s, current }: { s: SessionView; current: number }) {
+  return (
+    <div className="flex h-full flex-col rounded-tile bg-surface-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-label uppercase text-ink-mute">Ensuite · {whenLabel(s.weekNumber, current)}</p>
+        {s.isKeySession && <KeyBadge />}
+      </div>
+      <p className="mt-1.5 text-xl font-bold leading-tight tracking-tight">{s.title}</p>
+      <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">≈ {fmtDuration(s.durationS)}</p>
+      {s.summary && <p className="mt-1.5 line-clamp-3 text-sm leading-snug text-ink-soft">{s.summary}</p>}
+    </div>
+  );
+}
+
 /** Carte « Programme course » en tête de l'accueil : la prochaine séance en grand, un seul bouton principal. */
 export function ProgramCard({ p }: { p: RunProgramView }) {
   const week = p.weeks.find((w) => w.number === p.current.number);
@@ -69,12 +98,15 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
           <PauseToggle id={p.id} paused full />
         </div>
       ) : n ? (
-        <>
-          <h2 className="relative mt-1.5 text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
-          <p className="relative mt-1 font-num text-base tabular-nums text-ink-soft">≈ {fmtDuration(n.durationS)}{n.isKeySession ? " · séance clé" : ""}</p>
-          {n.summary && <p className="relative mt-2 text-[15px] leading-snug text-ink-soft">{n.summary}</p>}
-          <div className="relative mt-5"><SessionActions id={n.id} variant="card" /></div>
-        </>
+        <SessionCarousel className="relative mt-1.5">
+          <div>
+            <h2 className="text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
+            <p className="mt-1 font-num text-base tabular-nums text-ink-soft">≈ {fmtDuration(n.durationS)}{n.isKeySession ? " · séance clé" : ""}</p>
+            {n.summary && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{n.summary}</p>}
+            <div className="mt-5"><SessionActions id={n.id} variant="card" /></div>
+          </div>
+          {upcomingAfter(p).map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
+        </SessionCarousel>
       ) : (
         <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>
       )}
