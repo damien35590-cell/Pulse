@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { addGoal, deleteGoal } from "@/app/actions";
+import { addGoal } from "@/app/actions";
+import { GoalEdit } from "@/components/goals/goal-edit";
 import { goalProgress, METRICS, PERIODS, type Metric, type Period } from "@/lib/goals";
 import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { fmtNum } from "@/lib/format";
@@ -19,6 +20,7 @@ export default async function GoalsPage() {
     prisma.goal.findMany({ where: { userId: s.user.id, active: true }, orderBy: { createdAt: "asc" } }),
     prisma.activity.findMany({ where: { userId: s.user.id, startedAt: { gte: new Date(+now - 400 * 864e5) } }, select: { startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, type: true } }),
   ]);
+  const sports = MY_SPORTS.map((k) => ({ key: k, label: SPORTS[k].label }));
   return (
     <div className="space-y-5">
       <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
@@ -29,7 +31,7 @@ export default async function GoalsPage() {
         return (
           <section key={g.id} className="rounded-xl border border-line bg-surface p-4">
             <div className="flex items-start justify-between gap-2"><h2 className="font-bold">{m.label}, {g.type ? SPORTS[g.type].label.toLowerCase() : "tous sports"}, {PERIODS[g.period as Period]}</h2>
-              <form action={deleteGoal.bind(null, g.id)}><button className="min-h-11 px-2 text-sm text-ink-soft">Retirer</button></form></div>
+              <GoalEdit g={{ id: g.id, metric: g.metric as Metric, period: g.period as Period, type: g.type, target: g.target }} sports={sports} /></div>
             <div className="mt-1 flex items-baseline justify-between"><p className="font-display text-3xl font-bold tabular-nums">{fmtNum(p.value)} <span className="text-base font-medium text-ink-soft">/ {fmtNum(p.target, 0)} {u}</span></p><p className="font-display text-2xl font-bold">{Math.round(p.pct)} %</p></div>
             <div className="relative my-3 h-2.5 rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(p.pct)} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-brand" style={{ width: `${p.pct}%` }} /><span className="absolute -bottom-1 -top-1 w-0.5 bg-ink-soft" style={{ left: `${Math.min(100, p.elapsed * 100)}%` }} />
