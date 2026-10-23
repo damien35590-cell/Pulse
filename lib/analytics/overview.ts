@@ -12,6 +12,7 @@ import { isCommute } from "../routes/estimate";
 import { getStrengthAnalysis } from "./strength";
 import { getCyclingAnalysis } from "./cycling";
 import { getHikingAnalysis } from "./hiking";
+import { overviewNotes, type CoachNote, type PlanAdherence } from "./coach-notes";
 
 export type SportGroup = "WORKOUT" | "RUN" | "RIDE" | "HIKE" | "OTHER";
 export const GROUPS: readonly SportGroup[] = ["WORKOUT", "RUN", "RIDE", "HIKE", "OTHER"];
@@ -90,15 +91,17 @@ export function buildOverview(input: { acts: OverviewAct[]; insights: SportInsig
   };
 }
 
-export async function getOverview(userId: string, tz: string, weeks: number, now = new Date()): Promise<OverviewAnalysis> {
+/** `current` : la période se termine aujourd'hui ; `plans` : suivi des programmes, pour « Le mot du coach ». */
+export async function getOverview(userId: string, tz: string, weeks: number, now = new Date(), opts: { current?: boolean; plans?: PlanAdherence[] } = {}): Promise<OverviewAnalysis & { notes: CoachNote[] }> {
   const [acts, strength, cycling, hiking] = await Promise.all([
     prisma.activity.findMany({
-      where: { userId, startedAt: { gte: new Date(+now - HISTORY_DAYS * 864e5), lte: now } },
+      where: { userId, startedAt: { gte: new Date(+now - Math.max(HISTORY_DAYS, 14 * weeks + 84) * 864e5), lte: now } },
       select: { type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, load: true },
     }),
     getStrengthAnalysis(userId, tz, weeks, now),
     getCyclingAnalysis(userId, tz, weeks, now, false), // sans les séries 1 Hz : seules les phrases servent ici
     getHikingAnalysis(userId, tz, weeks, now),
   ]);
-  return buildOverview({ acts, insights: { WORKOUT: strength.insights, RIDE: cycling.insights, HIKE: hiking.insights }, weeks, tz, now });
+  const data = buildOverview({ acts, insights: { WORKOUT: strength.insights, RIDE: cycling.insights, HIKE: hiking.insights }, weeks, tz, now });
+  return { ...data, notes: overviewNotes({ acts, period: { weeks, tz, now, current: opts.current ?? true }, plans: opts.plans }) };
 }

@@ -29,6 +29,8 @@ export type StrengthAnalysis = {
   exercises: ExerciseProgress[];
   regularity: { perWeek: number; target: readonly [number, number]; upperPct: number | null; lowerPct: number | null };
   insights: string[];
+  /** Période précédente de même durée (null si l'historique chargé ne la couvre pas). */
+  prev: { sessions: number; reps: number } | null;
 };
 
 type Det = SetDetail & { isWarmup?: boolean };
@@ -99,6 +101,7 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
   const mon = weekKeys(now, tz)[0], first = shiftDay(mon, -7 * (weeks - 1));
   const weekOf = (d: Date) => Math.floor((Date.parse(dayKey(d, tz)) - Date.parse(first)) / (7 * 864e5)); // < 0 avant la période
   const inPeriod = rows.filter((r) => weekOf(r.startedAt) >= 0 && doneSets(r).length > 0);
+  const inPrev = rows.filter((r) => { const w = weekOf(r.startedAt); return w >= -weeks && w < 0 && doneSets(r).length > 0; });
   const sorted = [...rows].sort((a, b) => +b.startedAt - +a.startedAt);
 
   // 1. Résumé
@@ -150,6 +153,7 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
     empty: inPeriod.length === 0, summary,
     weekly: weekly.map((w) => ({ weekStart: w.weekStart, reps: w.reps, sets: w.sets, sessions: w.ids.size })),
     exercises, regularity, insights: insightsOf(rows, exercises, weekOf, weeks, tz),
+    prev: inPrev.length ? { sessions: new Set(inPrev.map((r) => r.activityId)).size, reps: inPrev.reduce((s, r) => s + sumReps(doneSets(r)), 0) } : null,
   };
 }
 
@@ -186,8 +190,8 @@ function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: 
 const exerciseLabel = (k: string, name: string) => (k.startsWith("lafay:") ? name.trim().replace(/\s*[-–:.].*$/, "").toUpperCase() : name);
 
 export async function getStrengthAnalysis(userId: string, tz: string, weeks: number, now = new Date()): Promise<StrengthAnalysis> {
-  // Au moins 8 semaines d'historique : la comparaison « 4 semaines contre 4 semaines » en a besoin, même sur une période de 4
-  const since = new Date(Date.parse(shiftDay(weekKeys(now, tz)[0], -7 * (Math.max(weeks, 8) - 1))) - 864e5);
+  // Deux périodes (comparaison avec la précédente), et au moins 8 semaines : la comparaison « 4 semaines contre 4 semaines » en a besoin
+  const since = new Date(Date.parse(shiftDay(weekKeys(now, tz)[0], -7 * (Math.max(2 * weeks, 8) - 1))) - 864e5);
   const found = await prisma.workoutExercise.findMany({
     where: { activity: { userId, type: "WORKOUT", startedAt: { gte: since, lte: now } } },
     select: { activityId: true, name: true, sets: true, reps: true, loadKg: true, setsDetail: true, activity: { select: { startedAt: true } } },
