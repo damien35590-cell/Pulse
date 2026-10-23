@@ -85,6 +85,14 @@ function UpcomingSlide({ s, current }: { s: SessionView; current: number }) {
 export function ProgramCard({ p }: { p: RunProgramView }) {
   const week = p.weeks.find((w) => w.number === p.current.number);
   const paused = p.status === "PAUSED", msg = cheer(p.weekDone, p.sessionsPerWeek), n = p.next;
+  const next = upcomingAfter(p);
+  const vma = p.pendingTest ? <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div> : null;
+  const foot = (
+    <>
+      <p className="truncate text-xs text-ink-mute">{weekLabel(p)}</p>
+      {msg && <p className="mt-0.5 text-xs font-semibold text-brand">{msg}</p>}
+    </>
+  );
   return (
     <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4")}>
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/[0.07] blur-3xl" />
@@ -98,29 +106,37 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
           <PauseToggle id={p.id} paused full />
         </div>
       ) : n ? (
-        <SessionCarousel className="relative mt-1.5">
+        <SessionCarousel
+          className="relative mt-1.5"
+          slideIds={[n.id, ...next.map((s) => s.id)]}
+          week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
+          between={vma}
+          footer={foot}
+          count={`${p.weekDone}/${p.sessionsPerWeek}`}
+        >
           <div>
             <h2 className="text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
             <p className="mt-1 font-num text-base tabular-nums text-ink-soft">≈ {fmtDuration(n.durationS)}{n.isKeySession ? " · séance clé" : ""}</p>
             {n.summary && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{n.summary}</p>}
             <div className="mt-5"><SessionActions id={n.id} variant="card" /></div>
           </div>
-          {upcomingAfter(p).map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
+          {next.map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
         </SessionCarousel>
       ) : (
         <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>
       )}
-      {p.pendingTest && <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div>}
-      <div className="relative mt-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-xs text-ink-mute">{weekLabel(p)}</p>
-          {msg && <p className="mt-0.5 text-xs font-semibold text-brand">{msg}</p>}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {week && <WeekDots sessions={week.sessions} />}
-          <p className="font-num text-sm tabular-nums text-ink-soft">{p.weekDone}/{p.sessionsPerWeek}</p>
-        </div>
-      </div>
+      {(paused || !n) && (
+        <>
+          {vma}
+          <div className="relative mt-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">{foot}</div>
+            <div className="flex shrink-0 items-center gap-3">
+              {week && <WeekDots sessions={week.sessions} />}
+              <p className="font-num text-sm tabular-nums text-ink-soft">{p.weekDone}/{p.sessionsPerWeek}</p>
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

@@ -2,28 +2,49 @@
 
 import { Children, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { tap } from "@/lib/haptics";
+
+type Dot = { id: string; title: string; status: string };
 
 /**
  * Carrousel au doigt des séances du programme : la prochaine d'abord, les suivantes en glissant.
- * Chaque diapo laisse à peine dépasser la suivante (≈ 12 px) pour suggérer le swipe ; les points suivent la position.
+ * La séance suivante dépasse à peine (≈ 12 px) pour suggérer le swipe.
+ * Les points de la semaine (en bas à droite) servent aussi d'indicateur : celui de la séance affichée porte l'anneau,
+ * et toucher un point à faire amène le carrousel sur cette séance.
  */
-export function SessionCarousel({ children, className }: { children: ReactNode; className?: string }) {
+export function SessionCarousel({ children, slideIds, week, between, footer, count, className }: {
+  children: ReactNode;
+  /** Id de la séance de chaque diapo, dans l'ordre. */
+  slideIds: string[];
+  /** Séances de la semaine en cours (points). */
+  week: Dot[];
+  /** Contenu entre le carrousel et le pied (ex. invitation au test VMA). */
+  between?: ReactNode;
+  /** Pied à gauche : semaine du programme, encouragement. */
+  footer: ReactNode;
+  /** « 1/3 » */
+  count: string;
+  className?: string;
+}) {
   const slides = Children.toArray(children);
   const track = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const shownId = slideIds[active];
 
   const onScroll = () => {
     const el = track.current;
     if (!el) return;
-    const w = (el.firstElementChild as HTMLElement | null)?.offsetWidth ?? el.clientWidth;
+    const w = ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? el.clientWidth) + 12; // + gap-3
     setActive(Math.min(slides.length - 1, Math.round(el.scrollLeft / Math.max(1, w))));
   };
-  const goTo = (i: number) => {
-    const el = track.current?.children[i] as HTMLElement | undefined;
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+  const goTo = (id: string) => {
+    const i = slideIds.indexOf(id);
+    const el = track.current, slide = el?.children[i] as HTMLElement | undefined;
+    if (!el || !slide) return;
+    tap();
+    el.scrollTo({ left: slide.offsetLeft - el.offsetLeft - 16, behavior: "smooth" });
   };
 
-  if (slides.length <= 1) return <div className={className}>{slides}</div>;
   return (
     <div className={className}>
       <div
@@ -46,16 +67,35 @@ export function SessionCarousel({ children, className }: { children: ReactNode; 
           </div>
         ))}
       </div>
-      <div className="mt-2.5 flex justify-center gap-1" aria-hidden>
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            tabIndex={-1}
-            onClick={() => goTo(i)}
-            className={cn("h-1 rounded-full transition-all duration-200", i === active ? "w-3 bg-ink-mute" : "w-1 bg-ink-mute/30")}
-          />
-        ))}
+
+      {between}
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">{footer}</div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ol className="-my-2 flex items-center" aria-label="Séances de la semaine">
+            {week.map((s) => {
+              const canGo = slideIds.includes(s.id), shown = s.id === shownId;
+              const state = s.status === "COMPLETED" ? "faite" : s.status === "SKIPPED" ? "passée" : "à faire";
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    disabled={!canGo}
+                    onClick={() => goTo(s.id)}
+                    aria-label={`${s.title} : ${state}${canGo ? ", afficher" : ""}`}
+                    aria-current={shown || undefined}
+                    className="grid size-7 place-items-center rounded-full disabled:cursor-default"
+                  >
+                    <span className={cn("size-3 rounded-full transition-colors duration-200",
+                      s.status === "COMPLETED" ? "bg-brand" : s.status === "SKIPPED" ? "bg-line" : shown ? "border-2 border-brand" : "border-2 border-line")} />
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="font-num text-sm tabular-nums text-ink-soft">{count}</p>
+        </div>
       </div>
     </div>
   );
