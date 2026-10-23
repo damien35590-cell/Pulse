@@ -38,6 +38,20 @@ export async function acknowledgeBadge(key: string): Promise<Res> {
   return { ok: true };
 }
 
+/** Modifie un objectif en place (mesure, sport, période, cible) : plus besoin de le retirer pour le recréer. */
+export async function updateGoal(id: string, fd: FormData): Promise<Res> {
+  const userId = await uid();
+  const metric = String(fd.get("metric")), period = String(fd.get("period")), type = String(fd.get("type")), t = parseFloat(String(fd.get("target")).replace(",", "."));
+  if (!(metric in METRICS) || !(period in PERIODS)) return { ok: false, error: "Objectif invalide." };
+  if (!(t > 0)) return { ok: false, error: "Donne une cible supérieure à zéro." };
+  const r = await prisma.goal.updateMany({
+    where: { id, userId },
+    data: { metric: metric as GoalMetric, period: period as GoalPeriod, type: MY.includes(type) ? (type as ActivityType) : null, target: t * METRICS[metric as keyof typeof METRICS].base },
+  });
+  if (r.count === 0) return { ok: false, error: "Objectif introuvable." };
+  revalidatePath("/goals"); revalidatePath("/");
+  return { ok: true };
+}
 export async function deleteGoal(id: string) { const userId = await uid(); await prisma.goal.deleteMany({ where: { id, userId } }); revalidatePath("/goals"); }
 
 export async function saveProfile(fd: FormData) {
