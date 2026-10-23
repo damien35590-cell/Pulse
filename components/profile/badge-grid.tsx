@@ -1,19 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Lock, X } from "lucide-react";
+import { Check, Gem, Lock, X } from "lucide-react";
 import type { BadgeItem, Discipline, EvaluatedBadge } from "@/lib/badges";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 import { useBadgeReview } from "./badge-celebration";
-import { DISC_LABEL, ICONS, TIER_COLORS } from "./badge-meta";
+import { DISC_LABEL, ICONS } from "./badge-meta";
+import { TIER_BG, TIER_CHIP, TIER_NAMES, TIER_TEXT, TierMedal, unitFor } from "./tier-medal";
 
 type Tab = "ALL" | Discipline;
 const TABS: { key: Tab; label: string }[] = [
   { key: "ALL", label: "Tous" }, { key: "GLOBAL", label: "Général" }, { key: "RIDE", label: "Vélo" },
   { key: "RUN", label: "Running" }, { key: "HIKE", label: "Rando" }, { key: "WORKOUT", label: "Muscu" },
 ];
-const TIER_NAMES = ["Bronze", "Argent", "Or", "Diamant"];
 
 const fmt = (n: number, dec = 0) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: dec }).format(n);
 const left = (target: number, value: number, dec: number) => {
@@ -52,6 +52,8 @@ export function BadgeGrid({ badges, items }: { badges: EvaluatedBadge[]; items: 
   const earned = list.filter((b) => b.tier > 0).length;
   const medals = list.reduce((n, b) => n + b.tier, 0);
   const maxMedals = list.length * 4;
+  /** Médailles par palier : un badge Or compte une médaille Bronze, une Argent et une Or. */
+  const perTier = [0, 1, 2, 3].map((i) => list.filter((b) => b.tier > i).length);
   const upcoming = useMemo(
     () => list.filter((b) => b.next !== null && b.value > 0).sort((a, b) => progressToNext(b) - progressToNext(a)).slice(0, 3),
     [list],
@@ -71,7 +73,7 @@ export function BadgeGrid({ badges, items }: { badges: EvaluatedBadge[]; items: 
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-bold ${tab === t.key ? "bg-brand text-brand-ink" : "border border-line bg-surface text-ink-soft"}`}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-bold ${tab === t.key ? "bg-ink text-bg" : "border border-line bg-surface text-ink-soft"}`}
           >
             {t.label}
           </button>
@@ -83,13 +85,16 @@ export function BadgeGrid({ badges, items }: { badges: EvaluatedBadge[]; items: 
           <p className="text-sm font-bold">Médailles</p>
           <p className="text-sm tabular-nums text-ink-soft">{medals} / {maxMedals}</p>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full rounded-full bg-brand" style={{ width: `${maxMedals ? Math.round((medals / maxMedals) * 100) : 0}%` }} />
+        <div className="mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={TIER_NAMES.map((n, i) => `${perTier[i]} ${n}`).join(", ")}>
+          {perTier.map((n, i) => n > 0 && (
+            <div key={i} className={cn("h-full", TIER_BG[i])} style={{ width: `${(n / maxMedals) * 100}%` }} />
+          ))}
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-soft">
           {TIER_NAMES.map((n, i) => (
             <span key={n} className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full" style={{ background: TIER_COLORS[i] }} />{n}
+              <span className={cn("h-2 w-2 rounded-full", TIER_BG[i])} />{n}
+              <b className="font-semibold tabular-nums text-ink">{perTier[i]}</b>
             </span>
           ))}
         </div>
@@ -109,17 +114,17 @@ export function BadgeGrid({ badges, items }: { badges: EvaluatedBadge[]; items: 
                   className="w-52 shrink-0 rounded-xl border border-line bg-surface p-3 text-left"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><I className="h-4 w-4" aria-hidden /></span>
+                    <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full", TIER_CHIP[b.tier])}><I className="h-4 w-4" aria-hidden /></span>
                     <div className="min-w-0">
                       <p className="truncate text-[13px] font-bold leading-tight">{b.name}</p>
                       <p className="text-[11px] leading-tight text-ink-soft">vers {TIER_NAMES[b.tier]}</p>
                     </div>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                    <div className="h-full rounded-full" style={{ width: `${Math.round(progressToNext(b) * 100)}%`, background: TIER_COLORS[b.tier] }} />
+                    <div className={cn("h-full rounded-full", TIER_BG[b.tier])} style={{ width: `${Math.round(progressToNext(b) * 100)}%` }} />
                   </div>
                   <p className="mt-1 text-[11px] tabular-nums text-ink-soft">
-                    Encore {fmt(left(b.next as number, b.value, b.decimals), b.decimals)} {b.unit}
+                    Encore {fmt(left(b.next as number, b.value, b.decimals), b.decimals)} {unitFor(left(b.next as number, b.value, b.decimals), b.unit)}
                   </p>
                 </button>
               );
@@ -141,26 +146,29 @@ export function BadgeGrid({ badges, items }: { badges: EvaluatedBadge[]; items: 
                 className={cn("min-h-12 h-full w-full rounded-xl border border-line bg-surface p-3 text-left", !on && "opacity-70", isNew && "border-brand shadow-glow")}
               >
                 <div className="flex items-center justify-between">
-                  <span
-                    className={`grid h-11 w-11 place-items-center rounded-full ${on ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft"}`}
-                    style={on ? { boxShadow: `0 0 0 3px ${TIER_COLORS[b.tier - 1]}` } : undefined}
-                  >
-                    <I className="h-5 w-5" aria-hidden />
-                  </span>
+                  <TierMedal tier={b.tier} icon={I} className="h-11 w-11" iconClassName="h-5 w-5" />
                   <span className="flex gap-1" role="img" aria-label={on ? `Niveau ${TIER_NAMES[b.tier - 1]}` : "Verrouillé"}>
                     {b.tiers.map((_, i) => (
-                      <span key={i} className="h-2 w-2 rounded-full bg-line" style={i < b.tier ? { background: TIER_COLORS[i] } : undefined} />
+                      <span key={i} className={cn("box-border h-2 w-2 rounded-full", i < b.tier ? TIER_BG[i] : "border-[1.5px] border-ink-mute/60")} />
                     ))}
                   </span>
                 </div>
                 <p className="mt-2 text-[13px] font-bold leading-tight">{b.name}</p>
                 <p className="mt-0.5 text-[11px] leading-tight text-ink-soft">{b.desc}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full rounded-full bg-brand" style={{ width: `${Math.round(progressToNext(b) * 100)}%` }} />
-                </div>
-                <p className="mt-1 text-[11px] tabular-nums text-ink-soft">
-                  {b.next === null ? "Diamant atteint" : `${fmt(b.value, b.decimals)} / ${fmt(b.next, b.decimals)} ${b.unit}`}
-                </p>
+                {b.next === null ? (
+                  <p className={cn("mt-3 flex items-center gap-1 text-[11px] font-semibold", TIER_TEXT[3])}>
+                    <Gem className="h-3.5 w-3.5" aria-hidden />Diamant atteint
+                  </p>
+                ) : (
+                  <>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                      <div className={cn("h-full rounded-full", TIER_BG[b.tier])} style={{ width: `${Math.round(progressToNext(b) * 100)}%` }} />
+                    </div>
+                    <p className="mt-1 text-[11px] tabular-nums text-ink-soft">
+                      {fmt(b.value, b.decimals)} / {fmt(b.next, b.decimals)} {unitFor(b.next, b.unit)} · vers {TIER_NAMES[b.tier]}
+                    </p>
+                  </>
+                )}
               </button>
               {isNew && (
                 <span className="pointer-events-none absolute -top-2 right-3 rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-brand-ink">Nouveau</span>
@@ -186,7 +194,6 @@ function BadgeSheet({ b, onClose }: { b: EvaluatedBadge; onClose: () => void }) 
   }, [onClose]);
 
   const I = ICONS[b.icon];
-  const on = b.tier > 0;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60" role="dialog" aria-modal="true" aria-label={b.name} onClick={onClose}>
@@ -197,12 +204,7 @@ function BadgeSheet({ b, onClose }: { b: EvaluatedBadge; onClose: () => void }) 
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
 
         <div className="flex items-start gap-4">
-          <span
-            className={`grid h-16 w-16 shrink-0 place-items-center rounded-full ${on ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft"}`}
-            style={on ? { boxShadow: `0 0 0 3px ${TIER_COLORS[b.tier - 1]}` } : undefined}
-          >
-            <I className="h-8 w-8" aria-hidden />
-          </span>
+          <TierMedal tier={b.tier} icon={I} className="h-16 w-16" iconClassName="h-8 w-8" ring={4} />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-bold uppercase tracking-wide text-ink-soft">{DISC_LABEL[b.discipline]}</p>
             <h3 className="font-display text-2xl font-bold leading-tight">{b.name}</h3>
@@ -228,10 +230,7 @@ function BadgeSheet({ b, onClose }: { b: EvaluatedBadge; onClose: () => void }) 
             const fill = reached ? 1 : Math.max(0, Math.min(1, (b.value - lo) / (t - lo)));
             return (
               <li key={i} className="flex items-start gap-3">
-                <span
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${reached ? "" : "bg-surface-2 text-ink-soft"}`}
-                  style={reached ? { background: TIER_COLORS[i], color: "#1a1a1a" } : isNext ? { boxShadow: `inset 0 0 0 2px ${TIER_COLORS[i]}` } : undefined}
-                >
+                <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full", reached ? TIER_CHIP[i] : "bg-surface-2 text-ink-soft", isNext && !reached && "ring-2 ring-inset ring-ink-mute/50")}>
                   {reached ? <Check className="h-5 w-5" aria-hidden /> : <Lock className="h-4 w-4" aria-hidden />}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -245,10 +244,10 @@ function BadgeSheet({ b, onClose }: { b: EvaluatedBadge; onClose: () => void }) 
                     <>
                       {isNext && (
                         <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2">
-                          <div className="h-full rounded-full" style={{ width: `${Math.round(fill * 100)}%`, background: TIER_COLORS[i] }} />
+                          <div className={cn("h-full rounded-full", TIER_BG[i])} style={{ width: `${Math.round(fill * 100)}%` }} />
                         </div>
                       )}
-                      <p className="mt-1 text-[13px] text-ink-soft">Encore {fmt(left(t, b.value, b.decimals), b.decimals)} {b.unit}</p>
+                      <p className="mt-1 text-[13px] text-ink-soft">Encore {fmt(left(t, b.value, b.decimals), b.decimals)} {unitFor(left(t, b.value, b.decimals), b.unit)}</p>
                     </>
                   )}
                 </div>

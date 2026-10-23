@@ -24,12 +24,18 @@ Cible : PWA installée sur Pixel, sombre par défaut, lisible en plein effort.
 | `ink` | #F5F5F7 | valeurs, titres | 16,9:1 |
 | `ink-soft` | #A1A1AA | unités, phrases | 7,2:1 |
 | `ink-mute` | #8A8A95 | libellés, dates | 5,4:1 |
-| `brand` | #FC4C02 | action principale, lien, mise en avant (une seule par écran) | 5,4:1 |
-| `brand-ink` | #0A0A0C | texte sur fond orange (5,8:1 ; le blanc ne fait que 3,4:1) | |
+| `brand` | #C6F432 « Volt » (clair : #B8E62A) | aplat de l'action principale : bouton +, barres de niveau (`bg-brand`, une mise en avant par écran) | |
+| `brand-ink` | #0A0A0C | texte sur fond citron, dans les deux thèmes (jamais de blanc sur Volt) | |
+| `brand-text` | #C6F432 (clair : #4D7C0F) | utilisé automatiquement par `text-brand`, `border-brand`, `ring-brand`, `outline-brand`, `stroke-brand` : le citron ne se lit pas sur fond blanc | ≥ 5:1 |
 | `good` / `warn` / `bad` | vert / ambre / rouge | progrès, vigilance, baisse | ≥ 4,9:1 |
 | `z1` … `z6` | gris, bleu, vert, jaune, rouge, violet | zones cardio / puissance uniquement | |
+| `tier-bronze` / `-silver` / `-gold` (+ `-soft`, `-ink`) | bronze, argent, or | paliers de badges uniquement (`components/profile/tier-medal.tsx`) | |
+| `bg-holo`, `bg-holo-ring`, `tier-gem`, `tier-diamond-soft/-ink` | dégradé holographique | palier Diamant : anneau animé autour d'une gemme sombre, le badge ultime | |
 
 Thème clair : opt-in avec `<html data-theme="light">` (mêmes noms de tokens). Les variantes `dark:` s'appliquent dès que ce n'est pas le thème clair.
+
+Règle des badges : la couleur d'un badge = son palier, jamais la marque. Barres de progression dans la teinte du **prochain** palier ;
+pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `bg-ink text-bg`.
 
 ## Typographie
 

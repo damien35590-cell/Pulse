@@ -10,7 +10,8 @@ import { Confetti } from "@/components/ui/confetti";
 import { celebrate, chime, stamp, tap } from "@/lib/haptics";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { DISC_LABEL, ICONS, TIER_COLORS } from "./badge-meta";
+import { DISC_LABEL, HOLO_COLORS, ICONS, TIER_COLORS } from "./badge-meta";
+import { TIER_TEXT, TierMedal } from "./tier-medal";
 
 type View = { key: string; read: boolean };
 /** sealed : médaille retournée à révéler · open : révélée, à valider · stamped : tampon « Validé » en cours */
@@ -85,7 +86,7 @@ export function useBadgeReview(items: BadgeItem[]) {
   }, [item, phase, pending]);
 
   const remaining = view && !view.read ? pending.filter((p) => p.key !== view.key).length : 0;
-  const colors = useMemo(() => (item ? [TIER_COLORS[item.tier - 1], "#ffffff"] : [...TIER_COLORS]), [item]);
+  const colors = useMemo(() => (item ? (item.tier === 4 ? [...HOLO_COLORS, "#ffffff"] : [TIER_COLORS[item.tier - 1], "#ffffff"]) : [...TIER_COLORS]), [item]);
   const open = !!item || finale;
 
   const sheet = (
@@ -155,10 +156,10 @@ function Celebration({ item, read, phase, done, remaining, medalRef, onReveal, o
             </span>
             {/* Face révélée */}
             <span
-              className="absolute inset-0 grid place-items-center rounded-full bg-brand text-brand-ink [backface-visibility:hidden] [transform:rotateY(180deg)]"
-              style={{ boxShadow: `0 0 0 6px ${color}, 0 0 60px 0 ${color}` }}
+              className="absolute inset-0 rounded-full [backface-visibility:hidden] [transform:rotateY(180deg)]"
+              style={{ boxShadow: `0 0 60px 0 ${color}` }}
             >
-              <Icon className="size-20" strokeWidth={2} aria-hidden />
+              <TierMedal tier={item.tier} icon={Icon} className={item.tier === 4 ? "size-full" : "size-full border-[6px]"} iconClassName="size-20" ring={7} />
               {!reduce && !sealed && item.tier >= 3 && <Shine />}
             </span>
           </motion.span>
@@ -188,7 +189,7 @@ function Celebration({ item, read, phase, done, remaining, medalRef, onReveal, o
           </motion.div>
         ) : (
           <motion.div key="open" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: read ? 0 : 0.25 }} className="mt-5 w-full">
-            <p className={ui.label}>{DISC_LABEL[item.discipline]} · <span style={{ color }}>{item.tierName}</span></p>
+            <p className={ui.label}>{DISC_LABEL[item.discipline]} · <span className={TIER_TEXT[item.tier - 1]}>{item.tierName}</span></p>
             <h2 className="mt-1 text-2xl font-bold leading-tight tracking-tight">{item.name}</h2>
             <p className="mt-1 text-sm text-ink-soft">{TIER_LINES[item.tier - 1]}</p>
 
