@@ -36,7 +36,7 @@ export function EventTimeline({ events, pendingResult }: { events: EventView[]; 
           <ChevronRight className="size-4 shrink-0 text-ink-mute" aria-hidden />
         </Link>
       ) : (
-        <Link href={`/events/${next.id}`} className={cn(hot ? "block rounded-card bg-brand p-4 text-brand-ink shadow-glow transition duration-150 ease-snappy active:scale-[0.985]" : cn(ui.card, ui.pressCard, "block p-4"))}>
+        <Link href={`/events/${next.id}`} className={cn(hot ? "block rounded-card bg-brand p-4 text-brand-ink transition duration-150 ease-snappy active:scale-[0.985]" : cn(ui.card, ui.pressCard, "block p-4"))}>
           {hot && <p className="mb-1 text-sm font-bold">{soonText(next.days)}</p>}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

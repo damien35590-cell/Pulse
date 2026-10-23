@@ -50,7 +50,7 @@ pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `
 
 - Rayons : `rounded-tile` 14 px (contrôles), `rounded-card` 20 px (cartes), `rounded-t-sheet` 28 px (feuilles), `rounded-full` (boutons, pastilles).
 - Cartes : `ui.card` = `rounded-card bg-surface shadow-card` (liseré clair en haut, pas de bordure grise).
-- Ombres portées seulement sur ce qui flotte : `shadow-glow` (bouton principal), `shadow-pop` (feuilles, menus).
+- Ombres portées seulement sur ce qui flotte : `shadow-glow` (halo discret du bouton + de la nav, jamais sur un bouton posé dans une carte), `shadow-pop` (feuilles, menus).
 - Espacement : `p-4` dans les cartes, `gap-3` entre cartes, `space-y-8` entre sections.
 
 ## Recettes (`lib/ui.ts`)

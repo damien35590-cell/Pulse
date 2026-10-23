@@ -58,7 +58,7 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
   const paused = p.status === "PAUSED", msg = cheer(p.weekDone, p.sessionsPerWeek), n = p.next;
   return (
     <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4")}>
-      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/[0.07] blur-3xl" />
       <div className="relative flex items-center justify-between gap-3">
         <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"} · {p.name}</p>
         <Link href="/plan" className="shrink-0 text-sm font-semibold text-brand active:opacity-60">Programme</Link>
