@@ -310,7 +310,7 @@ function Tokens() {
 
         <Section title="Accent et états">
           <div className="grid grid-cols-4 gap-2">
-            {swatch("brand", "bg-brand", "#FC4C02")}
+            {swatch("brand", "bg-brand", "Volt")}
             {swatch("good", "bg-good", "progrès")}
             {swatch("warn", "bg-warn", "vigilance")}
             {swatch("bad", "bg-bad", "baisse")}

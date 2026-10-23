@@ -14,7 +14,7 @@ export function StoryReveal({ story, record, alerts = [], onClose }: { story: st
     <div role="dialog" aria-modal="true" aria-label="Sortie enregistrée" className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6">
       {record && !reduce && Array.from({ length: N }, (_, i) => {
         const a = (i / N) * Math.PI * 2, d = 120 + (i % 5) * 45;
-        return <motion.span key={i} className="absolute h-3 w-2 rounded-sm" style={{ background: i % 3 ? "#FC4C02" : "#fff" }}
+        return <motion.span key={i} className="absolute h-3 w-2 rounded-sm" style={{ background: i % 3 ? "rgb(var(--brand))" : "#fff" }}
           initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }} animate={{ x: Math.cos(a) * d, y: Math.sin(a) * d + 60, opacity: 0, rotate: 260 + i * 20 }}
           transition={{ duration: 1.3 + (i % 4) * 0.15, ease: "easeOut" }} />;
       })}

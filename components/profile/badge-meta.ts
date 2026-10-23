@@ -13,4 +13,6 @@ export const ICONS: Record<BadgeIcon, LucideIcon> = {
 };
 
 export const DISC_LABEL: Record<Discipline, string> = { GLOBAL: "Général", RIDE: "Vélo", RUN: "Running", HIKE: "Randonnée", WORKOUT: "Musculation" };
-export const TIER_COLORS = ["#b87333", "#aab2bd", "#f2b705", "#4cc9f0"];
+/** Teintes brutes des paliers, pour ce qui ne lit pas les classes (confettis, halos). Le diamant est holographique. */
+export const TIER_COLORS = ["#c07a3e", "#aab2bd", "#f2c230", "#7c6bff"];
+export const HOLO_COLORS = ["#5cf2ff", "#7c6bff", "#ff5cd6", "#ffd45c"];

@@ -18,11 +18,26 @@ const config: Config = {
       colors: {
         bg: c("bg"), surface: c("surface"), "surface-2": c("surface-2"), "surface-3": c("surface-3"),
         ink: c("ink"), "ink-soft": c("ink-soft"), "ink-mute": c("ink-mute"), line: c("line"),
-        brand: c("brand"), "brand-ink": c("brand-ink"),
+        brand: c("brand"), "brand-ink": c("brand-ink"), "brand-text": c("brand-text"),
+        tier: {
+          bronze: { DEFAULT: c("tier-bronze"), soft: c("tier-bronze-soft"), ink: c("tier-bronze-ink") },
+          silver: { DEFAULT: c("tier-silver"), soft: c("tier-silver-soft"), ink: c("tier-silver-ink") },
+          gold: { DEFAULT: c("tier-gold"), soft: c("tier-gold-soft"), ink: c("tier-gold-ink") },
+          diamond: { soft: c("tier-diamond-soft"), ink: c("tier-diamond-ink") },
+          gem: c("tier-gem"),
+        },
         good: c("good"), warn: c("warn"), bad: c("bad"),
         stack: { workout: c("stack-workout"), run: c("stack-run"), ride: c("stack-ride"), hike: c("stack-hike"), other: c("stack-other") },
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
       },
+      // text-brand, border-brand, ring-brand… prennent la variante lisible de la marque (le citron Volt
+      // ne se lit pas sur fond blanc) ; bg-brand reste l'aplat citron.
+      textColor: { brand: c("brand-text") },
+      borderColor: { brand: c("brand-text") },
+      outlineColor: { brand: c("brand-text") },
+      ringColor: { brand: c("brand-text") },
+      caretColor: { brand: c("brand-text") },
+      stroke: { brand: c("brand-text") },
       fontFamily: {
         sans: ["var(--font-body)", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "var(--font-body)", "sans-serif"],
