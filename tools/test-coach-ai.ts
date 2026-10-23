@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { parseDebrief } from "../lib/coach/ai";
 import { DOCTRINE } from "../lib/coach/doctrine";
-import { renderCoachText } from "../lib/coach/chat-render";
+import { renderCoachText, trimToSentence } from "../lib/coach/chat-render";
 
 const ok = { verdict: "Bonne période.", points: [{ tone: "good", text: "Les dips progressent." }, { tone: "bizarre", text: "Peu de course." }, { tone: "bad", text: "" }], consigne: "2 sorties faciles de 40 min.", principe: "Campus Coach : régularité avant intensité." };
 
@@ -33,5 +33,10 @@ assert.deepEqual(r[2].parts, [{ text: "Jeudi : ", bold: false }, { text: "VMA", 
 assert.equal(r[3].parts[0].text, "Samedi : repos");
 assert.equal(r[4].parts[0].text, "Titre");
 assert.deepEqual(renderCoachText("a ** b"), [{ kind: "p", parts: [{ text: "a ** b", bold: false }] }]);
+
+// Réponse coupée : retour à la dernière phrase complète
+assert.equal(trimToSentence("Repos ce soir. Demain footing facile. Si la gêne dure plus"), "Repos ce soir. Demain footing facile.");
+assert.equal(trimToSentence("Phrase complète."), "Phrase complète.");
+assert.equal(trimToSentence("Un. Deux trois quatre cinq six sept huit"), "Un. Deux trois quatre cinq six sept huit…");
 
 console.log("coach-ai : OK");

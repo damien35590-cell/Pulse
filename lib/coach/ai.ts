@@ -46,7 +46,7 @@ type Block = { type: "text"; text: string; cache_control?: { type: "ephemeral" }
 type Usage = { inputTokens: number; outputTokens: number; cachedTokens: number };
 
 /** Appel brut de l'API Messages. `system` : blocs mis en cache s'ils sont marqués. Renvoie le texte de la réponse et la consommation. */
-export async function callClaude(o: { system: Block[]; messages: { role: "user" | "assistant"; content: string }[]; maxTokens: number }): Promise<{ text: string; model: string } & Usage> {
+export async function callClaude(o: { system: Block[]; messages: { role: "user" | "assistant"; content: string }[]; maxTokens: number }): Promise<{ text: string; model: string; truncated: boolean } & Usage> {
   const key = process.env.ANTHROPIC_API_KEY?.trim();
   if (!key) throw new CoachAiError("Clé ANTHROPIC_API_KEY absente : ajoute-la dans Vercel (Settings > Environment Variables) puis redéploie.");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -56,7 +56,7 @@ export async function callClaude(o: { system: Block[]; messages: { role: "user" 
     signal: AbortSignal.timeout(50_000),
   });
   const body = (await res.json().catch(() => null)) as {
-    content?: { type: string; text?: string }[]; model?: string; error?: { message?: string };
+    content?: { type: string; text?: string }[]; model?: string; error?: { message?: string }; stop_reason?: string;
     usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
   } | null;
   if (!res.ok) {
@@ -65,6 +65,7 @@ export async function callClaude(o: { system: Block[]; messages: { role: "user" 
   }
   const u = body?.usage ?? {};
   return {
+    truncated: body?.stop_reason === "max_tokens",
     text: (body?.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n").trim(),
     model: body?.model ?? COACH_MODEL,
     inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), outputTokens: u.output_tokens ?? 0, cachedTokens: u.cache_read_input_tokens ?? 0,
@@ -73,7 +74,7 @@ export async function callClaude(o: { system: Block[]; messages: { role: "user" 
 
 export async function askCoach(facts: unknown): Promise<DebriefResult> {
   const r = await callClaude({
-    maxTokens: 900,
+    maxTokens: 2000, // plafond large : seuls les tokens écrits sont facturés, et un JSON coupé serait illisible
     // La doctrine ne change pas d'un appel à l'autre : mise en cache, relue à prix réduit
     system: [{ type: "text", text: `${RULES}\n\n${DOCTRINE}`, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: `Faits de la période (JSON) :\n${JSON.stringify(facts)}` }],
