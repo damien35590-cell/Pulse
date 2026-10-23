@@ -42,20 +42,18 @@ export function parseDebrief(text: string): Debrief | null {
 
 export class CoachAiError extends Error {}
 
-export async function askCoach(facts: unknown): Promise<DebriefResult> {
+type Block = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+type Usage = { inputTokens: number; outputTokens: number; cachedTokens: number };
+
+/** Appel brut de l'API Messages. `system` : blocs mis en cache s'ils sont marqués. Renvoie le texte de la réponse et la consommation. */
+export async function callClaude(o: { system: Block[]; messages: { role: "user" | "assistant"; content: string }[]; maxTokens: number }): Promise<{ text: string; model: string } & Usage> {
   const key = process.env.ANTHROPIC_API_KEY?.trim();
   if (!key) throw new CoachAiError("Clé ANTHROPIC_API_KEY absente : ajoute-la dans Vercel (Settings > Environment Variables) puis redéploie.");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: COACH_MODEL,
-      max_tokens: 900,
-      // La doctrine ne change pas d'un appel à l'autre : mise en cache, relue à prix réduit
-      system: [{ type: "text", text: `${RULES}\n\n${DOCTRINE}`, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: `Faits de la période (JSON) :\n${JSON.stringify(facts)}` }],
-    }),
-    signal: AbortSignal.timeout(45_000),
+    body: JSON.stringify({ model: COACH_MODEL, max_tokens: o.maxTokens, system: o.system, messages: o.messages }),
+    signal: AbortSignal.timeout(50_000),
   });
   const body = (await res.json().catch(() => null)) as {
     content?: { type: string; text?: string }[]; model?: string; error?: { message?: string };
@@ -65,9 +63,22 @@ export async function askCoach(facts: unknown): Promise<DebriefResult> {
     const msg = body?.error?.message ?? `HTTP ${res.status}`;
     throw new CoachAiError(res.status === 401 ? "Clé ANTHROPIC_API_KEY refusée : vérifie-la dans Vercel." : res.status === 400 && /credit/i.test(msg) ? "Crédit de l'API épuisé : recharge-le sur console.anthropic.com." : `Le coach IA n'a pas répondu (${msg}).`);
   }
-  const text = (body?.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
-  const debrief = parseDebrief(text);
-  if (!debrief) throw new CoachAiError("Réponse du coach illisible, réessaie.");
   const u = body?.usage ?? {};
-  return { debrief, model: body?.model ?? COACH_MODEL, inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), outputTokens: u.output_tokens ?? 0, cachedTokens: u.cache_read_input_tokens ?? 0 };
+  return {
+    text: (body?.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n").trim(),
+    model: body?.model ?? COACH_MODEL,
+    inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), outputTokens: u.output_tokens ?? 0, cachedTokens: u.cache_read_input_tokens ?? 0,
+  };
+}
+
+export async function askCoach(facts: unknown): Promise<DebriefResult> {
+  const r = await callClaude({
+    maxTokens: 900,
+    // La doctrine ne change pas d'un appel à l'autre : mise en cache, relue à prix réduit
+    system: [{ type: "text", text: `${RULES}\n\n${DOCTRINE}`, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content: `Faits de la période (JSON) :\n${JSON.stringify(facts)}` }],
+  });
+  const debrief = parseDebrief(r.text);
+  if (!debrief) throw new CoachAiError("Réponse du coach illisible, réessaie.");
+  return { debrief, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens };
 }

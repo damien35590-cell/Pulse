@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { parseDebrief } from "../lib/coach/ai";
 import { DOCTRINE } from "../lib/coach/doctrine";
+import { renderCoachText } from "../lib/coach/chat-render";
 
 const ok = { verdict: "Bonne période.", points: [{ tone: "good", text: "Les dips progressent." }, { tone: "bizarre", text: "Peu de course." }, { tone: "bad", text: "" }], consigne: "2 sorties faciles de 40 min.", principe: "Campus Coach : régularité avant intensité." };
 
@@ -23,5 +24,14 @@ assert.equal(parseDebrief("{ cassé"), null);
 
 // La doctrine couvre les trois méthodes et les règles clés
 for (const k of ["Lafay", "SuperPhysique", "Campus Coach", "TOTAL de répétitions", "VMA", "vélotaf"]) assert.ok(DOCTRINE.includes(k), k);
+
+// Rendu du chat : paragraphes, listes, gras, lignes vides et titres ignorés
+const r = renderCoachText("**Oui**, décale-la à jeudi.\n\n- Mardi : footing\n* Jeudi : **VMA**\n2. Samedi : repos\n## Titre");
+assert.deepEqual(r.map((b) => b.kind), ["p", "li", "li", "li", "p"]);
+assert.deepEqual(r[0].parts, [{ text: "Oui", bold: true }, { text: ", décale-la à jeudi.", bold: false }]);
+assert.deepEqual(r[2].parts, [{ text: "Jeudi : ", bold: false }, { text: "VMA", bold: true }]);
+assert.equal(r[3].parts[0].text, "Samedi : repos");
+assert.equal(r[4].parts[0].text, "Titre");
+assert.deepEqual(renderCoachText("a ** b"), [{ kind: "p", parts: [{ text: "a ** b", bold: false }] }]);
 
 console.log("coach-ai : OK");
