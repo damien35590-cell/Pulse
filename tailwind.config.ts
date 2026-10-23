@@ -61,7 +61,8 @@ const config: Config = {
       boxShadow: {
         card: "var(--shadow-card)",
         pop: "0 24px 48px -12px rgb(0 0 0 / 0.6)",
-        glow: "0 10px 28px -10px rgb(var(--brand) / 0.65)",
+        // Halo discret, réservé à ce qui flotte (bouton + de la nav, carte « à valider »).
+        glow: "0 6px 16px -8px rgb(var(--brand) / 0.35)",
       },
       transitionTimingFunction: { snappy: "cubic-bezier(.2,.8,.2,1)" },
       keyframes: {

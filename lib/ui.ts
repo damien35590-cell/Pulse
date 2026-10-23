@@ -11,7 +11,7 @@ export const ui = {
   label: "text-label uppercase text-ink-mute",
   /** Bouton principal : texte quasi noir sur orange = contraste 5,8:1 (le blanc ne fait que 3,4:1). */
   btnPrimary:
-    "inline-flex h-14 items-center justify-center gap-2 rounded-full bg-brand px-6 text-base font-semibold text-brand-ink shadow-glow select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97] active:brightness-90 disabled:opacity-40 disabled:shadow-none",
+    "inline-flex h-14 items-center justify-center gap-2 rounded-full bg-brand px-6 text-base font-semibold text-brand-ink select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97] active:brightness-90 disabled:opacity-40",
   btnSecondary:
     "inline-flex h-14 items-center justify-center gap-2 rounded-full bg-surface-2 px-6 text-base font-semibold text-ink select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97] active:bg-surface-3 disabled:opacity-40",
   btnDanger:
