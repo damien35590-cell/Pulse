@@ -1,8 +1,9 @@
 "use client";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 
-type Option<T extends string> = { value: T; label: string };
+type Option<T extends string> = { value: T; label: ReactNode };
 
 /** Sélecteur à onglets (FC / Puissance, Semaine / Mois…). Cibles de 40 px, retour haptique au changement. */
 export function Segmented<T extends string>({ options, value, onChange, size = "md", className }: {
@@ -24,7 +25,8 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
             aria-selected={active}
             onClick={() => { if (!active) { tap(6); onChange(o.value); } }}
             className={cn(
-              "touch-manipulation truncate rounded-full px-3 font-semibold transition duration-200 ease-snappy",
+              "touch-manipulation truncate rounded-full font-semibold transition duration-200 ease-snappy",
+              typeof o.label === "string" ? "px-3" : "px-2", // étiquette avec icône : un peu moins de marge pour tenir à 4 onglets
               size === "sm" ? "h-8 text-xs" : "h-10 text-sm",
               active ? "bg-surface-3 text-ink shadow-card" : "text-ink-soft active:text-ink",
             )}

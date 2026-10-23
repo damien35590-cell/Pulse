@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Flag, Trophy, Wrench, type LucideIcon } from "lucide-react";
+import { ChevronRight, Flag, Trophy, Wrench } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadBadgeStats } from "@/lib/data/badges";
-import { fmtClock, fmtKm, fmtNum } from "@/lib/format";
-import { SPORTS } from "@/lib/sports";
+import { fmtNum } from "@/lib/format";
 import { getZones } from "@/lib/data/zones";
 import { ZonesForm } from "@/components/profile/zones-form";
 import { Section } from "@/components/ui/section";
@@ -15,6 +14,8 @@ import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { EditProfile } from "@/components/profile/edit-profile";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
+import { getRecordsBySport } from "@/lib/data/records";
+import { RecordsTabs } from "@/components/profile/records-tabs";
 import { prisma } from "@/lib/prisma";
 import { level, rank, xpOf } from "@/lib/xp";
 import { getCountdown } from "@/lib/races/time";
@@ -30,19 +31,10 @@ export default async function ProfilePage() {
   const [me, zones, gear, notifyPrefs, raceRows] = await Promise.all([prisma.user.findUnique({ where: { id: userId }, select: { name: true, image: true, email: true } }), getZones(userId), getGear(userId), getPrefs(userId), prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 })]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
-  const { acts, rec, stats } = await loadBadgeStats(userId, TZ);
+  const { acts, stats } = await loadBadgeStats(userId, TZ);
+  const records = await getRecordsBySport(userId, TZ, acts.map((a) => a.type));
   const lvl = level(acts.reduce((t, a) => t + xpOf(a), 0));
   const st = stats.GLOBAL; // mêmes totaux que les badges, tous sports confondus
-  // Record de distance : le vélotaf à assistance électrique (EBIKE) n'en établit pas.
-  const longest = acts.reduce<(typeof acts)[number] | null>((best, a) => (a.type !== "EBIKE" && a.distanceM > 0 && a.distanceM > (best?.distanceM ?? 0) ? a : best), null);
-
-  type Row = { label: string; value: string; Icon?: LucideIcon };
-  const rows: Row[] = [
-    rec.BEST_5K && { label: "Meilleur 5 km", value: fmtClock(rec.BEST_5K) },
-    rec.BEST_10K && { label: "Meilleur 10 km", value: fmtClock(rec.BEST_10K) },
-    // L'icône suit le sport du record : <Bike /> pour le vélo, <Footprints /> pour la course, <Mountain /> pour la rando…
-    longest && { label: "Plus longue sortie", value: `${fmtKm(longest.distanceM)} km`, Icon: (SPORTS[longest.type] ?? SPORTS.OTHER).icon },
-  ].filter(Boolean) as Row[];
 
   return (
     <div className="space-y-6">
@@ -53,9 +45,7 @@ export default async function ProfilePage() {
         ))}
       </dl>
       <section><h2 className="mb-2 font-display text-xl font-bold">Records personnels</h2>
-        <div className="divide-y divide-line rounded-xl border border-line bg-surface px-4">
-          {rows.length ? rows.map(({ label, value, Icon }) => <p key={label} className="flex items-center justify-between py-3"><span>{label}</span><span className="flex items-center gap-2">{Icon && <Icon className="h-5 w-5 text-brand" aria-hidden />}<b className="font-display text-2xl tabular-nums">{value}</b></span></p>) : <p className="py-4 text-ink-soft">Vos records apparaîtront dès qu’une sortie avec trace GPS les établira.</p>}
-        </div>
+        <RecordsTabs data={records} />
       </section>
       <Link href="/gear" className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 active:bg-surface-2">
         <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand/10 text-brand"><Wrench className="h-5 w-5" aria-hidden /></span>
