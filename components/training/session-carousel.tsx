@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Carrousel au doigt des séances du programme : la prochaine d'abord, les suivantes en glissant.
- * Chaque diapo laisse dépasser la suivante pour montrer qu'on peut swiper ; les points suivent la position.
+ * Chaque diapo laisse à peine dépasser la suivante (≈ 12 px) pour suggérer le swipe ; les points suivent la position.
  */
 export function SessionCarousel({ children, className }: { children: ReactNode; className?: string }) {
   const slides = Children.toArray(children);
@@ -40,20 +40,20 @@ export function SessionCarousel({ children, className }: { children: ReactNode; 
             role="group"
             aria-roledescription="séance"
             aria-label={`${i + 1} sur ${slides.length}`}
-            className="w-[88%] shrink-0 snap-start last:w-full"
+            className="w-[calc(100%-8px)] shrink-0 snap-start last:w-full"
           >
             {s}
           </div>
         ))}
       </div>
-      <div className="mt-3 flex justify-center gap-1.5" aria-hidden>
+      <div className="mt-2.5 flex justify-center gap-1" aria-hidden>
         {slides.map((_, i) => (
           <button
             key={i}
             type="button"
             tabIndex={-1}
             onClick={() => goTo(i)}
-            className={cn("h-1.5 rounded-full transition-all duration-200", i === active ? "w-4 bg-ink-soft" : "w-1.5 bg-ink-mute/40")}
+            className={cn("h-1 rounded-full transition-all duration-200", i === active ? "w-3 bg-ink-mute" : "w-1 bg-ink-mute/30")}
           />
         ))}
       </div>
