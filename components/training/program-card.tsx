@@ -69,7 +69,7 @@ const whenLabel = (week: number, current: number) =>
 /** Aperçu d'une séance à venir (diapo du carrousel) : lecture seule, les actions restent sur la prochaine. */
 function UpcomingSlide({ s, current }: { s: SessionView; current: number }) {
   return (
-    <div className="flex h-full flex-col rounded-tile bg-surface-2 p-3">
+    <div className="flex h-full flex-col rounded-tile bg-surface-2/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-label uppercase text-ink-mute">Ensuite · {whenLabel(s.weekNumber, current)}</p>
         {s.isKeySession && <KeyBadge />}
