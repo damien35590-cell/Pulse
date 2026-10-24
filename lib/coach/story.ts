@@ -9,10 +9,11 @@
 import { prisma } from "../prisma";
 import { dayKey, shiftDay } from "../dates";
 import { isCommute } from "../routes/estimate";
-import { ordinalFr } from "../format";
+import { fmtNum, ordinalFr } from "../format";
+import { comparisonFor, type Scale } from "./comparisons";
 import { verdictForActivity } from "./session-comment";
 
-export type StoryKind = "record" | "streak" | "comparison";
+export type StoryKind = "record" | "milestone" | "streak" | "comparison";
 export type Story = { kind: StoryKind; text: string };
 
 export const STREAK_MIN = 3;
@@ -77,27 +78,91 @@ export function gaps(cur: Cur, past: Past[]): { metric: Metric; pct: number }[] 
   return out;
 }
 
-export type StoryInput = { id: string; type: string; streakDays: number; records: RecordFact[]; cur: Cur; past: Past[] };
+/** Historique du sport avant l'activité (toutes les sorties, pas seulement 30 jours). */
+export type Hist = { distanceM: number; elevationGainM: number; movingTimeS: number };
+
+export type StoryInput = {
+  id: string; type: string; streakDays: number; records: RecordFact[]; cur: Cur; past: Past[];
+  hist: Hist[]; tonnageKg: number;
+  /** Textes des dernières anecdotes du sport (les plus récentes d'abord) : on n'y réutilise pas une référence de comparaison. */
+  recent: string[];
+};
+
+export const TOP_SHARE = 0.05;
+export const HIST_MIN = 20;
+/** Paliers « première fois » : distance (km) et D+ (m). */
+const MILESTONES: Record<string, { km: number[]; dplus: number[] }> = {
+  RUN: { km: [10, 15, 21.1, 30, 42.2], dplus: [] },
+  RIDE: { km: [50, 100, 150, 200], dplus: [1000, 2000, 3000] },
+  HIKE: { km: [10, 20, 30, 40], dplus: [500, 1000, 1500, 2000] },
+};
+
+/** Ce qui rend l'activité exceptionnelle : sa phrase factuelle (si aucune autre) et l'échelle de la comparaison créative. */
+type Why = { text: string | null; scale: Scale | null };
+function exceptional(i: StoryInput, rec: RecordFact | undefined): Why | null {
+  const noun = sportNoun(i.type), c = i.cur;
+  const km = c.distanceM / 1000;
+  // 1. Record
+  if (rec) return { text: null, scale: rec.kind === "REPS" ? "mass" : rec.kind === "BEST_ELEVATION" ? "height" : "distance" };
+  // 2. Première fois
+  const m = MILESTONES[i.type];
+  if (m && i.hist.length >= 10) {
+    const maxKm = Math.max(0, ...i.hist.map((h) => h.distanceM / 1000)), maxD = Math.max(0, ...i.hist.map((h) => h.elevationGainM));
+    const d = m.dplus.filter((t) => c.elevationGainM >= t && maxD < t).pop();
+    if (d) return { text: `Première ${noun} à plus de ${fmtNum(d, 0)} m de D+.`, scale: "height" };
+    const k = m.km.filter((t) => km >= t && maxKm < t).pop();
+    if (k) return { text: `Première ${noun} de plus de ${fmtNum(k, 1)} km.`, scale: "distance" };
+  }
+  if (i.type === "WORKOUT" && i.hist.length >= 10 && c.movingTimeS > Math.max(...i.hist.map((h) => h.movingTimeS)))
+    return { text: "Séance la plus longue enregistrée.", scale: i.tonnageKg >= 500 ? "mass" : null };
+  // 3. Top 5 % de l'historique du sport
+  if (i.hist.length + 1 >= HIST_MIN) {
+    const n = i.hist.length + 1;
+    const top = (v: number, f: (h: Hist) => number) => v > 0 && i.hist.filter((h) => f(h) >= v).length / n < TOP_SHARE;
+    if (i.type !== "WORKOUT" && top(c.elevationGainM, (h) => h.elevationGainM)) return { text: `${cap(noun)} dans les 5 % les plus riches en dénivelé de l'historique.`, scale: "height" };
+    if (i.type !== "WORKOUT" && top(c.distanceM, (h) => h.distanceM)) return { text: `${cap(noun)} dans les 5 % les plus longues en distance de l'historique.`, scale: "distance" };
+    if (top(c.movingTimeS, (h) => h.movingTimeS)) return { text: `${cap(noun)} dans les 5 % les plus longues en durée de l'historique.`, scale: i.type === "WORKOUT" ? (i.tonnageKg >= 500 ? "mass" : null) : "distance" };
+  }
+  return null;
+}
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Phrase créative d'une activité exceptionnelle : valeur + comparaison (« 1 400 m de D+, soit 1,7 fois le Burj Khalifa. »). */
+function creative(i: StoryInput, scale: Scale | null): string | null {
+  if (!scale) return null;
+  const value = scale === "height" ? i.cur.elevationGainM : scale === "distance" ? i.cur.distanceM / 1000 : i.tonnageKg;
+  const cmp = comparisonFor(scale, value, i.id, i.recent);
+  if (!cmp) return null;
+  const shown = scale === "height" ? `${fmtNum(value, 0)} m de D+` : scale === "distance" ? `${fmtNum(value, 1)} km` : `Volume soulevé : ${value >= 1000 ? `${fmtNum(value / 1000, 1)} t` : `${fmtNum(value, 0)} kg`}`;
+  return `${shown}, ${cmp}.`;
+}
 
 /** Fonction pure. `null` : rien de notable. */
 export function buildStory(i: StoryInput): Story | null {
   const rec = [...i.records].sort((a, b) => RECORD_RANK.indexOf(a.kind) - RECORD_RANK.indexOf(b.kind))[0];
-  if (rec) return { kind: "record", text: recordText(rec, i.type) };
-  if (i.streakDays >= STREAK_MIN) return { kind: "streak", text: streakText(i.id, i.type, i.streakDays) };
-  if (i.past.length >= 3) {
+  const why = exceptional(i, rec);
+  let base: Story | null = null;
+  if (rec) base = { kind: "record", text: recordText(rec, i.type) };
+  else if (i.streakDays >= STREAK_MIN) base = { kind: "streak", text: streakText(i.id, i.type, i.streakDays) };
+  else if (i.past.length >= 3) {
     const g = gaps(i.cur, i.past).filter((x) => Math.abs(x.pct) >= GAP_MIN_PCT).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
-    if (g) return { kind: "comparison", text: comparisonText(i.id, g.metric, g.pct) };
+    if (g) base = { kind: "comparison", text: comparisonText(i.id, g.metric, g.pct) };
   }
-  return null;
+  if (!why) return base;
+  if (!base && why.text) base = { kind: "milestone", text: why.text };
+  if (!base) return null;
+  const extra = creative(i, why.scale);
+  return extra ? { kind: base.kind, text: `${base.text} ${extra}` } : base;
 }
 
 type RecordRow = { kind: string; value: number; beaten: boolean };
 
 /**
  * Anecdote d'une activité, lue en base. `records` : records battus à l'import (RecordUpdate) ; absent (régénération), on les déduit des records
- * actuellement détenus par l'activité, à condition qu'une sortie du même sport l'ait précédée.
+ * actuellement détenus par l'activité, à condition qu'une sortie du même sport l'ait précédée. `opts.recent` : textes des dernières anecdotes du sport
+ * (sinon lus en base), pour ne pas répéter une référence de comparaison ; la régénération en série les fournit dans l'ordre chronologique.
  */
-export async function storyForActivity(activityId: string, records?: RecordRow[]): Promise<Story | null> {
+export async function storyForActivity(activityId: string, records?: RecordRow[], opts: { recent?: string[] } = {}): Promise<Story | null> {
   const a = await prisma.activity.findUnique({
     where: { id: activityId },
     select: { id: true, userId: true, type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
@@ -133,15 +198,29 @@ export async function storyForActivity(activityId: string, records?: RecordRow[]
     select: { id: true, title: true, source: true, dedupeKey: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
   })).filter((p) => !isCommute(p) && p.movingTimeS > 0);
   const repsOf = new Map<string, number>();
+  let tonnageKg = 0;
   if (a.type === "WORKOUT") {
-    const ex = await prisma.workoutExercise.findMany({ where: { activityId: { in: [a.id, ...prev.map((p) => p.id)] } }, select: { activityId: true, sets: true, reps: true } });
-    for (const e of ex) repsOf.set(e.activityId, (repsOf.get(e.activityId) ?? 0) + e.sets * e.reps);
+    const ex = await prisma.workoutExercise.findMany({ where: { activityId: { in: [a.id, ...prev.map((p) => p.id)] } }, select: { activityId: true, sets: true, reps: true, loadKg: true } });
+    for (const e of ex) {
+      repsOf.set(e.activityId, (repsOf.get(e.activityId) ?? 0) + e.sets * e.reps);
+      if (e.activityId === a.id) tonnageKg += e.sets * e.reps * (e.loadKg ?? 0);
+    }
   }
   const past = prev.map((p) => ({ distanceM: p.distanceM, movingTimeS: p.movingTimeS, elevationGainM: p.elevationGainM, reps: repsOf.get(p.id) ?? 0 }))
     .filter((p) => a.type !== "WORKOUT" || p.reps > 0);
 
+  // Historique complet du sport (records « première fois » et top 5 %), et dernières anecdotes (références déjà citées).
+  const hist = (await prisma.activity.findMany({
+    where: { userId: a.userId, type: a.type, id: { not: a.id }, startedAt: { lt: a.startedAt } },
+    select: { type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
+  })).filter((h) => !isCommute(h));
+  const recent = opts.recent ?? (await prisma.activity.findMany({
+    where: { userId: a.userId, type: a.type, story: { not: null }, startedAt: { lt: a.startedAt } },
+    orderBy: { startedAt: "desc" }, take: 10, select: { story: true },
+  })).map((r) => r.story!);
+
   return buildStory({
-    id: a.id, type: a.type, streakDays, records: recs, past,
+    id: a.id, type: a.type, streakDays, records: recs, past, hist, tonnageKg, recent,
     cur: { type: a.type, distanceM: a.distanceM, movingTimeS: a.movingTimeS, elevationGainM: a.elevationGainM, reps: repsOf.get(a.id) ?? 0 },
   });
 }
