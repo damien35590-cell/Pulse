@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { Segmented } from "@/components/ui/segmented";
-import { BASEMAP_URL, basemapOptions, getMapTheme, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
 
 export type TrackPoint = { lat: number; lng: number; ele?: number; t?: number };
 type Mode = "slope" | "speed";
@@ -47,7 +47,7 @@ const COARSE = "(pointer: coarse)";
 const HINT_TOUCH = "Utilise deux doigts pour déplacer la carte", HINT_WHEEL = "Ctrl + molette pour zoomer";
 
 /**
- * Carte du parcours (fond CARTO selon le thème) : tracé coloré point par point selon la pente ou la vitesse, sur un halo.
+ * Carte du parcours (fond Stadia Maps selon le thème) : tracé coloré point par point selon la pente ou la vitesse, sur un halo.
  * Gestes coopératifs : un doigt fait défiler la page, deux doigts déplacent / zooment la carte ; sur PC, Ctrl + molette.
  * En plein écran, tous les gestes habituels reviennent. `cursor` : position suivie depuis le profil d'altitude.
  */
@@ -70,7 +70,7 @@ export default function InteractiveTopoMap({ points, cursor, className }: { poin
     const touch = matchMedia(COARSE).matches;
     const m = L.map(box, { zoomControl: !touch, scrollWheelZoom: false, dragging: !touch, touchZoom: true, zoomSnap: 0.5, preferCanvas: true });
     m.attributionControl.setPrefix(false);
-    base.current = L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions).addTo(m);
+    base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     layer.current = L.layerGroup().addTo(m);
     bounds.current = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
     m.fitBounds(bounds.current, { padding: [24, 24] });

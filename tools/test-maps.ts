@@ -23,9 +23,10 @@ assert.equal(previewTrack(null), undefined); // intérieur / muscu : pas de cart
 assert.equal(previewTrack(encodePolyline([[48.1, -1.6]])), undefined);
 assert.ok(previewTrack(encodePolyline(wiggly))!.length <= 200);
 
-// ── Tuiles CARTO ──
-assert.equal(tileUrl("dark", 16, 32462, 22750), `https://${"abcd"[(32462 + 22750) % 4]}.basemaps.cartocdn.com/dark_all/16/32462/22750.png`);
-assert.match(tileUrl("light", 3, 1, 2, true), /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/rastertiles\/voyager\/3\/1\/2@2x\.png$/);
+// ── Tuiles Stadia Maps (endpoint UE, sans clé) ──
+assert.equal(tileUrl("dark", 16, 32462, 22750), "https://tiles-eu.stadiamaps.com/tiles/alidade_smooth_dark/16/32462/22750.png");
+assert.equal(tileUrl("light", 3, 1, 2, true), "https://tiles-eu.stadiamaps.com/tiles/alidade_smooth/3/1/2@2x.png");
+assert.ok(!/api_key|cartocdn/.test(tileUrl("dark", 1, 0, 0)));
 
 // ── Axe d'altitude : 3 valeurs rondes, jamais depuis 0, données dans l'axe ──
 assert.equal(niceStep(17), 20);

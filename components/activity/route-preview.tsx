@@ -31,7 +31,7 @@ function layout(points: LatLng[], w: number, h: number) {
 }
 
 /**
- * Vignette statique d'un parcours pour le fil : tuiles CARTO posées en <img>, tracé en SVG projeté pareil.
+ * Vignette statique d'un parcours pour le fil : tuiles Stadia Maps posées en <img>, tracé en SVG projeté pareil.
  * Aucune bibliothèque de carte, aucune interaction : la carte du fil reste un simple lien vers le détail.
  * Attendu : une trace déjà simplifiée (~200 points, lib/map/track.ts → previewTrack).
  */
@@ -74,7 +74,7 @@ export function RoutePreview({ points, className }: { points: LatLng[]; classNam
               decoding="async"
               draggable={false}
               onLoad={() => done(frame)}
-              onError={() => done(frame)}
+              onError={(e) => { e.currentTarget.style.visibility = "hidden"; done(frame); }} /* tuile en erreur : le fond surface-2 reste, le tracé aussi */
               className="absolute max-w-none"
               style={{ left: t.left, top: t.top, width: TILE, height: TILE }}
             />

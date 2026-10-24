@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
-import { BASEMAP_URL, basemapOptions, getMapTheme, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
 import type { Junction } from "@/lib/habits/grid";
 
 type Props = {
@@ -41,7 +41,7 @@ export default function HeatMap({ lat0, cellM, cells, junctions, highlight, focu
     if (!el.current) return;
     const m = L.map(el.current, { zoomControl: false, scrollWheelZoom: false, preferCanvas: true });
     m.attributionControl.setPrefix(false);
-    base.current = L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions).addTo(m);
+    base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     const renderer = L.canvas({ padding: 0.3 });
     const brand = token("brand-text", "#C6F432");
     const ky = 110_540, kx = 111_320 * Math.cos((lat0 * Math.PI) / 180);

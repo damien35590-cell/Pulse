@@ -5,7 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BASEMAP_URL, basemapOptions, getMapTheme, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import type { RoutePoi } from "@/lib/routes/poi";
@@ -53,7 +53,7 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
       zoomControl: false, scrollWheelZoom: false, dragging: !still, touchZoom: !still, doubleClickZoom: !still, boxZoom: !still, keyboard: !still,
     });
     m.attributionControl.setPrefix(false);
-    base.current = L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions).addTo(m);
+    base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     const brand = token("brand-text", "#C6F432"), good = token("good", "#22C55E"), ring = token("surface", "#141417");
     const line = L.polyline(points, { color: brand, weight: still ? 4 : 5, opacity: 0.95, lineJoin: "round", interactive: false }).addTo(m);
     const dot = (p: [number, number], c: string) => L.circleMarker(p, { radius: still ? 5 : 7, color: ring, weight: 3, fillColor: c, fillOpacity: 1, interactive: false }).addTo(m);

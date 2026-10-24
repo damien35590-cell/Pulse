@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
-import { BASEMAP_URL, basemapOptions, getMapTheme, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
 import { tap } from "@/lib/haptics";
 
 type LatLng = { lat: number; lng: number };
@@ -38,7 +38,7 @@ export default function PickMap({ center, value, onPick, className }: Props) {
     const start = value ?? center;
     const m = L.map(el.current, { zoomControl: false, scrollWheelZoom: false }).setView(start ? [start.lat, start.lng] : FRANCE, start ? (value ? 15 : 13) : 5);
     m.attributionControl.setPrefix(false);
-    base.current = L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions).addTo(m);
+    base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     m.on("click", (e: L.LeafletMouseEvent) => { tap(8); pick.current({ lat: e.latlng.lat, lng: e.latlng.lng }); });
     map.current = m;
     return () => { m.remove(); map.current = null; pin.current = null; };

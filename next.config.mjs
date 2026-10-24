@@ -48,13 +48,15 @@ export default async () => {
           },
         },
         {
-          // Fond de carte CARTO (lib/map/basemap.ts) : vignettes du fil et cartes Leaflet.
-          urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*/i,
+          // Fond de carte Stadia Maps (lib/map/basemap.ts) : vignettes du fil et cartes Leaflet.
+          // Nom versionné : worker/index.ts supprime les anciens caches à l'activation. Seules les réponses 200 sont gardées
+          // (jamais d'erreur ni de tuile filigrane « clé requise »).
+          urlPattern: /^https:\/\/tiles-eu\.stadiamaps\.com\/.*/i,
           handler: "CacheFirst",
           options: {
-            cacheName: "carto-tiles",
+            cacheName: "stadia-tiles-v1",
             expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 14 },
-            cacheableResponse: { statuses: [0, 200] },
+            cacheableResponse: { statuses: [200] },
           },
         },
         {
