@@ -38,7 +38,7 @@ const config: Config = {
       outlineColor: { brand: c("brand-text") },
       ringColor: { brand: c("brand-text") },
       caretColor: { brand: c("brand-text") },
-      stroke: { brand: c("brand-text") },
+      stroke: { brand: c("brand-text"), act: Object.fromEntries(["run", "strength", "ride", "hike", "other"].map((k) => [k, c(`act-${k}`)])) },
       fontFamily: {
         sans: ["var(--font-body)", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "var(--font-body)", "sans-serif"],

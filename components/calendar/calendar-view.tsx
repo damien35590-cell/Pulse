@@ -102,7 +102,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
               <li key={k}>
                 <button type="button" onClick={() => toggle(k)} aria-pressed={selected === k}
                   className={cn("flex min-h-11 w-full gap-3 rounded-xl border p-2 text-left", selected === k ? "border-brand bg-brand/10" : "border-transparent bg-surface-2", k === today && "ring-2 ring-brand")}>
-                  <span className="w-12 shrink-0 text-xs font-semibold capitalize text-ink-soft">{shortDay(k)}</span>
+                  <span className="w-12 shrink-0 text-xs font-semibold text-ink-soft first-letter:uppercase">{shortDay(k)}</span>
                   <span className="min-w-0 flex-1 space-y-1">
                     {isEmpty(d) && <span className="text-sm text-ink-soft">—</span>}
                     {d.races.map((r) => <Row key={r.id} icon={<StarIcon className="h-3.5 w-3.5" />} text={r.name} />)}
@@ -124,7 +124,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
 
       {selected && sel && (
         <div className="space-y-1 rounded-xl border border-line bg-surface-2 p-3" role="region" aria-label={`Détail du ${longDay(selected)}`}>
-          <p className="font-semibold capitalize">{longDay(selected)}</p>
+          <p className="font-semibold first-letter:uppercase">{longDay(selected)}</p>
           {isEmpty(sel) && <p className="text-sm text-ink-soft">Rien de prévu ni de fait ce jour-là.</p>}
           {sel.races.map((r) => <Row key={r.id} icon={<StarIcon className="h-3.5 w-3.5" />} text={r.name} meta={raceLabel[r.status]} />)}
           {sel.sessions.map((s) => <Row key={s.id} icon={<span className={cn(dot, sessionDot(s))} />} text={s.title} meta={[statusLabel[s.status], s.isKey ? "clé" : null, s.durationS ? fmtDuration(s.durationS) : null].filter(Boolean).join(" · ")} />)}

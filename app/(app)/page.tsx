@@ -23,6 +23,7 @@ import { PlanRouteCard } from "@/components/routes/plan-route-card";
 import { PendingBadgesCard } from "@/components/profile/pending-badges-card";
 import { CoachCard } from "@/components/dashboard/coach-card";
 import { getCoach } from "@/lib/coach/load";
+import { fmtWhen } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
     const all = cells(a), picked = a.type === "WORKOUT" ? LIFT.map((l) => all.find((c) => c.l === l)).filter((c) => !!c) : all;
     return {
       id: a.id, type: a.type, title: a.title, story: a.story ?? undefined, tags: a.muscles.length ? a.muscles : undefined,
-      when: new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt),
+      when: fmtWhen(a.startedAt, TZ),
       metrics: picked.slice(0, 3).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
     };
   });

@@ -33,7 +33,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold leading-tight text-ink">{a.title}</p>
-          <p className="mt-0.5 truncate text-xs text-ink-mute first-letter:uppercase">{a.when}</p>
+          <p className="mt-0.5 truncate text-xs text-ink-mute">{a.when}</p>
         </div>
         {a.badge && <span className="shrink-0 rounded-full bg-brand/15 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-brand">{a.badge}</span>}
       </div>

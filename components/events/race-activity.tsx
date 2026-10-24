@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, Link2, Unlink } from "lucide-react";
 import { adoptWatchTime, linkRaceActivity, unlinkRaceActivity } from "@/app/actions";
 import { routePath } from "@/lib/polyline";
-import { fmtDuration, fmtKm, fmtNum, fmtPace } from "@/lib/format";
+import { fmtDuration, fmtKm, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
 import { fmtHms } from "@/lib/races/format";
 import { SPORTS } from "@/lib/sports";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,6 @@ const TZ = "Europe/Paris";
 export type RaceActivityView = { id: string; title: string; type: string; startedAt: string; distanceM: number; movingTimeS: number; elevationGainM: number; avgHr: number | null; polyline: string | null };
 export type CandidateView = Pick<RaceActivityView, "id" | "title" | "type" | "startedAt" | "distanceM" | "movingTimeS">;
 
-const when = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("fr-FR", { ...opts, timeZone: TZ }).format(new Date(iso));
 const btn = "flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface font-semibold disabled:opacity-50";
 
 /** Carte « Ta sortie du jour J » : stats de l'activité liée, temps montre provisoire et délier. */
@@ -37,7 +36,7 @@ export function RaceActivityCard({ raceId, activity: a, hasResult }: { raceId: s
         <div className="flex items-center justify-between gap-3 px-4 pt-3">
           <div className="min-w-0">
             <p className="truncate font-semibold">{a.title}</p>
-            <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {when(a.startedAt, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}</p>
+            <p className="text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhen(new Date(a.startedAt), TZ)}</p>
           </div>
           <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft" aria-hidden />
         </div>
@@ -74,7 +73,7 @@ export function LinkRaceActivity({ raceId, candidates }: { raceId: string; candi
                 <Icon className="h-5 w-5 shrink-0 text-ink-soft" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{c.title}</span>
-                  <span className="block text-sm capitalize text-ink-soft">{when(c.startedAt, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {fmtKm(c.distanceM)} km · {fmtDuration(c.movingTimeS)}</span>
+                  <span className="block text-sm text-ink-soft">{fmtWhen(new Date(c.startedAt), TZ, { short: true })} · {fmtKm(c.distanceM)} km · {fmtDuration(c.movingTimeS)}</span>
                 </span>
               </button>
             </li>

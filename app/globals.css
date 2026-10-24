@@ -21,7 +21,7 @@
     --sport-hike: var(--brand); --sport-workout: var(--brand); --sport-other: var(--brand);
     /* Couleurs par type d'activité (lib/activity-style.ts) : une famille, même luminosité et chroma OKLCH, sans concurrencer Volt. */
     --act-run: 255 138 92; --act-strength: 142 146 255; --act-ride: 63 202 219; --act-hike: 69 203 162; --act-other: var(--ink-mute);
-    --act-run-soft: color-mix(in oklch, rgb(var(--act-run)) 18%, transparent); --act-strength-soft: color-mix(in oklch, rgb(var(--act-strength)) 18%, transparent);
+    --act-run-soft: color-mix(in oklch, rgb(var(--act-run)) 18%, transparent); --act-strength-soft: color-mix(in oklch, rgb(var(--act-strength)) 22%, transparent);
     --act-ride-soft: color-mix(in oklch, rgb(var(--act-ride)) 18%, transparent); --act-hike-soft: color-mix(in oklch, rgb(var(--act-hike)) 18%, transparent);
     --act-other-soft: color-mix(in oklch, rgb(var(--act-other)) 18%, transparent);
     /* Barres empilées par sport (Analyse > Tous) : une teinte par sport, identique en clair et en sombre. */

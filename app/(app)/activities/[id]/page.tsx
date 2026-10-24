@@ -8,7 +8,7 @@ import { decodePolyline } from "@/lib/polyline";
 import { haversine } from "@/lib/geo";
 import { SPORTS } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
-import { fmtDuration, fmtKm, fmtNum, fmtPace } from "@/lib/format";
+import { fmtDuration, fmtKm, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
 import { RouteMapLazy } from "@/components/activity/route-map-lazy";
 import { TopoMapLazy } from "@/components/activity/topo-map-lazy";
 import { TimeInZones } from "@/components/activity/time-in-zones";
@@ -87,7 +87,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       <header>
         <div className="flex items-center gap-3">
           <span className={`grid size-12 shrink-0 place-items-center rounded-tile ${sportSoft} ${sportFg}`}><SportIcon className="size-6" aria-hidden /></span>
-          <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt)}</p>
+          <p className="text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhen(a.startedAt, TZ, { year: true })}</p>
         </div>
         {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand">🏁 Course · {a.raceEvent.name}</Link>}
         <EditableTitle activityId={a.id} title={a.title} />
