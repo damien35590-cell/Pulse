@@ -1,0 +1,18 @@
+# Fins de ligne LF partout (dépôt et copie de travail), quel que soit l'OS.
+* text=auto eol=lf
+
+# Scripts Windows : cmd.exe attend du CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaires : jamais de conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.fit binary
+*.gz binary
+*.zip binary
