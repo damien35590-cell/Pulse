@@ -1,6 +1,6 @@
 # Garde-fou : à chaque push (et pull request), on vérifie que Pulse compile, que les types sont bons et que les tests passent.
 # En cas d'échec, GitHub met une croix rouge sur le commit et envoie un e-mail. Aucun accès à la base : la construction
-# utilise des valeurs factices (la vraie base n'est touchée que par le build Vercel, via `prisma db push`).
+# utilise des valeurs factices (la vraie base n'est touchée que par le build Vercel, via `prisma migrate deploy`).
 name: Vérifier Pulse
 
 on:
