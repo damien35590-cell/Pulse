@@ -36,7 +36,7 @@ export function RaceActivityCard({ raceId, activity: a, hasResult }: { raceId: s
         <div className="flex items-center justify-between gap-3 px-4 pt-3">
           <div className="min-w-0">
             <p className="truncate font-semibold">{a.title}</p>
-            <p className="text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhen(new Date(a.startedAt), TZ)}</p>
+            <p className="text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhen(new Date(a.startedAt), TZ, { prefixed: true })}</p>
           </div>
           <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft" aria-hidden />
         </div>

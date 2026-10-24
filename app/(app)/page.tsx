@@ -29,8 +29,7 @@ export const dynamic = "force-dynamic";
 
 const TZ = "Europe/Paris";
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
-// Muscu : durée, séries, volume. Autres sports : les 3 premiers chiffres de cells().
-const LIFT = ["Durée", "Séries", "Volume"];
+// Les 3 chiffres de cells() (identiques à la carte du fil).
 
 /**
  * Accueil : la semaine en tête, puis la séance du jour (carte « Aujourd'hui » du coach, seul bouton Volt de l'écran),
@@ -50,7 +49,7 @@ export default async function DashboardPage() {
   const goal = d.goals[0];
   const race = d.events[0];
   const recent = d.recent.map((a) => {
-    const all = cells(a), picked = a.type === "WORKOUT" ? LIFT.map((l) => all.find((c) => c.l === l)).filter((c) => !!c) : all;
+    const picked = cells(a);
     return {
       id: a.id, type: a.type, title: a.title, story: a.story ?? undefined, tags: a.muscles.length ? a.muscles : undefined,
       when: fmtWhen(a.startedAt, TZ),

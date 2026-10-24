@@ -12,7 +12,7 @@ type A = {
 };
 export type Cell = { l: string; v: string; u?: string };
 
-/** Les 3 ou 4 chiffres les plus utiles selon le sport : D+ pour le trail, puissance pour le vélo, volume pour la muscu… */
+/** Exactement 3 chiffres par carte (règle 2 du design system), les plus utiles selon le sport. */
 export function cells(a: A): Cell[] {
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const dist: Cell = { l: "Distance", v: fmtKm(a.distanceM), u: "km" }, dur: Cell = { l: "Durée", v: fmtDuration(a.movingTimeS) };
@@ -28,7 +28,7 @@ export function cells(a: A): Cell[] {
   else if (a.type === "HIKE") list = [dist, dplus, dur, hr];
   else if (a.type === "RUN") list = [dist, dur, sp, dplus, hr];
   else list = [dist, dur, dplus, hr];
-  return list.filter((c): c is Cell => c !== null).slice(0, a.type === "RIDE" || a.type === "HIKE" ? 3 : 4);
+  return list.filter((c): c is Cell => c !== null).slice(0, 3);
 }
 const COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
 

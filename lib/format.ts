@@ -27,10 +27,13 @@ export const fmtClock = (sec: number) => {
 /** « 2026-10-12 » → « 12 oct. » (clé de jour calendaire, sans décalage de fuseau). */
 export const fmtDayKey = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 
-/** Date d'une activité en français, seule la première lettre en majuscule : « Mardi 20 octobre à 12:36 » (jamais de CSS capitalize). */
-export function fmtWhen(d: Date, tz: string, o: { short?: boolean; year?: boolean } = {}) {
+/** Date d'une activité en français : « Mardi 20 octobre à 12:36 » (jamais de CSS capitalize). Majuscule seulement si la date ouvre la phrase ; après un préfixe (`prefixed`) : « Musculation · mardi 20 octobre… ». */
+export function fmtWhen(d: Date, tz: string, o: { short?: boolean; year?: boolean; prefixed?: boolean } = {}) {
   const s = o.short ? "short" : "long";
   const day = new Intl.DateTimeFormat("fr-FR", { weekday: s, day: "numeric", month: s, ...(o.year ? { year: "numeric" } : {}), timeZone: tz }).format(d);
   const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: tz }).format(d);
-  return `${day.charAt(0).toUpperCase()}${day.slice(1)} à ${time}`;
+  return `${o.prefixed ? day : day.charAt(0).toUpperCase() + day.slice(1)} à ${time}`;
 }
+
+/** Ordinal français : 1re / 1er, puis 2e, 14e… (jamais « ème »). `gender` : « f » par défaut (une sortie, une séance), « m » pour 1er. */
+export const ordinalFr = (n: number, gender: "m" | "f" = "f") => (n === 1 ? (gender === "m" ? "1er" : "1re") : `${n}e`);
