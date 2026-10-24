@@ -15,7 +15,6 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   formatDetection: { telephone: false },
   appleWebApp: { capable: true, title: "Pulse", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
 };
 
 export const viewport: Viewport = {
@@ -23,10 +22,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover", // contenu sous la barre d'état / la barre de gestes du Pixel : les safe areas sont gérées en CSS
   interactiveWidget: "resizes-content", // le clavier Android réduit la page : les boutons du bas restent au-dessus du clavier
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F7FA" },
-    { media: "(prefers-color-scheme: dark)", color: "#0A0A0C" },
-  ],
+  themeColor: "#0A0A0C",
   colorScheme: "light dark",
 };
 

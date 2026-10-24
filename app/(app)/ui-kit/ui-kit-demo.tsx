@@ -6,6 +6,7 @@ import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
 import { HR_MAX, fitness, goal, hrBands, liftSession, nextRace, recent, rideWeather, routeSuggestion, runs, today, week, workout } from "@/lib/mock/ui-kit";
+import { PulseLogo, PulseMark } from "@/components/brand/logo";
 import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
 import { Delta, Metric } from "@/components/ui/metric";
@@ -284,6 +285,15 @@ function Tokens() {
         }}
       />
       <div className="space-y-8">
+        <Section title="Marque">
+          <div className={cn(ui.card, "flex flex-wrap items-center gap-6 p-4")}>
+            <PulseMark size={64} />
+            <PulseMark size={32} />
+            <PulseMark size={16} />
+            <PulseLogo size={40} />
+          </div>
+        </Section>
+
         <Section title="Surfaces · élévation par la lumière">
           <div className="grid grid-cols-4 gap-2">
             {swatch("bg", "bg-bg", "#0A0A0C")}
