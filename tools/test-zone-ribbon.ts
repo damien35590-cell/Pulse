@@ -1,6 +1,9 @@
 // Lancer avec : npx tsx tools/test-zone-ribbon.ts
 import assert from "node:assert/strict";
 import { parseRibbon, refsChange, zoneRibbon as ribbonOf, RIBBON_BUCKETS, type RibbonOpts, type RibbonRefs, type RibbonSegment, type RibbonStream } from "../lib/art/zone-ribbon";
+import { readFileSync } from "node:fs";
+import { detectIntervals } from "../lib/art/interval";
+import { paceUpper } from "../lib/art/zone-ribbon";
 import { paceSeries, type PacePoint } from "../lib/art/pace";
 import { hasIntervalStructure, hasPaceIntervalStructure, shortTitle } from "../lib/art/effort";
 import { exerciseCode, setGroups } from "../lib/art/set-bars";
@@ -117,6 +120,19 @@ assert.ok(!hasPaceIntervalStructure(seg([3, 4], ...many(5, [4, 2], [3, 3]), [3, 
 assert.ok(hasPaceIntervalStructure(seg([2, 14], ...many(4, [4, 2], [2, 4]), [2, 2])), "4 blocs de 2 tranches = 20 % du temps : détecté");
 // Le ruban FC garde l'ancienne règle.
 assert.ok(hasIntervalStructure(seg([2, 10], ...many(5, [5, 1], [2, 5]), [2, 5])), "FC : un bloc d'une tranche compte");
+
+// Détection à 10 s sur des sorties réelles (tranches de 10 s de la base de dev, VMA 15) : fractionnés connus vs sorties faciles d'octobre 2026.
+const fx = JSON.parse(readFileSync(new URL("./fixtures/intervals-dev.json", import.meta.url), "utf8")) as { vma: number; runs: { date: string; km: number; expect: boolean; slots: number[] }[] };
+for (const r of fx.runs) {
+  const d = detectIntervals(r.slots, paceUpper(fx.vma));
+  assert.equal(d.is, r.expect, `${r.date} ${r.km} km : ${r.expect ? "fractionné" : "sortie facile"} attendu (répétitions détectées : ${d.reps})`);
+}
+// Synthétique : 10 × 90 s à la VMA / 90 s trot détecté ; 3 répétitions non ; un tempo continu non.
+const slotsOf = (plan: [number, number][]) => plan.flatMap(([sec, v]) => new Array<number>(sec / 10).fill(v));
+const ten = slotsOf([[900, 10], ...Array.from({ length: 10 }, () => [[90, 15], [90, 8]] as [number, number][]).flat(), [600, 9]]);
+assert.deepEqual(detectIntervals(ten, paceUpper(15)), { is: true, reps: 10 });
+assert.equal(detectIntervals(slotsOf([[900, 10], ...Array.from({ length: 3 }, () => [[90, 15], [90, 8]] as [number, number][]).flat(), [600, 9]]), paceUpper(15)).is, false);
+assert.equal(detectIntervals(slotsOf([[600, 10], [1500, 14], [600, 9]]), paceUpper(15)).is, false, "tempo continu");
 
 // Seuils qui bougent : FC max ≥ 2 bpm, FTP ≥ 2 W, VMA au dixième ; un seuil qui apparaît ou disparaît compte toujours.
 assert.deepEqual(refsChange({ hrMax: 185 }, { hrMax: 186 }), { stale: [], appeared: false });

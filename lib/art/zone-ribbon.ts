@@ -5,6 +5,7 @@
  * Source, par priorité : FC (FC max) > puissance (vélo, FTP) > allure (course, VMA).
  */
 import { bounds, HR_PCT, POWER_PCT, zoneIndex } from "../zones";
+import { detectIntervals, toSlots, type IntervalResult } from "./interval";
 import { PACE_PCT, paceSeries, type PacePoint } from "./pace";
 
 export const RIBBON_BUCKETS = 40;
@@ -25,7 +26,10 @@ export type RibbonStream = { hr?: number[]; power?: number[]; points?: PacePoint
 export type RibbonRefs = { hrMax?: number | null; ftp?: number | null; vma?: number | null };
 export type RibbonOpts = { ride?: boolean; run?: boolean };
 /** `ref` : le seuil qui a servi, gardé avec le ruban pour savoir quand il est périmé. */
-export type Ribbon = { segments: RibbonSegment[]; source: RibbonSource; ref: number };
+export type Ribbon = { segments: RibbonSegment[]; source: RibbonSource; ref: number; interval?: IntervalResult };
+
+/** Bornes hautes de Z1 à Z5 en km/h (pas de bounds() : il arrondit à l'entier, trop grossier). */
+export const paceUpper = (vma: number) => PACE_PCT.map((p) => (vma * p) / 100);
 
 /** Zone (0 à 5) de la moyenne de chaque tranche ; null = tranche sans mesure. */
 function bucketZones(series: number[], upper: number[], keepZeros: boolean): (number | null)[] {
@@ -75,7 +79,7 @@ export function zoneRibbon(stream: RibbonStream, refs: RibbonRefs, opts: RibbonO
   const { hr = [], power = [], points = [] } = stream;
   if (hr.length >= MIN_SECONDS && refs.hrMax && refs.hrMax > 0) {
     const zones = fill(bucketZones(hr, bounds(refs.hrMax, HR_PCT), false));
-    if (zones) return { segments: merge(zones), source: "hr", ref: refs.hrMax };
+    if (zones) return { segments: merge(zones), source: "hr", ref: refs.hrMax, interval: detectIntervals(toSlots(hr), bounds(refs.hrMax, HR_PCT)) };
   }
   if (opts.ride && power.length >= MIN_SECONDS && refs.ftp && refs.ftp > 0) {
     const zones = fill(bucketZones(power, bounds(refs.ftp, POWER_PCT), true));
@@ -84,8 +88,8 @@ export function zoneRibbon(stream: RibbonStream, refs: RibbonRefs, opts: RibbonO
   if (opts.run && points.length >= 2 && refs.vma && refs.vma > 0) {
     const speed = paceSeries(points);
     // Pas de bounds() ici : il arrondit à l'entier, trop grossier pour des km/h.
-    const zones = speed.length >= MIN_SECONDS ? fill(bucketZones(speed, PACE_PCT.map((p) => (refs.vma! * p) / 100), false)) : null;
-    if (zones) return { segments: merge(zones), source: "pace", ref: refs.vma };
+    const zones = speed.length >= MIN_SECONDS ? fill(bucketZones(speed, paceUpper(refs.vma), false)) : null;
+    if (zones) return { segments: merge(zones), source: "pace", ref: refs.vma, interval: detectIntervals(toSlots(speed), paceUpper(refs.vma)) };
   }
   return null;
 }

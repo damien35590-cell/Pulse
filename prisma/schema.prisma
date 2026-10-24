@@ -196,6 +196,8 @@ model Activity {
   zoneRibbon     Json?                   // [{ z: 1..6, f: fraction du temps }] : ruban de zones, lib/art/zone-ribbon.ts ; null sans FC, puissance (vélo) ni allure (course)
   zoneRibbonSource String?               // "hr" | "power" | "pace" : série d'où vient le ruban ; null = pas de ruban (ou ruban d'avant ce champ)
   zoneRibbonRef  Float?                  // seuil utilisé : FC max (bpm), FTP (W) ou VMA (km/h) ; sert à repérer les rubans périmés quand il change
+  isInterval     Boolean?                // séance d'intervalles (lib/art/interval.ts, 10 s de résolution, rubans FC et allure) ; null = non évalué
+  intervalReps   Int?                    // nombre de répétitions détectées
   zoneRibbonAt   DateTime?               // dernier calcul du ruban, même sans résultat ; null = jamais calculé ou à recalculer (lib/data/zone-ribbon.ts)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

@@ -27,6 +27,8 @@ export type ArtActivity = {
   zoneRibbon?: unknown;
   /** "hr" | "power" | "pace" : l'allure, plus bruitée, a une détection d'intervalles plus stricte. */
   zoneRibbonSource?: string | null;
+  /** Détection à 10 s (lib/art/interval.ts) ; null = non évalué, on retombe sur la règle du ruban. */
+  isInterval?: boolean | null;
   plannedSession?: { kind: string; title: string } | null;
   exercises?: SetExercise[];
 };
@@ -42,7 +44,7 @@ export function cardArt(a: ArtActivity): CardArt {
   if (!ribbon) return {};
   const key = a.plannedSession && EFFORT_KINDS.includes(a.plannedSession.kind) ? a.plannedSession : null;
   if (key) return { effort: { segments: ribbon, label: shortTitle(key.title) } };
-  if ((a.zoneRibbonSource === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(ribbon)) return { effort: { segments: ribbon } };
+  if (a.isInterval ?? (a.zoneRibbonSource === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(ribbon)) return { effort: { segments: ribbon } };
   if (a.hasRoute || (a.type === "RIDE" && a.source === "mywhoosh")) return { ribbon };
   return {};
 }

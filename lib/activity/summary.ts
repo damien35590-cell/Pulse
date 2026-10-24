@@ -11,7 +11,7 @@ export type SummaryActivity = {
   id: string; type: string; title: string; story: string | null; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; polyline: string | null;
   avgHr?: number | null; avgPower?: number | null; exercises?: ({ sets: number; reps: number; loadKg: number | null } & Partial<SetExercise>)[];
   /** Art (lib/art/card.ts) : tous facultatifs, sans eux la carte reste celle d'avant. */
-  source?: string | null; zoneRibbon?: unknown; zoneRibbonSource?: string | null; plannedSession?: { kind: string; title: string } | null;
+  source?: string | null; zoneRibbon?: unknown; zoneRibbonSource?: string | null; isInterval?: boolean | null; plannedSession?: { kind: string; title: string } | null;
 };
 export type Cell = { l: string; v: string; u?: string };
 
@@ -42,7 +42,7 @@ export function summaryData(a: SummaryActivity, insight: ActivityInsight | undef
   const route = isSoft(a.type) ? undefined : previewTrack(a.polyline);
   // Art : ruban, profil d'effort ou séries de muscu selon les données (jamais pour une activité douce).
   const art = isSoft(a.type) ? {} : cardArt({
-    type: a.type, source: a.source, hasRoute: !!route && route.length > 1, zoneRibbon: a.zoneRibbon, zoneRibbonSource: a.zoneRibbonSource, plannedSession: a.plannedSession,
+    type: a.type, source: a.source, hasRoute: !!route && route.length > 1, zoneRibbon: a.zoneRibbon, zoneRibbonSource: a.zoneRibbonSource, isInterval: a.isInterval, plannedSession: a.plannedSession,
     exercises: a.exercises?.flatMap((e) => (e.name ? [{ name: e.name, sets: e.sets, reps: e.reps, setsDetail: e.setsDetail }] : [])),
   });
   return {

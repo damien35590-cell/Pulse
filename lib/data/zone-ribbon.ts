@@ -28,7 +28,7 @@ export async function getRibbonZones(userId: string): Promise<RibbonZones> {
  * `zones` : à passer quand on traite plusieurs activités du même utilisateur.
  */
 export async function computeZoneRibbon(activityId: string, zones?: RibbonZones): Promise<Ribbon | null> {
-  const a = await prisma.activity.findUnique({ where: { id: activityId }, select: { userId: true, type: true, stream: { select: { data: true } } } });
+  const a = await prisma.activity.findUnique({ where: { id: activityId }, select: { userId: true, type: true, raceEvent: { select: { id: true } }, stream: { select: { data: true } } } });
   if (!a) return null;
   const run = a.type === "RUN", ride = a.type === "RIDE" || a.type === "EBIKE";
   let st = (a.stream?.data ?? null) as StreamData | null;
@@ -40,14 +40,16 @@ export async function computeZoneRibbon(activityId: string, zones?: RibbonZones)
     if (run) points = track;
   }
   if (!st && !points?.length) return null;
-  return zoneRibbon({ hr: st?.hr, power: st?.power, points }, zones ?? (await getRibbonZones(a.userId)), { ride, run });
+  const r = zoneRibbon({ hr: st?.hr, power: st?.power, points }, zones ?? (await getRibbonZones(a.userId)), { ride, run });
+  // Une course (jour J rattaché) n'est pas une séance d'intervalles, même avec des relances.
+  return r?.interval && a.raceEvent ? { ...r, interval: { is: false, reps: 0 } } : r;
 }
 
 /** Enregistre le ruban, sa source et son seuil (tout à null quand il n'y a pas de ruban) et date le calcul. */
 export const writeRibbon = (activityId: string, r: Ribbon | null) =>
   prisma.activity.update({
     where: { id: activityId },
-    data: { zoneRibbon: r?.segments ?? Prisma.DbNull, zoneRibbonSource: r?.source ?? null, zoneRibbonRef: r?.ref ?? null, zoneRibbonAt: new Date() },
+    data: { zoneRibbon: r?.segments ?? Prisma.DbNull, zoneRibbonSource: r?.source ?? null, zoneRibbonRef: r?.ref ?? null, isInterval: r?.interval?.is ?? null, intervalReps: r?.interval?.reps ?? null, zoneRibbonAt: new Date() },
   });
 
 /** Calcule et enregistre le ruban. Renvoie le nombre de tronçons (0 = pas de ruban). */
@@ -90,7 +92,7 @@ export async function pendingRibbonIds(userId: string, zones: RibbonZones, limit
     SELECT a.id FROM "Activity" a
     WHERE a."userId" = ${userId} ${skip.length ? Prisma.sql`AND a.id <> ALL(${skip})` : Prisma.empty} AND (
       (a."zoneRibbonAt" IS NULL AND (a."zoneRibbon" IS NOT NULL OR a.type = 'RUN' OR EXISTS (SELECT 1 FROM "ActivityStream" s WHERE s."activityId" = a.id)))
-      OR ${stale("hr")} OR ${stale("power")} OR ${stale("pace")} OR ${hrNow}
+      OR (a."zoneRibbonSource" IN ('hr', 'pace') AND a."isInterval" IS NULL) OR ${stale("hr")} OR ${stale("power")} OR ${stale("pace")} OR ${hrNow}
     )
     ORDER BY a."startedAt" DESC LIMIT ${limit}`;
   return rows.map((r) => r.id);

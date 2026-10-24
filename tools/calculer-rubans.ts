@@ -69,9 +69,9 @@ async function main() {
       total.ribbon++;
       bump(bySource, r.source);
       bump(byType, a?.type ?? "?");
-      const interval = (r.source === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(r.segments);
+      const interval = r.interval ? r.interval.is : (r.source === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(r.segments);
       if (interval) { total.interval++; bump(intervalBySource, r.source); }
-      const art = a && cardArt({ type: a.type, hasRoute: true, zoneRibbon: r.segments, zoneRibbonSource: r.source, plannedSession: a.plannedSession });
+      const art = a && cardArt({ type: a.type, hasRoute: true, zoneRibbon: r.segments, zoneRibbonSource: r.source, isInterval: r.interval?.is ?? null, plannedSession: a.plannedSession });
       if (art?.effort) { total.effort++; if (a?.plannedSession) total.keyLinked++; }
     }
 
