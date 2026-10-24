@@ -1,8 +1,12 @@
-import { Bike, Dumbbell, Footprints, Mountain, Waves, Activity, Zap, type LucideIcon } from "lucide-react";
+import { Bike, Dumbbell, Footprints, Mountain, Waves, Activity, Zap, type LucideProps } from "lucide-react";
+import type { ComponentType } from "react";
+import { Runner } from "@/components/ui/icons/runner";
+
+export type SportIcon = ComponentType<LucideProps>;
 
 /** Comme sur Strava : une seule couleur de marque, les sports se distinguent par leur pictogramme. */
-export const SPORTS: Record<string, { label: string; icon: LucideIcon }> = {
-  RUN: { label: "Running", icon: Footprints }, RIDE: { label: "Vélo", icon: Bike }, EBIKE: { label: "E-bike", icon: Zap }, SWIM: { label: "Natation", icon: Waves },
+export const SPORTS: Record<string, { label: string; icon: SportIcon }> = {
+  RUN: { label: "Running", icon: Runner }, RIDE: { label: "Vélo", icon: Bike }, EBIKE: { label: "E-bike", icon: Zap }, SWIM: { label: "Natation", icon: Waves },
   HIKE: { label: "Randonnée", icon: Mountain }, WALK: { label: "Marche", icon: Footprints }, WORKOUT: { label: "Musculation", icon: Dumbbell }, OTHER: { label: "Activité", icon: Activity },
 };
 export const sportColor = (_type?: string) => "rgb(var(--brand))";

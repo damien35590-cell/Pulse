@@ -363,6 +363,7 @@ function Tokens() {
               );
             })}
           </div>
+          <p className="mt-2 px-1 text-xs text-ink-mute">{"<Runner>"} : components/ui/icons/runner.tsx (Tabler, MIT)</p>
         </Section>
 
         <Section title="Zones d'intensité">

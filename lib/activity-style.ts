@@ -1,7 +1,6 @@
-import type { LucideIcon } from "lucide-react";
-import { SPORTS } from "@/lib/sports";
+import { SPORTS, type SportIcon } from "@/lib/sports";
 
-export type ActivityStyle = { icon: LucideIcon; fg: string; soft: string; dot: string; stroke: string };
+export type ActivityStyle = { icon: SportIcon; fg: string; soft: string; dot: string; stroke: string };
 
 // Classes écrites en toutes lettres : Tailwind ne scanne pas les noms construits.
 const RUN = { fg: "text-act-run", soft: "bg-act-run-soft", dot: "bg-act-run", stroke: "stroke-act-run" };

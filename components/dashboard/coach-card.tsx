@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, CircleCheck, Dumbbell, Footprints, MoonStar } from "lucide-react";
+import { ArrowRight, CircleCheck, Dumbbell, MoonStar } from "lucide-react";
+import { Runner } from "@/components/ui/icons/runner";
 import type { CoachPlan } from "@/lib/coach/today";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 
-const ICON = { run: Footprints, lift: Dumbbell, rest: MoonStar, done: CircleCheck } as const;
+const ICON = { run: Runner, lift: Dumbbell, rest: MoonStar, done: CircleCheck } as const;
 const TONE = { go: "bg-brand text-brand-ink", easy: "bg-good/15 text-good", rest: "bg-surface-2 text-ink-soft" } as const;
 
 /** Coach du jour : une seule recommandation (séance, créneau météo, boucle) et ce qui vient demain. */
