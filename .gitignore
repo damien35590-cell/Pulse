@@ -5,5 +5,7 @@ public/sw.js
 public/sw.js.map
 public/workbox-*.js
 public/swe-worker-*.js
+public/worker-*.js
+public/fallback-*.js
 tsconfig.tsbuildinfo
 .env*.local
