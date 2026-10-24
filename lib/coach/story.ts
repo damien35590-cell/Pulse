@@ -18,6 +18,11 @@ export type Story = { kind: StoryKind; text: string };
 
 export const STREAK_MIN = 3;
 export const GAP_MIN_PCT = 3;
+/** D+ : écart exprimé en mètres, seulement s'il est d'au moins 100 m ET 25 % au-dessus de la moyenne. */
+export const DPLUS_MIN_M = 100;
+export const DPLUS_MIN_PCT = 25;
+/** Au-delà de ce pourcentage, on affiche l'écart absolu plutôt que le pourcentage. */
+export const GAP_MAX_PCT = 50;
 const WINDOW_DAYS = 30;
 
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -53,12 +58,21 @@ export function streakText(id: string, type: string, n: number): string {
 }
 
 export type Metric = "Allure" | "Vitesse" | "D+" | "Répétitions totales";
-export function comparisonText(id: string, metric: Metric, gapPct: number): string {
-  const p = Math.round(Math.abs(gapPct)), up = gapPct > 0, sign = up ? "+" : "−";
+export type Gap = { metric: Metric; pct: number; abs: number };
+export function comparisonText(id: string, g: Gap): string {
+  if (g.metric === "D+") return `${fmtNum(Math.round(g.abs), 0)} m de D+ de plus que ta moyenne.`;
+  const up = g.pct > 0, sign = up ? "+" : "−", metric = g.metric;
+  if (Math.abs(g.pct) > GAP_MAX_PCT) {
+    const x = Math.abs(g.abs);
+    if (metric === "Allure") return `Allure ${Math.round(x)} s/km ${up ? "plus rapide" : "plus lente"} que ta moyenne sur 30 jours.`;
+    const gap = metric === "Vitesse" ? `${fmtNum(x, 1)} km/h` : `${Math.round(x)} reps`;
+    return `${metric} : ${gap} ${up ? "de plus" : "de moins"} que ta moyenne sur 30 jours.`;
+  }
+  const p = Math.round(Math.abs(g.pct));
   return pick(id, [
     `${metric} en ${up ? "hausse" : "baisse"} de ${p} % sur la moyenne des 30 derniers jours.`,
     `${metric} : ${sign}${p} % par rapport à la moyenne sur 30 jours.`,
-    `Moyenne sur 30 jours : ${metric === "D+" ? "D+" : metric.toLowerCase()} ${sign}${p} %.`,
+    `Moyenne sur 30 jours : ${metric.toLowerCase()} ${sign}${p} %.`,
   ]);
 }
 
@@ -66,15 +80,15 @@ export type Cur = { type: string; distanceM: number; movingTimeS: number; elevat
 export type Past = { distanceM: number; movingTimeS: number; elevationGainM: number; reps: number };
 
 /** Écart relatif (%) à la moyenne des 30 jours, par indicateur disponible ; positif = mieux / plus. */
-export function gaps(cur: Cur, past: Past[]): { metric: Metric; pct: number }[] {
-  const out: { metric: Metric; pct: number }[] = [];
+export function gaps(cur: Cur, past: Past[]): Gap[] {
+  const out: Gap[] = [];
   const dist = past.reduce((s, a) => s + a.distanceM, 0), time = past.reduce((s, a) => s + a.movingTimeS, 0);
   const speedOk = cur.distanceM >= 1000 && cur.movingTimeS > 0 && dist > 0 && time > 0;
   const avgDplus = past.reduce((s, a) => s + a.elevationGainM, 0) / past.length;
-  if (cur.type === "RUN" && speedOk) { const avg = time / (dist / 1000), now = cur.movingTimeS / (cur.distanceM / 1000); out.push({ metric: "Allure", pct: ((avg - now) / avg) * 100 }); }
-  if (cur.type === "RIDE" && speedOk) { const avg = dist / 1000 / (time / 3600), now = cur.distanceM / 1000 / (cur.movingTimeS / 3600); out.push({ metric: "Vitesse", pct: ((now - avg) / avg) * 100 }); }
-  if ((cur.type === "RIDE" || cur.type === "HIKE") && cur.elevationGainM > 0 && avgDplus > 0) out.push({ metric: "D+", pct: ((cur.elevationGainM - avgDplus) / avgDplus) * 100 });
-  if (cur.type === "WORKOUT" && cur.reps > 0) { const avg = past.reduce((s, a) => s + a.reps, 0) / past.length; if (avg > 0) out.push({ metric: "Répétitions totales", pct: ((cur.reps - avg) / avg) * 100 }); }
+  if (cur.type === "RUN" && speedOk) { const avg = time / (dist / 1000), now = cur.movingTimeS / (cur.distanceM / 1000); out.push({ metric: "Allure", pct: ((avg - now) / avg) * 100, abs: avg - now }); }
+  if (cur.type === "RIDE" && speedOk) { const avg = dist / 1000 / (time / 3600), now = cur.distanceM / 1000 / (cur.movingTimeS / 3600); out.push({ metric: "Vitesse", pct: ((now - avg) / avg) * 100, abs: now - avg }); }
+  if ((cur.type === "RIDE" || cur.type === "HIKE") && cur.elevationGainM > 0 && avgDplus > 0) { const abs = cur.elevationGainM - avgDplus, pct = (abs / avgDplus) * 100; if (abs >= DPLUS_MIN_M && pct >= DPLUS_MIN_PCT) out.push({ metric: "D+", pct, abs }); }
+  if (cur.type === "WORKOUT" && cur.reps > 0) { const avg = past.reduce((s, a) => s + a.reps, 0) / past.length; if (avg > 0) out.push({ metric: "Répétitions totales", pct: ((cur.reps - avg) / avg) * 100, abs: cur.reps - avg }); }
   return out;
 }
 
@@ -88,8 +102,9 @@ export type StoryInput = {
   recent: string[];
 };
 
-export const TOP_SHARE = 0.05;
-export const HIST_MIN = 20;
+export const TOP_SHARE = 0.02;
+/** Activités minimum dans le sport (celle-ci comprise) pour parler d'exceptionnel. */
+export const HIST_MIN = 30;
 /** Paliers « première fois » : distance (km) et D+ (m). */
 const MILESTONES: Record<string, { km: number[]; dplus: number[] }> = {
   RUN: { km: [10, 15, 21.1, 30, 42.2], dplus: [] },
@@ -115,13 +130,13 @@ function exceptional(i: StoryInput, rec: RecordFact | undefined): Why | null {
   }
   if (i.type === "WORKOUT" && i.hist.length >= 10 && c.movingTimeS > Math.max(...i.hist.map((h) => h.movingTimeS)))
     return { text: "Séance la plus longue enregistrée.", scale: i.tonnageKg >= 500 ? "mass" : null };
-  // 3. Top 5 % de l'historique du sport
+  // 3. Top 2 % de l'historique du sport
   if (i.hist.length + 1 >= HIST_MIN) {
     const n = i.hist.length + 1;
     const top = (v: number, f: (h: Hist) => number) => v > 0 && i.hist.filter((h) => f(h) >= v).length / n < TOP_SHARE;
-    if (i.type !== "WORKOUT" && top(c.elevationGainM, (h) => h.elevationGainM)) return { text: `${cap(noun)} dans les 5 % les plus riches en dénivelé de l'historique.`, scale: "height" };
-    if (i.type !== "WORKOUT" && top(c.distanceM, (h) => h.distanceM)) return { text: `${cap(noun)} dans les 5 % les plus longues en distance de l'historique.`, scale: "distance" };
-    if (top(c.movingTimeS, (h) => h.movingTimeS)) return { text: `${cap(noun)} dans les 5 % les plus longues en durée de l'historique.`, scale: i.type === "WORKOUT" ? (i.tonnageKg >= 500 ? "mass" : null) : "distance" };
+    if (i.type !== "WORKOUT" && top(c.elevationGainM, (h) => h.elevationGainM)) return { text: `${cap(noun)} dans les 2 % les plus riches en dénivelé de l'historique.`, scale: "height" };
+    if (i.type !== "WORKOUT" && top(c.distanceM, (h) => h.distanceM)) return { text: `${cap(noun)} dans les 2 % les plus longues en distance de l'historique.`, scale: "distance" };
+    if (top(c.movingTimeS, (h) => h.movingTimeS)) return { text: `${cap(noun)} dans les 2 % les plus longues en durée de l'historique.`, scale: i.type === "WORKOUT" ? (i.tonnageKg >= 500 ? "mass" : null) : "distance" };
   }
   return null;
 }
@@ -145,8 +160,8 @@ export function buildStory(i: StoryInput): Story | null {
   if (rec) base = { kind: "record", text: recordText(rec, i.type) };
   else if (i.streakDays >= STREAK_MIN) base = { kind: "streak", text: streakText(i.id, i.type, i.streakDays) };
   else if (i.past.length >= 3) {
-    const g = gaps(i.cur, i.past).filter((x) => Math.abs(x.pct) >= GAP_MIN_PCT).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
-    if (g) base = { kind: "comparison", text: comparisonText(i.id, g.metric, g.pct) };
+    const g = gaps(i.cur, i.past).filter((x) => x.metric === "D+" || Math.abs(x.pct) >= GAP_MIN_PCT).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))[0];
+    if (g) base = { kind: "comparison", text: comparisonText(i.id, g) };
   }
   if (!why) return base;
   if (!base && why.text) base = { kind: "milestone", text: why.text };
