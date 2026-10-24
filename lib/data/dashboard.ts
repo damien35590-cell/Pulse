@@ -8,6 +8,7 @@ import { prepLine, racePrep } from "@/lib/races/prep";
 import { getCountdown, needsResult } from "@/lib/races/time";
 import { uniqueById } from "@/lib/utils";
 import { isSoft } from "@/lib/sports";
+import { TARGET_LIFTS, TARGET_RUNS } from "@/lib/analytics/coach-notes";
 import type { Act } from "@/lib/insights/types";
 
 const sum = <T,>(a: T[], f: (x: T) => number) => a.reduce((s, x) => s + f(x), 0);
@@ -16,7 +17,7 @@ export async function getDashboard(userId: string) {
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } });
   const tz = user?.timezone ?? "Europe/Paris";
-  const [rows, goalRows, goalCount, allXp, fitActs, eventsRaw, pendingRaw, plannedRaw] = await Promise.all([
+  const [rows, goalRows, goalCount, allXp, fitActs, eventsRaw, pendingRaw, plannedRaw, countGoals, programs] = await Promise.all([
     prisma.activity.findMany({
       where: { userId, startedAt: { gte: new Date(+now - 100 * 864e5) } }, orderBy: { startedAt: "desc" },
       select: { id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, calories: true, avgHr: true, avgPower: true, polyline: true, startLat: true, startLng: true, weather: true, exercises: { select: { sets: true, reps: true, loadKg: true, exercise: { select: { primaryMuscles: true } } } } },
@@ -29,6 +30,9 @@ export async function getDashboard(userId: string) {
     prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { lt: new Date(+now + 864e5) } }, orderBy: { date: "desc" }, take: 3, select: { id: true, name: true, date: true, startTime: true, status: true } }),
     // Séances prévues au programme cette semaine (hors passées / déplacées) : pastilles en pointillé dans la semaine.
     prisma.plannedSession.findMany({ where: { userId, date: { gte: new Date(weekKeys(now, tz)[0]), lte: new Date(weekKeys(now, tz)[6]) }, status: { in: ["PLANNED", "COMPLETED", "PARTIAL"] } }, select: { date: true } }),
+    // Cibles hebdo : objectifs « nombre de séances » et programmes en cours (course, muscu).
+    prisma.goal.findMany({ where: { userId, active: true, metric: "ACTIVITIES", period: "WEEK", type: { in: ["RUN", "WORKOUT"] } }, orderBy: { createdAt: "asc" }, select: { type: true, target: true } }),
+    prisma.program.findMany({ where: { userId, sport: { in: ["RUN", "WORKOUT"] }, status: { in: ["ACTIVE", "PAUSED"] } }, orderBy: { createdAt: "desc" }, select: { sport: true, sessionsPerWeek: true } }),
   ]);
 
   const todayKey = dayKey(now, tz), keys = weekKeys(now, tz), keySet = new Set(keys);
@@ -44,7 +48,11 @@ export async function getDashboard(userId: string) {
     };
   });
   const runKm = sum(week.filter((a) => a.type === "RUN"), (a) => a.distanceM) / 1000;
-  const liftT = sum(week.filter((a) => a.type === "WORKOUT"), (a) => sum(a.exercises, (e) => e.sets * e.reps * (e.loadKg ?? 0))) / 1000;
+  // Séances par discipline face à leur propre cible (objectif fixé, sinon programme, sinon cible par défaut) :
+  // ne jamais comparer toutes les séances aux seules séances course prévues (« 2 / 1 »).
+  const target = (sport: "RUN" | "WORKOUT", fallback: number) =>
+    countGoals.find((g) => g.type === sport)?.target ?? programs.find((p) => p.sport === sport)?.sessionsPerWeek ?? fallback;
+  const targets = { run: target("RUN", TARGET_RUNS[1]), lift: target("WORKOUT", TARGET_LIFTS[1]) };
 
   // Série : semaines d'affilée avec au moins 2 jours actifs. La semaine en cours ne casse jamais la série.
   const active = new Set(rows.filter((a) => !isSoft(a.type)).map((a) => dayKey(a.startedAt, tz)));
@@ -73,7 +81,7 @@ export async function getDashboard(userId: string) {
   const form = { ctl, delta: ctl - Math.round(series.at(-8)?.ctl ?? fit.ctl), spark: series.slice(-14).map((f) => f.ctl), label: zone(fit.form).label };
   const muscles = (a: (typeof rows)[number]) => [...new Set(a.exercises.flatMap((e) => e.exercise?.primaryMuscles ?? []))].map((m) => MUSCLE_LABELS[m]);
   return {
-    form, runKm, weekCount: week.filter((a) => !isSoft(a.type)).length, liftT, plannedCount: plannedKeys.length, fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },
+    form, runKm, runCount: week.filter((a) => a.type === "RUN").length, liftCount: week.filter((a) => a.type === "WORKOUT").length, targets, fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },
     km: sum(week, (a) => a.distanceM) / 1000, days, streak, insights,
     timeS: sum(week, (a) => a.movingTimeS), elevation: sum(week, (a) => a.elevationGainM), kcal: week.some((a) => a.calories != null) ? sum(week, (a) => a.calories ?? 0) : null,
     goals, recent: uniqueById(rows.filter((a) => !isSoft(a.type))).slice(0, 3).map((a) => ({ ...a, muscles: muscles(a) })), empty: rows.length === 0,

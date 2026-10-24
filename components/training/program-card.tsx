@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Pause, Rocket } from "lucide-react";
+import { ChevronRight, Pause, Rocket, Route } from "lucide-react";
 import type { RunProgramView, SessionView } from "@/lib/data/training";
 import { fmtDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -11,8 +11,12 @@ import { SessionCarousel } from "./session-carousel";
 export const weekLabel = (p: RunProgramView) =>
   `Bloc ${p.current.block} · Semaine ${p.current.weekInBlock}/${p.blockWeeks} — ${p.current.phaseName}${p.current.isRecovery ? " · allégée" : ""}`;
 
-/** Toujours encourageant : rien n'est dit d'une semaine incomplète, seulement ce qui est fait ou à portée. */
-function cheer(done: number, target: number) {
+/** « Bloc 1 · Semaine 2/4 · Reprise & VMA » : pied de la carte d'accueil, le nom du programme y tient sans tronquer le libellé du haut. */
+const blockLabel = (p: RunProgramView) =>
+  `Bloc ${p.current.block} · Semaine ${p.current.weekInBlock}/${p.blockWeeks} · ${p.name}${p.current.isRecovery ? " · allégée" : ""}`;
+
+/** Phrase du coach pour la semaine (sous la date de l'accueil). Toujours encourageante : rien n'est dit d'une semaine incomplète. */
+export function cheer(done: number, target: number) {
   if (done >= target) return "Semaine bouclée, bravo 🎉";
   if (target - done === 1 && done > 0) return "Plus qu’une pour boucler la semaine 💪";
   if (done > 0) return "Bien lancé, continue comme ça";
@@ -81,24 +85,22 @@ function UpcomingSlide({ s, current }: { s: SessionView; current: number }) {
   );
 }
 
-/** Carte « Programme course » en tête de l'accueil : la prochaine séance en grand, un seul bouton principal. */
+/**
+ * Carte « Programme course » de l'accueil : la prochaine séance en grand, sans bouton principal
+ * (le Volt plein reste à la carte « Aujourd'hui » du coach, qui prend la course quand elle est du jour).
+ */
 export function ProgramCard({ p }: { p: RunProgramView }) {
   const week = p.weeks.find((w) => w.number === p.current.number);
-  const paused = p.status === "PAUSED", msg = cheer(p.weekDone, p.sessionsPerWeek), n = p.next;
+  const paused = p.status === "PAUSED", n = p.next;
   const next = upcomingAfter(p);
   const vma = p.pendingTest ? <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div> : null;
-  const foot = (
-    <>
-      <p className="truncate text-xs text-ink-mute">{weekLabel(p)}</p>
-      {msg && <p className="mt-0.5 text-xs font-semibold text-brand">{msg}</p>}
-    </>
-  );
+  const foot = <p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>;
   return (
-    <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4")}>
+    <section aria-label="Programme course" className={cn(ui.card, "relative overflow-hidden p-4 pb-0")}>
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/[0.07] blur-3xl" />
       <div className="relative flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"} · {p.name}</p>
-        <Link href="/plan" className="shrink-0 text-sm font-semibold text-brand active:opacity-60">Programme</Link>
+        <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"}</p>
+        <Link href="/plan" className="-my-3 inline-flex h-12 shrink-0 items-center text-sm font-semibold text-brand active:opacity-60">Programme</Link>
       </div>
       {paused ? (
         <div className="relative mt-3 space-y-3">
@@ -115,8 +117,10 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
           count={`${p.weekDone}/${p.sessionsPerWeek}`}
         >
           <div>
-            <h2 className="text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
-            <p className="mt-1 font-num text-base tabular-nums text-ink-soft">≈ {fmtDuration(n.durationS)}{n.isKeySession ? " · séance clé" : ""}</p>
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
+              {n.isKeySession && <span className="mt-2"><KeyBadge /></span>}
+            </div>
             {n.summary && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{n.summary}</p>}
             <div className="mt-5"><SessionActions id={n.id} variant="card" /></div>
           </div>
@@ -137,6 +141,11 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
           </div>
         </>
       )}
+      <Link href="/itineraires" className="relative -mx-4 mt-4 flex min-h-12 touch-manipulation items-center gap-3 border-t border-line px-4 py-3 transition duration-150 ease-snappy active:bg-surface-2">
+        <Route className="size-5 shrink-0 text-ink-soft" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">Prépare ta sortie</span>
+        <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
+      </Link>
     </section>
   );
 }

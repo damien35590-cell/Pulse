@@ -1,11 +1,11 @@
 "use client";
 import { useState } from "react";
-import { Dumbbell, Ellipsis, HeartPulse, RefreshCw, Sparkles, Target, Upload } from "lucide-react";
+import { Dumbbell, Ellipsis, Flag, HeartPulse, RefreshCw, Sparkles, Target, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
-import { HR_MAX, fitness, goal, hrBands, liftSession, recent, rideWeather, routeSuggestion, runs, today, week, workout } from "@/lib/mock/ui-kit";
+import { HR_MAX, fitness, goal, hrBands, liftSession, nextRace, recent, rideWeather, routeSuggestion, runs, today, week, workout } from "@/lib/mock/ui-kit";
 import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
 import { Delta, Metric } from "@/components/ui/metric";
@@ -75,18 +75,19 @@ function Home({ go }: { go: Go }) {
     <>
       <TopBar
         title="dimanche 18 octobre"
-        subtitle={`Données fictives · semaine 42 · ${week.done} séances sur ${week.planned}`}
+        subtitle="Bien lancé, continue comme ça"
         actions={<button type="button" aria-label="Synchroniser" className={ui.iconBtn}><RefreshCw className="size-5" aria-hidden /></button>}
       />
       <div className="space-y-8">
-        <TodayCard {...today} onStart={() => go("workout")} />
         <Section title="Cette semaine" action={<span className="font-num text-sm tabular-nums text-ink-mute">{week.range}</span>}>
           <WeekCard {...week} />
         </Section>
+        <TodayCard {...today} onStart={() => go("workout")} />
         <div className="grid grid-cols-2 gap-3">
           <StatTile icon={HeartPulse} label="Forme" value={String(fitness.ctl)} delta={{ text: signed(fitness.ctlDelta), good: true }} spark={fitness.trend} sub={`Fraîcheur ${signed(fitness.tsb)} · optimal`} />
-          <StatTile icon={Target} label={`Objectif ${goal.title}`} value={goal.predicted} unit="prédit" progress={goal.progress} sub={`Cible ${goal.target} · dans ${goal.weeksLeft} sem.`} />
+          <StatTile icon={Flag} label="Prochaine course" title={nextRace.name} tone="brand" value={`J-${nextRace.days}`} sub={nextRace.distance} />
         </div>
+        <StatTile icon={Target} label={`Objectif ${goal.title}`} value={goal.predicted} unit="prédit" progress={goal.progress} sub={`Cible ${goal.target} · dans ${goal.weeksLeft} sem.`} />
         <Section title="Récent" action={<button type="button" onClick={() => go("list")} className="touch-manipulation text-sm font-semibold text-brand active:opacity-60">Tout voir</button>}>
           <div className="space-y-3">
             {recent.slice(0, 2).map((a) => (

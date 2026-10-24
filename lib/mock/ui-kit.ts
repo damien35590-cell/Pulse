@@ -151,10 +151,10 @@ export const today = {
 
 export const week = {
   range: "12 – 18 oct.",
-  done: 4,
-  planned: 6,
-  runKm: runs[0].distanceKm + runs[1].distanceKm,
-  liftT: 7.6 + liftSession.volumeKg / 1000, // Push A (lundi) + Pull A (jeudi)
+  run: { done: 2, target: 3 },
+  lift: { done: 2, target: 3 }, // Push A (lundi) + Pull A (jeudi)
+  km: runs[0].distanceKm + runs[1].distanceKm,
+  goalKm: 25,
   // Minutes par jour (course / muscu) ; planned = séance prévue au programme.
   days: [
     { label: "L", run: 0, lift: 52, planned: true },
@@ -170,6 +170,8 @@ export const week = {
 export const fitness = { ctl: 38, ctlDelta: 4, atl: 50, tsb: -12, trend: [30, 31, 31, 32, 32, 33, 34, 34, 35, 35, 36, 37, 37, 38] };
 
 export const goal = { title: "10 km", target: "44:59", predicted: "46:20", progress: 0.62, weeksLeft: 6 };
+
+export const nextRace = { name: "Marathon de Paris", days: 154, distance: "42,2 km" };
 
 // ─── Séance de musculation en cours ───
 export const workout: { title: string; program: string; startedMinAgo: number; exercises: LiftExercise[] } = {

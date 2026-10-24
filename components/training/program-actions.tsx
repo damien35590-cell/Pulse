@@ -31,10 +31,10 @@ export function SessionActions({ id, variant }: { id: string; variant?: "card" }
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-[2fr_1fr] gap-2">
-        <button disabled={pending} onClick={() => { tap(); run(() => completePlannedSession(id), celebrate); }} className={variant === "card" ? ui.btnPrimary : cn(btn, "bg-brand text-brand-ink")}>
+        <button disabled={pending} onClick={() => { tap(); run(() => completePlannedSession(id), celebrate); }} className={variant === "card" ? ui.btnSecondary : cn(btn, "bg-brand text-brand-ink")}>
           <Check className="h-5 w-5" aria-hidden />Faite
         </button>
-        <button disabled={pending} onClick={() => { tap(); run(() => skipPlannedSession(id)); }} className={variant === "card" ? ui.btnSecondary : cn(btn, "border border-line bg-surface text-ink-soft")}>
+        <button disabled={pending} onClick={() => { tap(); run(() => skipPlannedSession(id)); }} className={variant === "card" ? cn(ui.btnSecondary, "bg-transparent text-ink-soft") : cn(btn, "border border-line bg-surface text-ink-soft")}>
           <SkipForward className="h-4 w-4" aria-hidden />Passer
         </button>
       </div>

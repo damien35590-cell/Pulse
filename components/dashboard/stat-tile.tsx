@@ -8,7 +8,11 @@ import { Delta } from "@/components/ui/metric";
 type Props = {
   icon: LucideIcon;
   label: string;
+  /** Nom sous le libellé (ex. la course visée). */
+  title?: string;
   value: string;
+  /** "brand" : compte à rebours (J-154). */
+  tone?: "default" | "brand";
   unit?: string;
   sub: string;
   delta?: { text: string; good: boolean };
@@ -18,16 +22,17 @@ type Props = {
   href?: string;
 };
 
-/** Tuile compacte (2 par ligne) : un chiffre, une tendance, une phrase. Pour la forme, un objectif, un record… */
-export function StatTile({ icon: Icon, label, value, unit, sub, delta, spark, progress, href }: Props) {
+/** Tuile compacte (2 par ligne) : un chiffre, une tendance, une phrase. Pour la forme, une course, un record… */
+export function StatTile({ icon: Icon, label, title, value, tone = "default", unit, sub, delta, spark, progress, href }: Props) {
   const body = (
     <>
       <p className="flex items-center gap-1.5 text-label uppercase text-ink-mute">
         <Icon className="size-3.5" strokeWidth={2.4} aria-hidden />
         <span className="truncate">{label}</span>
       </p>
-      <p className="mt-2 flex items-baseline gap-1.5">
-        <span className="font-num text-metric-lg tabular-nums text-ink">{value}</span>
+      {title && <p className="mt-1.5 truncate text-[15px] font-semibold leading-tight text-ink">{title}</p>}
+      <p className={cn("flex items-baseline gap-1.5", title ? "mt-1" : "mt-2")}>
+        <span className={cn("font-num text-metric-lg tabular-nums", tone === "brand" ? "text-brand" : "text-ink")}>{value}</span>
         {unit && <span className="text-sm font-medium text-ink-soft">{unit}</span>}
         {delta && <Delta good={delta.good}>{delta.text}</Delta>}
       </p>
