@@ -11,7 +11,7 @@ import { addGear, deleteGear, replaceGear, retireGear, setDefaultGear, updateGea
 import { WearGauge, LEVEL_STYLE } from "@/components/gear/wear-gauge";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Matériel" };
+export const metadata = { title: "Équipement" };
 const sel = "mt-1 min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-base";
 const btn = "min-h-11 rounded-lg px-3 text-sm font-semibold";
 const fmtDate = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" });
@@ -66,8 +66,8 @@ export default async function GearPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/profile" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Vous</Link>
-      <h1 className="font-display text-3xl font-bold leading-none">Matériel</h1>
+      <Link href="/vous" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Vous</Link>
+      <h1 className="font-display text-3xl font-bold leading-none">Équipement</h1>
 
       {alerts.length > 0 && (
         <div role="alert" className="flex gap-3 rounded-xl border border-red-600/40 bg-red-600/10 p-4">

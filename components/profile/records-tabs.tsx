@@ -13,7 +13,7 @@ const TAB_LABEL: Record<RecordSport, string> = { RUN: "Course", RIDE: "Vélo", W
 const STORAGE_KEY = "pulse:records-sport";
 
 /** Records personnels : un onglet par sport (seulement ceux qui ont des records), le dernier choisi est retenu. */
-export function RecordsTabs({ data }: { data: RecordsBySport }) {
+export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; limit?: number; moreHref?: string }) {
   const [sport, setSport] = useState<RecordSport | null>(data.defaultSport);
 
   // Après l'hydratation : on reprend l'onglet choisi la dernière fois (le stockage peut être indisponible ou vide)
@@ -24,7 +24,7 @@ export function RecordsTabs({ data }: { data: RecordsBySport }) {
     } catch { /* stockage indisponible : on garde l'onglet par défaut */ }
   }, [data.sports]);
 
-  if (!data.sports.length) return <p className="text-ink-soft">Vos records apparaîtront dès votre première sortie.</p>;
+  if (!data.sports.length) return <p className="text-ink-soft">Tes records apparaîtront dès ta première sortie.</p>;
 
   const current = data.sports.find((s) => s.sport === sport) ?? data.sports[0];
   const choose = (v: RecordSport) => {
@@ -45,7 +45,7 @@ export function RecordsTabs({ data }: { data: RecordsBySport }) {
         />
       )}
       <ul className={cn(ui.card, "divide-y divide-line overflow-hidden")}>
-        {current.rows.map((r) => {
+        {(limit ? current.rows.slice(0, limit) : current.rows).map((r) => {
           const body = (
             <>
               <span className="min-w-0 flex-1">
@@ -71,6 +71,14 @@ export function RecordsTabs({ data }: { data: RecordsBySport }) {
             </li>
           );
         })}
+        {limit && moreHref && current.rows.length > limit && (
+          <li>
+            <Link href={moreHref} onClick={() => tap()} className={cn(ui.pressCard, "flex min-h-14 items-center gap-3 px-4 py-3")}>
+              <span className="min-w-0 flex-1 font-semibold text-brand">Voir les {current.rows.length} records</span>
+              <ChevronRight className="size-4 shrink-0 text-ink-mute" aria-hidden />
+            </Link>
+          </li>
+        )}
       </ul>
     </div>
   );

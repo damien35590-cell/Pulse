@@ -11,7 +11,7 @@ const isBlobUrl = (u?: string | null) => { try { return !!u && new URL(u).hostna
 /** Met à jour le nom et, selon le formulaire, remplace (« file ») ou retire (« remove ») la photo. */
 export async function updateProfile(fd: FormData): Promise<Res> {
   const userId = (await auth())?.user?.id;
-  if (!userId) return { ok: false, error: "Session expirée, reconnectez-vous." };
+  if (!userId) return { ok: false, error: "Session expirée, reconnecte-toi." };
   const name = String(fd.get("name") ?? "").trim().replace(/\s+/g, " ");
   if (name.length < 1 || name.length > 40) return { ok: false, error: "Le nom doit faire de 1 à 40 caractères." };
   const file = fd.get("file"), remove = fd.get("remove") === "1";
@@ -27,8 +27,8 @@ export async function updateProfile(fd: FormData): Promise<Res> {
     await prisma.user.update({ where: { id: userId }, data: { name, ...(image !== undefined && { image }) } });
     if (image !== undefined && isBlobUrl(prev)) await del(prev!).catch(() => {}); // l'ancienne photo ne doit pas faire échouer l'enregistrement
   } catch {
-    return { ok: false, error: "Enregistrement impossible, réessayez." };
+    return { ok: false, error: "Enregistrement impossible, réessaie." };
   }
-  revalidatePath("/profile");
+  revalidatePath("/vous");
   return { ok: true };
 }

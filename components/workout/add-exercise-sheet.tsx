@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Info, Plus } from "lucide-react";
+import Link from "next/link";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
@@ -31,7 +32,7 @@ const searchKey = (e: CatalogExercise) => exerciseKey(`${e.code ?? ""} ${e.name}
 
 /**
  * Ajouter un exercice à la séance en préparation : catalogue Lafay (familles → sous-catégories → variantes) et SuperPhysique,
- * filtres source / muscle / « Mon matériel », exercices récents, fiche détaillée, ou un nom libre. La cible du jour est calculée côté serveur.
+ * filtres source / muscle / « Matériel de muscu », exercices récents, fiche détaillée, ou un nom libre. La cible du jour est calculée côté serveur.
  */
 export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolean; onClose: () => void; onAdd: (e: DraftExercise) => void; taken: string[] }) {
   const [q, setQ] = useState("");
@@ -125,7 +126,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
           />
           <Segmented<Source> className="mt-3" value={source} onChange={setSource} options={[{ value: "ALL", label: "Tout" }, { value: "lafay", label: "Lafay" }, { value: "superphysique", label: "SuperPhysique" }]} />
           <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-            <button type="button" aria-pressed={onlyMine} onClick={() => { tap(6); setOnlyMine((v) => !v); }} className={pill(onlyMine)}>Mon matériel</button>
+            <button type="button" aria-pressed={onlyMine} onClick={() => { tap(6); setOnlyMine((v) => !v); }} className={pill(onlyMine)}>Matériel de muscu</button>
             {MUSCLE_FILTERS.map((m, i) => (
               <button key={m.label} type="button" aria-pressed={muscle === i} onClick={() => { tap(6); setMuscle(muscle === i ? null : i); }} className={pill(muscle === i)}>{m.label}</button>
             ))}
@@ -183,7 +184,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
                   );
                 })}
               </ul>
-              {hidden > 0 && <p className="mt-3 text-sm text-ink-mute">{hidden} exercices masqués faute de matériel (réglable dans Vous › Mon matériel).</p>}
+              {hidden > 0 && <p className="mt-3 text-sm text-ink-mute">{hidden} exercices masqués faute de matériel (réglable dans <Link href="/vous/materiel-muscu" className="font-semibold text-brand">Vous › Matériel de muscu</Link>).</p>}
             </section>
           )}
 
@@ -203,7 +204,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
             </section>
           )}
 
-          {key && flat.length === 0 && mine.length === 0 && onlyMine && <p className="mt-4 text-sm text-ink-mute">Rien avec ton matériel. Désactive « Mon matériel » pour tout voir.</p>}
+          {key && flat.length === 0 && mine.length === 0 && onlyMine && <p className="mt-4 text-sm text-ink-mute">Rien avec ton matériel. Désactive « Matériel de muscu » pour tout voir.</p>}
           {q.trim() && !exact && (
             <button type="button" disabled={busy} onClick={() => pick(q)} className={cn(ui.btnSecondary, "mt-5 w-full bg-surface-3")}>
               Exercice perso : « {q.trim()} »

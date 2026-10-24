@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
-import { Section } from "@/components/ui/section";
 import { Switch } from "@/components/ui/switch";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { MORNING_TIMES, type AllPrefs, type Prefs } from "@/lib/notify/prefs";
@@ -49,7 +48,7 @@ async function subscribe(reg: ServiceWorkerRegistration) {
   if (!s.ok) throw new Error("Abonnement refusé par le serveur");
 }
 
-/** Réglages → Notifications : activation sur cet appareil, trois interrupteurs, envoi d'un test. */
+/** Vous › Notifications : activation sur cet appareil, trois interrupteurs, envoi d'un test. */
 export function NotificationSettings({ prefs: initial }: { prefs: AllPrefs }) {
   const [state, setState] = useState<State>("loading");
   const [prefs, setPrefs] = useState(initial);
@@ -137,7 +136,7 @@ export function NotificationSettings({ prefs: initial }: { prefs: AllPrefs }) {
   const s = status[state];
 
   return (
-    <Section title="Notifications">
+    <>
       <div className={cn(ui.card, "p-4")}>
         <div className="flex items-start gap-3">
           <span className={cn("grid size-12 shrink-0 place-items-center rounded-full bg-surface-2", s.tone)}><s.Icon className="size-6" aria-hidden /></span>
@@ -152,14 +151,14 @@ export function NotificationSettings({ prefs: initial }: { prefs: AllPrefs }) {
 
         <div className="mt-2 divide-y divide-line/60">
           {OPTIONS.map((o) => (
-            <Switch key={o.key} label={o.label} description={o.description} checked={prefs[o.key]} onChange={(v) => toggle(o.key, v)} disabled={state === "unsupported"} />
+            <Switch key={o.key} label={o.label} description={o.description} checked={prefs[o.key]} onChange={(v) => toggle(o.key, v)} disabled={state !== "on"} />
           ))}
         </div>
 
         <button
           type="button"
           onClick={() => setPickTime(true)}
-          disabled={!prefs.morning}
+          disabled={!prefs.morning || state !== "on"}
           className="flex min-h-12 w-full touch-manipulation items-center justify-between gap-3 border-t border-line/60 py-2 text-left active:opacity-60 disabled:opacity-40"
         >
           <span className="font-medium text-ink">Heure du coach du matin</span>
@@ -192,6 +191,6 @@ export function NotificationSettings({ prefs: initial }: { prefs: AllPrefs }) {
           ))}
         </div>
       </BottomSheet>
-    </Section>
+    </>
   );
 }

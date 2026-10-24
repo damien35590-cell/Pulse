@@ -77,6 +77,7 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `Section` | `components/ui/section.tsx` | bloc de page avec titre en capitales + action |
 | `Metric`, `Delta` | `components/ui/metric.tsx` | toute valeur chiffrée (dans un `<dl>`) ; `<Delta tone>` : `good` / `warn` (à surveiller) / `bad` / `neutral` (dans la moyenne), ou `good` booléen |
 | `Segmented` | `components/ui/segmented.tsx` | onglets (FC / puissance, filtres) |
+| `SettingsRow` | `components/ui/settings-row.tsx` | ligne de réglage de la page Vous (et sous-pages) : pastille d’icône `bg-brand/10`, titre, résumé `ink-mute` tronqué, chevron ou contrôle à droite (`trailing`, ex. `Segmented`) ; `Link` si `href`, bouton si `onClick` ; empilée dans une `ui.card` (`divide-y divide-surface-2`), 56 px mini |
 | `Switch` | `components/ui/switch.tsx` | réglage on / off : toute la ligne (libellé + phrase) est la cible, 56 px de haut |
 | `BottomSheet`, `ConfirmSheet` | `components/ui/bottom-sheet.tsx` | choix, confirmation, fin de séance |
 | `NumberStepper` | `components/ui/number-stepper.tsx` | saisie kg / reps : ±, appui long, clavier numérique |
@@ -103,7 +104,7 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `AddExerciseSheet` | `components/workout/add-exercise-sheet.tsx` | sélecteur d'exercices : recherche, filtres source / muscle / « Mon matériel », récents, familles Lafay → sous-catégories → variantes, fiche |
 | `ExerciseDetail`, `CodeBadge`, `LevelBars` | `components/workout/catalog-bits.tsx` | fiche d'exercice du catalogue, pastille de code Lafay, niveau 1 à 4 barres (jamais en couleur de marque) |
 | `LibrarySheet` | `components/workout/library-sheet.tsx` | bibliothèque de modèles (Lafay T1/T2, mes programmes, SuperPhysique) → « Ajouter à mes modèles » |
-| `EquipmentSettings` | `components/profile/equipment-settings.tsx` | réglage « Mon matériel » (page Vous) |
+| `EquipmentSettings` | `components/profile/equipment-settings.tsx` | réglage « Matériel de muscu » (/vous/materiel-muscu) |
 | `SessionFlow` | `components/workout/session-flow.tsx` | parcours `/record/session` : feuille → préparation → SetLogger → enregistrement ; reprise de la séance en cours |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
 | fond de carte | `lib/map/basemap.ts` | toutes les cartes : Stadia Maps (`alidade_smooth_dark` en sombre, `alidade_bright` en clair, constante `BASEMAP` ; endpoint UE, auth par domaine : aucune clé) selon le thème, `useMapTheme()` ; jamais d'URL de tuiles en dur dans un composant |

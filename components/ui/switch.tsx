@@ -27,8 +27,8 @@ export function Switch({ checked, onChange, label, description, disabled, classN
         <span className="block font-semibold text-ink">{label}</span>
         {description && <span className="block text-sm text-ink-soft">{description}</span>}
       </span>
-      <span aria-hidden className={cn("relative h-8 w-14 shrink-0 rounded-full transition-colors duration-200 ease-snappy", checked ? "bg-brand" : "bg-surface-3")}>
-        <span className={cn("absolute left-1 top-1 size-6 rounded-full shadow-card transition duration-200 ease-snappy", checked ? "translate-x-6 bg-brand-ink" : "bg-ink-soft")} />
+      <span aria-hidden className={cn("relative h-8 w-14 shrink-0 rounded-full transition-colors duration-200 ease-snappy", checked && !disabled ? "bg-brand" : "bg-surface-3")}>
+        <span className={cn("absolute left-1 top-1 size-6 rounded-full shadow-card transition duration-200 ease-snappy", checked ? "translate-x-6" : "", checked && !disabled ? "bg-brand-ink" : "bg-ink-soft")} />
       </span>
     </button>
   );

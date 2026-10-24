@@ -33,7 +33,7 @@ export async function acknowledgeBadge(key: string): Promise<Res> {
   const userId = await uid();
   if (typeof key !== "string" || !/^[\w-]{1,40}:[1-9]$/.test(key)) return { ok: false, error: "Badge inconnu." };
   await prisma.userBadge.updateMany({ where: { userId, badgeId: key, acknowledgedAt: null }, data: { acknowledgedAt: new Date() } });
-  revalidatePath("/"); revalidatePath("/profile"); revalidatePath("/profile/badges");
+  revalidatePath("/"); revalidatePath("/vous"); revalidatePath("/vous/badges");
   revalidatePath("/", "layout"); // pastille de la barre du bas (layout)
   return { ok: true };
 }
@@ -380,7 +380,7 @@ export async function saveZones(fd: FormData) {
   const userId = await uid(), ftp = num(fd.get("ftp")), hrMax = num(fd.get("hrMax"));
   const data = { ftp: ftp >= 50 && ftp <= 600 ? Math.round(ftp) : null, hrMax: hrMax >= 120 && hrMax <= 230 ? Math.round(hrMax) : null };
   await prisma.userZones.upsert({ where: { userId }, update: data, create: { userId, ...data } });
-  revalidatePath("/profile/settings"); revalidatePath("/analysis");
+  revalidatePath("/vous/seuils"); revalidatePath("/vous"); revalidatePath("/analysis");
 }
 
 // ───────── Muscu : catalogue d'exercices et rapprochement de l'historique ─────────

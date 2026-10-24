@@ -113,4 +113,4 @@ export function weeklyMessage(cur: WeekTotals, prev: WeekTotals, program: { done
 }
 
 // ───────── Test ─────────
-export const testMessage = (): PushMessage => ({ title: "Pulse", body: "Les notifications fonctionnent sur cet appareil.", url: "/profile", tag: "test" });
+export const testMessage = (): PushMessage => ({ title: "Pulse", body: "Les notifications fonctionnent sur cet appareil.", url: "/vous", tag: "test" });

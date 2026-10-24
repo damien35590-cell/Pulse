@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Camera, Pencil } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Avatar } from "@/components/profile/avatar";
-import { updateProfile } from "@/app/(app)/profile/actions";
+import { updateProfile } from "@/app/(app)/vous/actions";
 import { toAvatarBlob } from "@/lib/avatar-image";
 import { tap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,7 @@ export function EditProfile({ name, image, email }: Props) {
       const blob = await toAvatarBlob(f);
       revoke(); objectUrl.current = URL.createObjectURL(blob);
       setPhoto(blob); setPreview(objectUrl.current); setRemoved(false);
-    } catch { setError("Image illisible. Essayez une autre photo."); }
+    } catch { setError("Image illisible. Essaie une autre photo."); }
     setBusy(false);
     if (input.current) input.current.value = ""; // permet de rechoisir le même fichier
   }

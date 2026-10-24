@@ -4,6 +4,14 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   poweredByHeader: false,
+  // Ancienne route /profile → /vous (anciens liens, notifications déjà envoyées). Les réglages sont éclatés en sous-pages.
+  async redirects() {
+    return [
+      { source: "/profile/settings", destination: "/vous", permanent: false },
+      { source: "/profile", destination: "/vous", permanent: false },
+      { source: "/profile/:path*", destination: "/vous/:path*", permanent: false },
+    ];
+  },
   images: { formats: ["image/avif", "image/webp"] },
   experimental: { optimizePackageImports: ["lucide-react", "recharts", "framer-motion"] },
 };

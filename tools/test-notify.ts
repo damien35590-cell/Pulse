@@ -127,7 +127,7 @@ assert.equal(slotShort({ ...noon, at: noon.at + day, rainPct: 70, night: true },
   assert.equal(weeklyMessage(weekTotals([w(10, 1, 0)]), weekTotals([w(10, 1, 0)]), null).body.split("\n")[0], "1 sortie = · 10 km = · 1 h 00 = · 0 m D+ =");
 }
 
-assert.equal(testMessage().url, "/profile");
+assert.equal(testMessage().url, "/vous");
 
 // ── Planification ──
 const vercelHasMatin = () => (JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as { crons: { path: string }[] }).crons.some((c) => c.path.endsWith("/matin"));

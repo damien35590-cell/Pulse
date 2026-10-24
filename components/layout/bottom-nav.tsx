@@ -11,7 +11,7 @@ const items = [
   { href: "/activities", label: "Activités", icon: Activity },
   { href: "/record", label: "Enregistrer", icon: Plus, record: true },
   { href: "/analysis", label: "Analyse", icon: BarChart3 },
-  { href: "/profile", label: "Vous", icon: User },
+  { href: "/vous", label: "Vous", icon: User },
 ] as const;
 
 /** Barre du bas façon Material You : pastille derrière l'icône active, fond translucide, safe area du Pixel incluse. */
@@ -27,7 +27,7 @@ export function BottomNav({ pendingBadges = 0 }: { pendingBadges?: number }) {
       <ul className="mx-auto grid h-16 max-w-md grid-cols-5">
         {items.map((item) => {
           const { href, label, icon: Icon } = item, active = isActive(href), record = "record" in item;
-          const count = href === "/profile" ? pendingBadges : 0;
+          const count = href === "/vous" ? pendingBadges : 0;
           return (
             <li key={href}>
               <Link

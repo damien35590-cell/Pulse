@@ -9,7 +9,7 @@ import type { Equipment } from "@/lib/workout/catalog-data";
 
 const KEYS = Object.keys(EQUIPMENT_LABELS) as Exclude<Equipment, "aucun">[];
 
-/** « Mon matériel » : coche ce que tu as ; le catalogue d'exercices et la bibliothèque de modèles s'y adaptent. */
+/** « Matériel de muscu » : coche ce que tu as ; le catalogue d'exercices et la bibliothèque de modèles s'y adaptent. */
 export function EquipmentSettings({ initial }: { initial: Equipment[] }) {
   const [mine, setMine] = useState<Equipment[]>(initial);
   const [err, setErr] = useState("");
@@ -24,7 +24,7 @@ export function EquipmentSettings({ initial }: { initial: Equipment[] }) {
 
   return (
     <div className="rounded-xl border border-line bg-surface p-4">
-      <p className="font-display text-lg font-bold">Mon matériel</p>
+      <p className="font-display text-lg font-bold">Ce que tu as à disposition</p>
       <p className="text-sm text-ink-soft">Le catalogue d’exercices masque ce que tu ne peux pas faire chez toi.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {KEYS.map((k) => {

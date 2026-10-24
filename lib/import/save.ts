@@ -82,6 +82,6 @@ export async function saveActivities(uid: string, raw: ParsedActivity[]) {
     await processActivity(id, { points: gps });
   }
 
-  revalidatePath("/"); revalidatePath("/activities"); revalidatePath("/profile"); revalidatePath("/analysis"); revalidatePath("/gear");
+  revalidatePath("/"); revalidatePath("/activities"); revalidatePath("/vous"); revalidatePath("/analysis"); revalidatePath("/gear");
   return { saved, duplicates: items.length - saved, invalid: raw.length - items.length, backfilled };
 }

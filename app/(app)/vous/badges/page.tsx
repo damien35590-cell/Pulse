@@ -21,7 +21,7 @@ export default async function BadgesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <Link href="/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="h-4 w-4" aria-hidden />Vous</Link>
+        <Link href="/vous" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="h-4 w-4" aria-hidden />Vous</Link>
         <h1 className="font-display text-3xl font-bold leading-none">Badges et niveau</h1>
         <p className="mt-1 text-ink-soft">Niveau {lvl.n} · {rank(lvl.n)}</p>
       </header>
