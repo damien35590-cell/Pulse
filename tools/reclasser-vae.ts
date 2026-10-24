@@ -6,7 +6,10 @@
  *
  * Google Fit enregistrait ses activités avec la source « fit » (comme les fichiers FIT) : on les reconnaît
  * à leur dedupeKey « gfit-… ». Le script leur donne au passage la source « google-fit ».
- * Prisma lit DIRECT_URL dans le fichier .env à la racine du projet.
+ * Base : DIRECT_URL du .env, donc la branche Neon de dev. Pour la prod (voir CLAUDE.md), sans garder son adresse sur le disque :
+ *   vercel env pull .env.production.local --environment=production
+ *   node --env-file=.env.production.local --import tsx tools/reclasser-vae.ts --dry-run
+ *   rm .env.production.local
  */
 import { PrismaClient } from "@prisma/client";
 

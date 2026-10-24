@@ -3,6 +3,11 @@
  *
  *   node --env-file=.env.local --import tsx tools/seed-workout-templates.ts
  *
+ * Base : celle de .env.local, donc la branche Neon de dev. Pour la prod (voir CLAUDE.md), sans garder son adresse sur le disque :
+ *   vercel env pull .env.production.local --environment=production
+ *   node --env-file=.env.production.local --import tsx tools/seed-workout-templates.ts
+ *   rm .env.production.local
+ *
  * Pas indispensable : l'app les crée d'elle-même à la première ouverture de « Nouvelle séance » (lib/workout/builtin.ts).
  * Les variantes et reps de départ viennent de ton historique de muscu, sinon du premier niveau de chaque échelle.
  */

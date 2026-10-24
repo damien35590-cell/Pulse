@@ -7,6 +7,12 @@
  *
  * Options : --user <email> (défaut : ALLOWED_EMAIL du .env, sinon l'unique utilisateur) · --batch <n> (lot de 25) · --limit <n> (les n plus récentes, pour essayer).
  *
+ * Base : celle de .env.local / .env, donc la branche Neon de dev. Pour la prod (voir CLAUDE.md), sans garder son adresse sur le disque :
+ *   vercel env pull .env.production.local --environment=production
+ *   node --env-file=.env.production.local --import tsx tools/import-strava.ts "C:\strava-export"
+ *   rm .env.production.local
+ * Les variables passées par --env-file priment : le chargement de .env.local / .env ci-dessous ne les écrase pas.
+ *
  * Reprenable : chaque activité porte dedupeKey « strava-<id> » (source « strava ») ; relancer ignore ce qui est déjà en base.
  * Une activité qui ressemble à une activité déjà en base (Intervals.icu, Google Fit, MyWhoosh… : même sport, début à ±5 min, durée proche)
  * n'est jamais importée ni écrasée : elle figure dans le rapport avec sa correspondance.

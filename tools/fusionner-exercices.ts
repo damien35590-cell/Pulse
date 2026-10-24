@@ -6,7 +6,10 @@
  *
  * Deux noms sont les mêmes s'ils ont la même clé (sans accents, majuscules ni pluriel, cf. lib/exercises.ts).
  * Le nom conservé est l'orthographe la plus fréquente, à égalité la plus récente. Seul le champ name est modifié.
- * Prisma lit DIRECT_URL dans le fichier .env à la racine du projet.
+ * Base : DIRECT_URL du .env, donc la branche Neon de dev. Pour la prod (voir CLAUDE.md), sans garder son adresse sur le disque :
+ *   vercel env pull .env.production.local --environment=production
+ *   node --env-file=.env.production.local --import tsx tools/fusionner-exercices.ts --dry-run
+ *   rm .env.production.local
  */
 import { PrismaClient } from "@prisma/client";
 import { exerciseKey } from "../lib/exercises";

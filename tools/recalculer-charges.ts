@@ -6,7 +6,10 @@
  *
  * À relancer après un changement de FTP ou de FC max dans l'onglet Vous : les charges déjà stockées ne bougent pas seules.
  * Les seuils utilisés sont ceux d'aujourd'hui (saisis, sinon estimés), appliqués à toutes les dates.
- * Prisma lit DIRECT_URL dans le fichier .env à la racine du projet.
+ * Base : DIRECT_URL du .env, donc la branche Neon de dev. Pour la prod (voir CLAUDE.md), sans garder son adresse sur le disque :
+ *   vercel env pull .env.production.local --environment=production
+ *   node --env-file=.env.production.local --import tsx tools/recalculer-charges.ts --dry-run
+ *   rm .env.production.local
  */
 import { prisma } from "../lib/prisma";
 import { getZones } from "../lib/data/zones";
