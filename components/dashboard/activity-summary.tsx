@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import { activityStyle } from "@/lib/activity-style";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { Metric } from "@/components/ui/metric";
 import { ZoneBar, type ZoneSlice } from "@/components/activity/zone-bar";
 import { RoutePreview } from "@/components/activity/route-preview";
+import { InsightLine } from "@/components/activity/insight-line";
+import type { InsightLine as Line } from "@/lib/activity/comparables";
 import type { LatLng } from "@/lib/polyline";
 
 export type ActivitySummaryData = {
@@ -17,7 +18,8 @@ export type ActivitySummaryData = {
   metrics: { label: string; value: string; unit?: string }[];
   zones?: ZoneSlice[];
   tags?: string[];
-  story?: string;
+  /** La phrase unique : même comparaison que la fiche (lib/activity/comparables.ts : insightLine). */
+  insight?: Line;
   badge?: string;
   /** Trace GPS simplifiée (~200 points, previewTrack) : absente en intérieur ou en muscu, et alors pas de carte. */
   route?: LatLng[];
@@ -36,7 +38,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
           <Icon className="size-6" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold leading-tight text-ink">{a.title}</p>
+          <p className="truncate text-base font-semibold leading-tight text-ink">{a.title}</p>
           <p className="mt-0.5 truncate text-xs text-ink-mute">{a.when}</p>
         </div>
         {a.badge && <span className="shrink-0 rounded-full bg-brand/15 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-brand">{a.badge}</span>}
@@ -52,12 +54,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
           {a.tags.map((t) => <li key={t} className={ui.chip}>{t}</li>)}
         </ul>
       )}
-      {a.story && (
-        <p className="mt-3 flex gap-2 text-[13px] leading-snug text-ink-soft">
-          <Sparkles className="mt-0.5 size-3.5 shrink-0 text-brand" aria-hidden />
-          <span className="line-clamp-2">{a.story}</span>
-        </p>
-      )}
+      {a.insight && <InsightLine line={a.insight} className="mt-3" />}
       {a.route && a.route.length > 1 && <RoutePreview points={a.route} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />}
     </>
   );

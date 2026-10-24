@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { previewTrack, project, simplifyTrack, TILE } from "../lib/map/track";
 import { tileUrl } from "../lib/map/basemap";
-import { climb, distanceTicks, elevationAxis, niceStep } from "../lib/elevation-axis";
+import { climb, distanceTicks, elevationAxis, niceStep, spanAtLeast } from "../lib/elevation-axis";
 import { encodePolyline } from "../lib/polyline";
 
 // ── Web Mercator ──
@@ -43,6 +43,9 @@ assert.deepEqual(elevationAxis(31, 53).ticks, [35, 40, 45]);
 assert.deepEqual(elevationAxis(412, 1287).ticks, [500, 750, 1000]);
 assert.deepEqual(elevationAxis(1020, 1890).ticks, [1000, 1500, 2000]);
 assert.deepEqual(elevationAxis(5, 620).ticks, [200, 400, 600]);
+assert.deepEqual(spanAtLeast(48, 53), [30.5, 70.5], "parcours plat : 40 m au moins, centrés");
+assert.deepEqual(spanAtLeast(100, 180), [100, 180], "assez de relief : inchangé");
+{ const [lo, hi] = spanAtLeast(48, 53), { domain } = elevationAxis(lo, hi); assert.ok(domain[1] - domain[0] >= 40 && domain[0] <= 48 && domain[1] >= 53); }
 
 // ── Repères de distance ──
 assert.deepEqual(distanceTicks(3.4).map((t) => t.label), ["0", "1", "2", "3 km"]);

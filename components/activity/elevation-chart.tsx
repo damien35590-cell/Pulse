@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { fmtNum } from "@/lib/format";
 import { Metric } from "@/components/ui/metric";
 import { TraceChart } from "@/components/activity/trace-chart";
-import { climb, distanceTicks, elevationAxis } from "@/lib/elevation-axis";
+import { climb, distanceTicks, elevationAxis, spanAtLeast } from "@/lib/elevation-axis";
 
 export type ElevationPoint = { km: number; ele: number };
 
@@ -27,7 +27,7 @@ function analyse(points: ElevationPoint[], gain?: number) {
   const raw = points.map((p) => p.ele), min = Math.min(...raw), max = Math.max(...raw), c = climb(raw);
   // D+ de l'activité quand il est connu (même chiffre que le résumé) ; D− en découle : D+ − D− = arrivée − départ.
   const up = gain ?? c.up, down = gain != null ? Math.max(0, gain - (raw[raw.length - 1] - raw[0])) : c.down;
-  return { total, ele, grade, min, max, up, down, ...elevationAxis(min, max), xTicks: distanceTicks(total) };
+  return { total, ele, grade, min, max, up, down, ...elevationAxis(...spanAtLeast(min, max)), xTicks: distanceTicks(total) };
 }
 
 type Props = {
@@ -43,7 +43,7 @@ type Props = {
   className?: string;
 };
 
-/** Profil d'altitude : D+ / D− / min / max, axe en mètres sur 3 valeurs rondes, repères par km, curseur au doigt. */
+/** Profil d'altitude : D+ / D− / min / max, axe en mètres sur 3 valeurs rondes (40 m d'écart au moins : le plat reste plat), repères par km, curseur au doigt. */
 export function ElevationChart({ points, gain, onCursor, color = "text-brand", height = 140, className }: Props) {
   const g = useMemo(() => analyse(points, gain), [points, gain]);
   const tip = (f: number, v: number) => {

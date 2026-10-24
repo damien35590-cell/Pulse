@@ -121,7 +121,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
             autoComplete="off"
             enterKeyHint="search"
             aria-label="Chercher un exercice"
-            className="mt-3 h-14 w-full rounded-tile bg-surface px-4 text-base font-semibold text-ink caret-brand outline-none ring-1 ring-inset ring-line placeholder:font-normal placeholder:text-ink-mute focus:ring-brand"
+            className="mt-3 h-14 w-full rounded-tile bg-surface px-4 text-base font-semibold text-ink caret-brand outline-none ring-1 ring-inset ring-line placeholder:font-normal placeholder:text-ink-mute focus-visible:ring-brand"
           />
           <Segmented<Source> className="mt-3" value={source} onChange={setSource} options={[{ value: "ALL", label: "Tout" }, { value: "lafay", label: "Lafay" }, { value: "superphysique", label: "SuperPhysique" }]} />
           <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">

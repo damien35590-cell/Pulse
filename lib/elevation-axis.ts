@@ -45,3 +45,13 @@ export function climb(ele: number[]) {
   }
   return { up, down };
 }
+
+/** Écart vertical minimal du profil (m) : un parcours plat reste plat au lieu d'amplifier 5 m de bruit sur toute la hauteur. */
+export const MIN_ELEVATION_SPAN = 40;
+
+/** Bornes élargies à `span` mètres au moins, centrées sur les données. */
+export function spanAtLeast(min: number, max: number, span = MIN_ELEVATION_SPAN): [number, number] {
+  if (max - min >= span) return [min, max];
+  const mid = (min + max) / 2;
+  return [mid - span / 2, mid + span / 2];
+}

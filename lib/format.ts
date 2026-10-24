@@ -35,5 +35,13 @@ export function fmtWhen(d: Date, tz: string, o: { short?: boolean; year?: boolea
   return `${o.prefixed ? day : day.charAt(0).toUpperCase() + day.slice(1)} à ${time}`;
 }
 
+/** Date courte d'une activité : « mar. 13 oct. · 12:36 » (année ajoutée si ce n'est pas l'année en cours). */
+export function fmtWhenShort(d: Date, tz: string, now = new Date()) {
+  const year = (x: Date) => new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: tz }).format(x);
+  const day = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short", ...(year(d) !== year(now) ? { year: "numeric" } : {}), timeZone: tz }).format(d);
+  const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: tz }).format(d);
+  return `${day} · ${time}`;
+}
+
 /** Ordinal français : 1re / 1er, puis 2e, 14e… (jamais « ème »). `gender` : « f » par défaut (une sortie, une séance), « m » pour 1er. */
 export const ordinalFr = (n: number, gender: "m" | "f" = "f") => (n === 1 ? (gender === "m" ? "1er" : "1re") : `${n}e`);

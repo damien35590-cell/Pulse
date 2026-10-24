@@ -79,6 +79,10 @@ function hrLoad(a: LoadActivity, hrMax: number, hrRest: number): number | null {
   return (a.movingTimeS / 3600) * (w / threshold) * 100;
 }
 
+/** Charge ressentie (sRPE, méthode de Foster) : RPE × durée en minutes, enregistrée sur l'activité (Activity.srpe). Null sans RPE valide. */
+export const sessionRpe = (rpe: number | null | undefined, movingTimeS: number): number | null =>
+  rpe != null && rpe >= 1 && rpe <= 10 ? Math.round((rpe * movingTimeS) / 60) : null;
+
 const rpeLoad = (a: LoadActivity): number | null =>
   a.rpe != null && a.rpe >= 1 && a.rpe <= 10 ? (a.rpe * (a.movingTimeS / 60)) / 4.5 : null;
 

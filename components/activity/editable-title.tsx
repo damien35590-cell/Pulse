@@ -5,9 +5,20 @@ import { Check, Pencil } from "lucide-react";
 import { tap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
+type Props = {
+  activityId: string;
+  title: string;
+  /** Mode piloté de l'extérieur (crayon de la barre du haut) : plus de crayon à côté du titre. */
+  editing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
+};
+
 /** Titre de l'activité, renommable d'un appui sur le crayon. Entrée ou sortie du champ : enregistre ; Échap ou champ vide : annule. */
-export function EditableTitle({ activityId, title }: { activityId: string; title: string }) {
-  const [cur, setCur] = useState(title), [draft, setDraft] = useState(title), [editing, setEditing] = useState(false), [err, setErr] = useState(false);
+export function EditableTitle({ activityId, title, editing: editingProp, onEditingChange }: Props) {
+  const controlled = editingProp !== undefined;
+  const [cur, setCur] = useState(title), [draft, setDraft] = useState(title), [ownEditing, setOwnEditing] = useState(false), [err, setErr] = useState(false);
+  const editing = controlled ? editingProp : ownEditing;
+  const setEditing = (v: boolean) => { if (v) setDraft(cur); if (controlled) onEditingChange?.(v); else setOwnEditing(v); };
   const [pending, start] = useTransition();
   const router = useRouter();
   const saving = useRef(false);
@@ -39,9 +50,11 @@ export function EditableTitle({ activityId, title }: { activityId: string; title
     <div className="mt-1">
       <div className={cn("flex items-start gap-2", pending && "opacity-70")}>
         <h1 className={cn(h1, "min-w-0 flex-1 break-words")}>{cur}</h1>
-        <button type="button" onClick={() => { tap(); setDraft(cur); setEditing(true); }} aria-label="Renommer l’activité" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-surface-2"><Pencil className="h-5 w-5" aria-hidden /></button>
+        {!controlled && (
+          <button type="button" onClick={() => { tap(); setEditing(true); }} aria-label="Renommer l’activité" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-surface-2"><Pencil className="h-5 w-5" aria-hidden /></button>
+        )}
       </div>
-      {err && <p role="alert" className="text-sm font-medium text-brand">Impossible de renommer. Vérifiez votre connexion et réessayez.</p>}
+      {err && <p role="alert" className="text-sm font-medium text-bad">Impossible de renommer. Vérifiez votre connexion et réessayez.</p>}
     </div>
   );
 }

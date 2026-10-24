@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapAttribution } from "@/components/map/map-attribution";
 import { cn } from "@/lib/utils";
 import type { LatLng } from "@/lib/polyline";
 import { TILE, project } from "@/lib/map/track";
@@ -33,7 +32,7 @@ function layout(points: LatLng[], w: number, h: number) {
 
 /**
  * Vignette statique d'un parcours pour le fil : tuiles Stadia Maps posées en <img>, tracé en SVG projeté pareil.
- * Aucune bibliothèque de carte, aucune interaction : la carte du fil reste un simple lien vers le détail.
+ * Aucune bibliothèque de carte, aucun contrôle (pas même les crédits, présents sur le détail) : la carte du fil reste un simple lien vers le détail.
  * Attendu : une trace déjà simplifiée (~200 points, lib/map/track.ts → previewTrack).
  */
 export function RoutePreview({ points, className, basemap = BASEMAP, theme: forced }: { points: LatLng[]; className?: string; basemap?: Record<MapTheme, BasemapStyle>; theme?: MapTheme }) {
@@ -90,7 +89,6 @@ export function RoutePreview({ points, className, basemap = BASEMAP, theme: forc
             {!g.loop && <circle cx={g.end[0]} cy={g.end[1]} r={4.5} className="fill-ink stroke-surface" strokeWidth={2} />}
             <circle cx={g.start[0]} cy={g.start[1]} r={4.5} className="fill-good stroke-surface" strokeWidth={2} />
           </svg>
-          <MapAttribution inLink />
         </div>
       )}
     </div>

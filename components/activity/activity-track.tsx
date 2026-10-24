@@ -1,7 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import { TopoMapLazy } from "@/components/activity/topo-map-lazy";
-import { ElevationChart } from "@/components/activity/elevation-chart";
 import type { TrackPoint } from "@/components/activity/interactive-topo-map";
 
 const rad = Math.PI / 180;
@@ -11,10 +9,10 @@ const meters = (a: TrackPoint, b: TrackPoint) => {
 };
 
 /**
- * Carte + profil d'altitude d'une activité, qui partagent le curseur : glisser le doigt sur le profil
- * déplace un point sur la carte à la même distance.
+ * Curseur partagé entre la carte et le profil d'altitude d'une activité : glisser le doigt sur le profil
+ * déplace un point sur la carte à la même distance. Renvoie le profil (km, altitude), la position du point et son réglage.
  */
-export function ActivityTrack({ points, gain }: { points: TrackPoint[]; gain?: number }) {
+export function useTrackCursor(points: TrackPoint[]) {
   const [cursorKm, setCursorKm] = useState<number | null>(null);
 
   const t = useMemo(() => {
@@ -34,15 +32,5 @@ export function ActivityTrack({ points, gain }: { points: TrackPoint[]; gain?: n
     return [a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f];
   }, [cursorKm, points, t]);
 
-  return (
-    <>
-      <TopoMapLazy points={points} cursor={cursor} />
-      {t.profile.length > 5 && (
-        <section>
-          <h2 className="mb-3 font-display text-lg font-bold">Altitude</h2>
-          <ElevationChart points={t.profile} gain={gain} onCursor={setCursorKm} />
-        </section>
-      )}
-    </>
-  );
+  return { profile: t.profile, cursor, setCursorKm };
 }
