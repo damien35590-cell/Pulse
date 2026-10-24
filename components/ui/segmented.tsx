@@ -10,7 +10,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
   options: readonly Option<T>[];
   value: T;
   onChange: (v: T) => void;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   className?: string;
 }) {
   return (
@@ -27,7 +27,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
             className={cn(
               "touch-manipulation truncate rounded-full font-semibold transition duration-200 ease-snappy",
               typeof o.label === "string" ? "px-3" : "px-2", // étiquette avec icône : un peu moins de marge pour tenir à 4 onglets
-              size === "sm" ? "h-8 text-xs" : "h-10 text-sm",
+              size === "sm" ? "h-8 text-xs" : size === "lg" ? "h-12 text-sm" : "h-10 text-sm",
               active ? "bg-surface-3 text-ink shadow-card" : "text-ink-soft active:text-ink",
             )}
           >
