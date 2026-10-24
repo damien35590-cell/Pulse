@@ -44,6 +44,7 @@ pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `
 - Échelle des chiffres (graisse 600 : en sombre, le 700 « bave ») :
   `text-metric-hero` 56 · `text-metric-xl` 40 · `text-metric-lg` 28 · `text-metric-md` 22 · `text-metric-sm` 17.
 - Libellés : `text-label uppercase text-ink-mute` (12 px, interlettrage 0,06em).
+- Micro : `text-micro` (10 px), réservé aux mentions d'attribution des cartes (`text-ink-soft` sur pastille `bg-surface/70 backdrop-blur rounded-full px-1.5`, en bas à droite, 6 px de marge ; Leaflet : même rendu via `.leaflet-control-attribution` dans globals.css).
 - Titres : grand titre de page 32 px bold (via `<TopBar>`), titre de section = `text-label uppercase text-ink-soft` (via `<Section>`).
 - Pas de nouvelles tailles arbitraires `text-[13px]` : utiliser l'échelle.
 

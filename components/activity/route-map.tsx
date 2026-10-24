@@ -5,7 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import type { RoutePoi } from "@/lib/routes/poi";
@@ -39,7 +39,7 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
   const base = useRef<L.TileLayer | null>(null);
   const theme = useMapTheme();
   // Changement de thème : seules les tuiles changent, la vue reste.
-  useEffect(() => { base.current?.setUrl(BASEMAP_URL[theme]); }, [theme]);
+  useEffect(() => { setBasemap(base.current, theme); }, [theme]);
   const bounds = useRef<L.LatLngBounds | null>(null);
   const [slots, setSlots] = useState<{ el: HTMLElement; poi: RoutePoi }[]>([]);
   const [full, setFull] = useState(false);

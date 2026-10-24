@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
-import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 import type { Junction } from "@/lib/habits/grid";
 
 type Props = {
@@ -33,7 +33,7 @@ export default function HeatMap({ lat0, cellM, cells, junctions, highlight, focu
   const base = useRef<L.TileLayer | null>(null);
   const theme = useMapTheme();
   // Changement de thème : seules les tuiles changent, la vue reste.
-  useEffect(() => { base.current?.setUrl(BASEMAP_URL[theme]); }, [theme]);
+  useEffect(() => { setBasemap(base.current, theme); }, [theme]);
   const top = useRef<L.LayerGroup | null>(null);
   const home = useRef<L.LatLngBounds | null>(null);
 

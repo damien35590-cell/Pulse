@@ -47,6 +47,7 @@ const config: Config = {
       },
       fontSize: {
         label: ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.06em", fontWeight: "600" }],
+        micro: ["0.625rem", { lineHeight: "1rem" }],
         "metric-sm": ["1.0625rem", { lineHeight: "1.2", fontWeight: "600" }],
         "metric-md": ["1.375rem", { lineHeight: "1.1", fontWeight: "600" }],
         "metric-lg": ["1.75rem", { lineHeight: "1", letterSpacing: "-0.01em", fontWeight: "600" }],

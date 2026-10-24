@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { LatLng } from "@/lib/polyline";
 import { TILE, project } from "@/lib/map/track";
-import { BASEMAP_CREDIT, tileUrl, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP, BASEMAP_CREDIT, tileUrl, useMapTheme, type BasemapStyle, type MapTheme } from "@/lib/map/basemap";
 
 const PAD = 0.12, MAX_ZOOM = 16;
 
@@ -35,10 +35,12 @@ function layout(points: LatLng[], w: number, h: number) {
  * Aucune bibliothèque de carte, aucune interaction : la carte du fil reste un simple lien vers le détail.
  * Attendu : une trace déjà simplifiée (~200 points, lib/map/track.ts → previewTrack).
  */
-export function RoutePreview({ points, className }: { points: LatLng[]; className?: string }) {
+export function RoutePreview({ points, className, basemap = BASEMAP, theme: forced }: { points: LatLng[]; className?: string; basemap?: Record<MapTheme, BasemapStyle>; theme?: MapTheme }) {
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
-  const theme = useMapTheme();
+  const appTheme = useMapTheme();
+  const theme = forced ?? appTheme;
+  const { style, filter } = basemap[theme];
 
   useEffect(() => {
     const el = box.current;
@@ -51,7 +53,7 @@ export function RoutePreview({ points, className }: { points: LatLng[]; classNam
   const h = Math.round(w / 2);
   const g = useMemo(() => (w > 0 && points.length > 1 ? layout(points, w, h) : null), [points, w, h]);
   // Tuiles chargées pour le cadrage courant : squelette tant qu'il en manque.
-  const frame = g ? `${theme}:${w}:${g.z}` : "";
+  const frame = g ? `${style}:${w}:${g.z}` : "";
   const [loaded, setLoaded] = useState({ frame: "", n: 0 });
   const done = (f: string) => setLoaded((l) => (l.frame === f ? { frame: f, n: l.n + 1 } : { frame: f, n: 1 }));
   const ready = !!g && loaded.frame === frame && loaded.n >= g.tiles.length;
@@ -61,12 +63,13 @@ export function RoutePreview({ points, className }: { points: LatLng[]; classNam
       {!ready && <div aria-hidden className="absolute inset-0 animate-pulse bg-surface-2" />}
       {g && (
         <div aria-hidden className={cn("pointer-events-none absolute inset-0 transition-opacity duration-300", ready ? "opacity-100" : "opacity-0")}>
+          <div className="absolute inset-0" style={{ filter }}>
           {g.tiles.map((t) => (
             // eslint-disable-next-line @next/next/no-img-element -- tuiles externes, taille fixe : pas besoin de next/image
             <img
-              key={`${theme}/${t.key}`}
-              src={tileUrl(theme, g.z, t.x, t.y)}
-              srcSet={`${tileUrl(theme, g.z, t.x, t.y, true)} 2x`}
+              key={`${style}/${t.key}`}
+              src={tileUrl(theme, g.z, t.x, t.y, false, style)}
+              srcSet={`${tileUrl(theme, g.z, t.x, t.y, true, style)} 2x`}
               alt=""
               width={TILE}
               height={TILE}
@@ -79,13 +82,14 @@ export function RoutePreview({ points, className }: { points: LatLng[]; classNam
               style={{ left: t.left, top: t.top, width: TILE, height: TILE }}
             />
           ))}
+          </div>
           <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="absolute inset-0" fill="none" strokeLinecap="round" strokeLinejoin="round">
             <path d={g.d} className="stroke-bg/60" strokeWidth={4} />
             <path d={g.d} className="stroke-brand" strokeWidth={2.5} />
             {!g.loop && <circle cx={g.end[0]} cy={g.end[1]} r={4.5} className="fill-ink stroke-surface" strokeWidth={2} />}
             <circle cx={g.start[0]} cy={g.start[1]} r={4.5} className="fill-good stroke-surface" strokeWidth={2} />
           </svg>
-          <span className="absolute bottom-1 right-1.5 rounded bg-bg/60 px-1 text-label font-normal tracking-normal text-ink-mute">{BASEMAP_CREDIT}</span>
+          <span className="absolute bottom-1.5 right-1.5 rounded-full bg-surface/70 px-1.5 text-micro text-ink-soft backdrop-blur">{BASEMAP_CREDIT}</span>
         </div>
       )}
     </div>

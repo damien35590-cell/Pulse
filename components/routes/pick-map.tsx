@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
-import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 import { tap } from "@/lib/haptics";
 
 type LatLng = { lat: number; lng: number };
@@ -28,7 +28,7 @@ export default function PickMap({ center, value, onPick, className }: Props) {
   const base = useRef<L.TileLayer | null>(null);
   const theme = useMapTheme();
   // Changement de thème : seules les tuiles changent, la vue reste.
-  useEffect(() => { base.current?.setUrl(BASEMAP_URL[theme]); }, [theme]);
+  useEffect(() => { setBasemap(base.current, theme); }, [theme]);
   const pin = useRef<L.CircleMarker | null>(null);
   const pick = useRef(onPick);
   pick.current = onPick;

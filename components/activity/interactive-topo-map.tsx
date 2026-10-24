@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { Segmented } from "@/components/ui/segmented";
-import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, useMapTheme } from "@/lib/map/basemap";
+import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 
 export type TrackPoint = { lat: number; lng: number; ele?: number; t?: number };
 type Mode = "slope" | "speed";
@@ -102,7 +102,7 @@ export default function InteractiveTopoMap({ points, cursor, className }: { poin
     };
   }, [points]);
 
-  useEffect(() => { base.current?.setUrl(BASEMAP_URL[theme]); }, [theme]);
+  useEffect(() => { setBasemap(base.current, theme); }, [theme]);
 
   // Tracé : halo sous la ligne colorée, départ (good) et arrivée (ink, anneau surface). Couleurs relues à chaque thème.
   useEffect(() => {
