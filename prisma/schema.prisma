@@ -193,7 +193,10 @@ model Activity {
   srpe           Int?                    // charge ressentie (sRPE, Foster) = RPE × durée en minutes ; null sans RPE
   kind           WorkoutKind?            // muscu : moitié du corps travaillée (null = séance d'avant ce champ, déduite des exercices)
   templateId     String?                 // muscu : modèle dont la séance est partie
-  zoneRibbon     Json?                   // [{ z: 1..6, f: fraction du temps }] : ruban de zones FC (puissance en vélo sans FC), lib/art/zone-ribbon.ts ; null sans FC ni puissance
+  zoneRibbon     Json?                   // [{ z: 1..6, f: fraction du temps }] : ruban de zones, lib/art/zone-ribbon.ts ; null sans FC, puissance (vélo) ni allure (course)
+  zoneRibbonSource String?               // "hr" | "power" | "pace" : série d'où vient le ruban ; null = pas de ruban (ou ruban d'avant ce champ)
+  zoneRibbonRef  Float?                  // seuil utilisé : FC max (bpm), FTP (W) ou VMA (km/h) ; sert à repérer les rubans périmés quand il change
+  zoneRibbonAt   DateTime?               // dernier calcul du ruban, même sans résultat ; null = jamais calculé ou à recalculer (lib/data/zone-ribbon.ts)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -417,7 +420,8 @@ model WeatherCache {
 model UserZones {
   userId    String   @id
   ftp       Int?     // watts
-  hrMax     Int?     // bpm
+  hrMax     Int?     // bpm, saisi : prime toujours sur l'estimation et n'est jamais écrasé
+  hrMaxEstimate Int? // bpm, estimé (lib/physio/hr-max.ts), rafraîchi chaque nuit tant que hrMax est vide
   updatedAt DateTime @updatedAt
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

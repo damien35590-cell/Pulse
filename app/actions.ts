@@ -13,6 +13,9 @@ import type { RaceDraft } from "@/types/race";
 import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { createRunProgram, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
 import { revokeLostBadges } from "@/lib/data/badges";
+import { getZones } from "@/lib/data/zones";
+import { onThresholdsChange } from "@/lib/data/zone-ribbon";
+import { refreshEstimatedHrMax } from "@/lib/physio/hr-max";
 import { recomputeRecords } from "@/lib/pipeline/post-import";
 import { canUseExercise, createCustomExercise, linkExerciseName, syncCatalogAndHistory, type CatalogSyncResult } from "@/lib/data/exercises-catalog";
 import { EQUIPMENT_LABELS, LOAD_TYPE_LABELS } from "@/lib/training/catalog/exercises";
@@ -375,11 +378,15 @@ export async function retireGear(id: string) {
 
 export async function deleteGear(id: string) { const userId = await uid(); await prisma.gear.deleteMany({ where: { id, userId } }); gearPaths(); }
 
-/** Champ vide = retour à l'estimation automatique. */
+/** Champ vide = retour à l'estimation automatique. Un seuil qui change de façon sensible fait recalculer les rubans de zones en arrière-plan. */
 export async function saveZones(fd: FormData) {
   const userId = await uid(), ftp = num(fd.get("ftp")), hrMax = num(fd.get("hrMax"));
   const data = { ftp: ftp >= 50 && ftp <= 600 ? Math.round(ftp) : null, hrMax: hrMax >= 120 && hrMax <= 230 ? Math.round(hrMax) : null };
+  const before = await getZones(userId);
   await prisma.userZones.upsert({ where: { userId }, update: data, create: { userId, ...data } });
+  // Saisie effacée : l'estimation reprend la main, autant qu'elle soit à jour tout de suite plutôt qu'à la prochaine nuit.
+  if (data.hrMax == null && before.hrManual) await refreshEstimatedHrMax(userId).catch((e) => console.error("[seuils] FC max estimée", e));
+  await onThresholdsChange(userId, before, await getZones(userId));
   revalidatePath("/vous/seuils"); revalidatePath("/vous"); revalidatePath("/analysis");
 }
 

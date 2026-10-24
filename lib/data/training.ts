@@ -7,6 +7,7 @@ import type { RunGeneratorInput, RunWorkoutStructure } from "@/types/training";
 import { generateRunBaseVma, startMonday } from "@/lib/training/generate";
 import { estimateRun, resolveSteps, summarizeRun } from "@/lib/training/resolve";
 import { DEFAULT_VMA, pickVma, type CurrentVma } from "@/lib/training/vma";
+import { getStoredVma, onThresholdsChange } from "@/lib/data/zone-ribbon";
 import { RUN_BASE_VMA, blockOf, weekInBlock } from "@/lib/training/catalog/run-base-vma";
 
 const TZ = "Europe/Paris";
@@ -31,7 +32,11 @@ export async function getCurrentVma(userId: string): Promise<CurrentVma | null> 
 }
 
 export async function saveVmaMetric(userId: string, vmaKmh: number, source: MetricSource, opts: { note?: string; activityId?: string | null; measuredAt?: Date } = {}) {
-  return prisma.athleteMetric.create({ data: { userId, type: "VMA_KMH", value: Math.round(vmaKmh * 10) / 10, source, measuredAt: opts.measuredAt ?? new Date(), activityId: opts.activityId ?? null, note: opts.note ?? null } });
+  const before = await getStoredVma(userId);
+  const m = await prisma.athleteMetric.create({ data: { userId, type: "VMA_KMH", value: Math.round(vmaKmh * 10) / 10, source, measuredAt: opts.measuredAt ?? new Date(), activityId: opts.activityId ?? null, note: opts.note ?? null } });
+  // La VMA courante est la dernière mesure : un test daté d'avant la dernière ne la change pas (onThresholdsChange le constate).
+  await onThresholdsChange(userId, { vma: before }, { vma: await getStoredVma(userId) });
+  return m;
 }
 
 // ───────── Création ─────────
@@ -67,6 +72,7 @@ export async function createRunProgram(userId: string, o: { sessionsPerWeek: 2 |
       plannedDurationS: s.plannedDurationS, plannedDistanceM: s.plannedDistanceM,
     }))) }),
   ]);
+  await onThresholdsChange(userId, { vma: last?.value ?? null }, { vma: o.vmaKmh }); // la VMA du nouveau programme est la plus récente
   return programId;
 }
 

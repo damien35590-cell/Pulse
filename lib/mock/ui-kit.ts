@@ -162,9 +162,9 @@ function intervalHr() {
 }
 export const artDemo = {
   /** Le tempo de 10 km, sa FC → ruban sous la carte. */
-  ribbon: zoneRibbon({ hr: runs[0].hr }, { hrMax: HR_MAX })!,
+  ribbon: zoneRibbon({ hr: runs[0].hr }, { hrMax: HR_MAX })!.segments,
   /** Fractionné : profil d'effort à la place de la carte, étiquette de la séance prévue. */
-  effort: { segments: zoneRibbon({ hr: intervalHr() }, { hrMax: HR_MAX })!, label: "10×400" },
+  effort: { segments: zoneRibbon({ hr: intervalHr() }, { hrMax: HR_MAX })!.segments, label: "10×400" },
   /** Séance Lafay : B2 (6 séries, cible 10 non atteinte partout), A3, E4 au chrono (secondes), G. */
   sets: setGroups([
     { name: "B2 - dips", sets: 6, reps: 10, setsDetail: [10, 10, 9, 9, 8, 8].map((reps) => ({ reps, done: true })) },

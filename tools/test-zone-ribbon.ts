@@ -1,10 +1,13 @@
 // Lancer avec : npx tsx tools/test-zone-ribbon.ts
 import assert from "node:assert/strict";
-import { parseRibbon, zoneRibbon, RIBBON_BUCKETS, type RibbonSegment } from "../lib/art/zone-ribbon";
+import { parseRibbon, refsChange, zoneRibbon as ribbonOf, RIBBON_BUCKETS, type RibbonOpts, type RibbonRefs, type RibbonSegment, type RibbonStream } from "../lib/art/zone-ribbon";
+import { paceSeries, type PacePoint } from "../lib/art/pace";
 import { hasIntervalStructure, shortTitle } from "../lib/art/effort";
 import { exerciseCode, setGroups } from "../lib/art/set-bars";
 import { cardArt } from "../lib/art/card";
 
+/** Segments seuls ; la source et le seuil sont vérifiés plus bas avec ribbonOf. */
+const zoneRibbon = (st: RibbonStream, refs: RibbonRefs, opts: RibbonOpts = {}) => ribbonOf(st, refs, opts)?.segments ?? null;
 const sum = (r: RibbonSegment[]) => r.reduce((s, x) => s + x.f, 0);
 const HR_MAX = 190; // bornes FC : Z1 ≤ 114, Z2 ≤ 133, Z3 ≤ 152, Z4 ≤ 171, Z5 ≤ 181, Z6 au-delà
 
@@ -40,6 +43,79 @@ assert.deepEqual(zoneRibbon({ power }, { ftp: 250 }, { ride: true })!.map((s) =>
 assert.equal(zoneRibbon({ power }, { ftp: 250 }), null, "la puissance ne sert que pour le vélo");
 assert.deepEqual(zoneRibbon({ hr: new Array(2400).fill(125), power }, { hrMax: HR_MAX, ftp: 250 }, { ride: true }), [{ z: 2, f: 1 }], "FC prioritaire");
 assert.deepEqual(zoneRibbon({ hr: [], power }, { hrMax: HR_MAX, ftp: 250 }, { ride: true })!.map((s) => s.z), [1, 4], "FC absente : puissance");
+
+// Source et seuil mémorisés avec le ruban.
+const hrRibbon = ribbonOf({ hr: new Array(2400).fill(125) }, { hrMax: HR_MAX, ftp: 250 }, { ride: true })!;
+assert.deepEqual([hrRibbon.source, hrRibbon.ref], ["hr", HR_MAX]);
+const pwRibbon = ribbonOf({ power }, { hrMax: HR_MAX, ftp: 250 }, { ride: true })!;
+assert.deepEqual([pwRibbon.source, pwRibbon.ref], ["power", 250]);
+
+// ─── Allure (course sans FC) : zones en % de la VMA, trace GPS d'un point toutes les 3 s ───
+const VMA = 15; // Z1 ≤ 9, Z2 ≤ 11,25, Z3 ≤ 12,75, Z4 ≤ 13,8, Z5 ≤ 15, Z6 au-delà
+const M_PER_DEG = 111195; // 1° de latitude, en mètres (rayon 6 371 km)
+/** Trace vers le nord : plan = [secondes, km/h] ; 0 km/h = à l'arrêt (le GPS reste en place). `step` : secondes entre deux points. */
+function track(plan: [number, number][], step = 3): PacePoint[] {
+  const pts: PacePoint[] = [{ t: 0, lat: 48, lng: -1.6 }];
+  let t = 0, lat = 48;
+  for (const [sec, kmh] of plan) {
+    for (let k = 0; k < sec; k += step) { t += step; lat += (kmh / 3.6 * step) / M_PER_DEG; pts.push({ t: t * 1000, lat, lng: -1.6 }); }
+  }
+  return pts;
+}
+const paceOf = (plan: [number, number][], vma: number | null = VMA, step = 3) => ribbonOf({ points: track(plan, step) }, { vma }, { run: true });
+
+const steady = paceSeries(track([[1200, 12]]));
+assert.ok(steady.length >= 1199 && steady.length <= 1201, "une valeur par seconde");
+assert.ok(steady.slice(50, -50).every((v) => Math.abs(v - 12) < 0.05), "vitesse constante lue juste (12 km/h)");
+
+const easy = paceOf([[2400, 12]])!; // 80 % de la VMA
+assert.deepEqual(easy.segments, [{ z: 3, f: 1 }]);
+assert.deepEqual([easy.source, easy.ref], ["pace", VMA]);
+for (const [kmh, z] of [[8.5, 1], [9.5, 2], [12, 3], [13.5, 4], [14.5, 5], [16, 6]] as const) assert.deepEqual(paceOf([[1800, kmh]])!.segments, [{ z, f: 1 }], `${kmh} km/h = Z${z}`);
+assert.equal(paceOf([[2400, 12]], null), null, "sans VMA : pas de ruban d'allure");
+assert.equal(ribbonOf({ points: track([[2400, 12]]) }, { vma: VMA }), null, "l'allure ne sert que pour la course");
+assert.equal(ribbonOf({ points: track([[2400, 12]]) }, { vma: VMA }, { ride: true }), null, "ni pour le vélo");
+assert.equal(paceOf([[30, 12]]), null, "trop court");
+
+// Arrêts (< 1 km/h) ignorés : ni Z1 ni moyenne tirée vers le bas ; trop d'arrêts : pas de ruban.
+assert.deepEqual(paceOf([[1200, 12], [300, 0], [1200, 12]])!.segments, [{ z: 3, f: 1 }], "un arrêt de 5 min ne crée pas de Z1");
+assert.equal(paceOf([[600, 12], [1800, 0]]), null, "75 % d'arrêt : pas de ruban");
+// Saut GPS (500 m en 3 s) ignoré.
+const glitchy = track([[1200, 12]]);
+glitchy[200] = { ...glitchy[200], lat: glitchy[200].lat! + 500 / M_PER_DEG };
+assert.deepEqual(ribbonOf({ points: glitchy }, { vma: VMA }, { run: true })!.segments, [{ z: 3, f: 1 }], "un saut GPS ne change pas la zone");
+// Pause de montre : un trou de 5 min dans la trace n'est pas une allure de marche.
+const before = track([[900, 12]]), resumeAt = before.at(-1)!.lat! + 300 / M_PER_DEG - 48; // 300 m parcourus pendant les 5 min de pause (3,6 km/h)
+const paused = [...before, ...track([[900, 12]]).map((p) => ({ ...p, t: p.t + 1200e3, lat: p.lat! + resumeAt }))];
+assert.deepEqual(ribbonOf({ points: paused }, { vma: VMA }, { run: true })!.segments, [{ z: 3, f: 1 }], "pause de montre ignorée");
+// Trace compactée d'une longue sortie (un point toutes les 8 s).
+assert.deepEqual(paceOf([[7200, 12]], VMA, 8)!.segments, [{ z: 3, f: 1 }]);
+
+// Priorité des sources : FC > puissance > allure.
+const hrSeries = new Array(2400).fill(125), run12 = track([[2400, 12]]);
+assert.equal(ribbonOf({ hr: hrSeries, points: run12 }, { hrMax: HR_MAX, vma: VMA }, { run: true })!.source, "hr", "FC prioritaire sur l'allure");
+assert.equal(ribbonOf({ hr: hrSeries, points: run12 }, { vma: VMA }, { run: true })!.source, "pace", "FC sans FC max : allure");
+assert.equal(ribbonOf({ hr: [...new Array(300).fill(125), ...new Array(2100).fill(0)], points: run12 }, { hrMax: HR_MAX, vma: VMA }, { run: true })!.source, "pace", "FC trop lacunaire : allure");
+assert.equal(ribbonOf({ power, points: run12 }, { ftp: 250, vma: VMA }, { ride: true, run: true })!.source, "power", "puissance prioritaire sur l'allure");
+
+// Fractionné 10 × 90 s à la VMA (récup 90 s à 8 km/h) : reconnu comme séance d'intervalles, comme avec la FC.
+const paceRepsPlan: [number, number][] = [[900, 10]];
+for (let i = 0; i < 10; i++) paceRepsPlan.push([90, 15], [90, 8]);
+paceRepsPlan.push([600, 9]);
+const paceReps = paceOf(paceRepsPlan)!;
+assert.ok(hasIntervalStructure(paceReps.segments), "10 × 90 s détecté sur l'allure");
+assert.ok(!hasIntervalStructure(easy.segments), "un footing régulier non");
+assert.deepEqual(cardArt({ type: "RUN", hasRoute: true, zoneRibbon: paceReps.segments }), { effort: { segments: paceReps.segments } }, "séance d'intervalles à l'allure : EffortStrip");
+
+// Seuils qui bougent : FC max ≥ 2 bpm, FTP ≥ 2 W, VMA au dixième ; un seuil qui apparaît ou disparaît compte toujours.
+assert.deepEqual(refsChange({ hrMax: 185 }, { hrMax: 186 }), { stale: [], appeared: false });
+assert.deepEqual(refsChange({ hrMax: 185 }, { hrMax: 187 }), { stale: ["hr"], appeared: false });
+assert.deepEqual(refsChange({ hrMax: 185, ftp: 250, vma: 15 }, { hrMax: 185, ftp: 251, vma: 15 }), { stale: [], appeared: false });
+assert.deepEqual(refsChange({ ftp: 250 }, { ftp: 252 }), { stale: ["power"], appeared: false });
+assert.deepEqual(refsChange({ vma: 15 }, { vma: 15.1 }), { stale: ["pace"], appeared: false });
+assert.deepEqual(refsChange({ hrMax: null }, { hrMax: 190 }), { stale: ["hr"], appeared: true });
+assert.deepEqual(refsChange({ vma: 15 }, { vma: null }), { stale: ["pace"], appeared: false });
+assert.deepEqual(refsChange({}, { hrMax: null }), { stale: [], appeared: false });
 
 // Relecture du JSON stocké.
 assert.deepEqual(parseRibbon(two), two);

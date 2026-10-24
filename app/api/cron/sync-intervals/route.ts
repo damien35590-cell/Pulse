@@ -6,6 +6,7 @@ import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
 import { matchRaceActivities } from "@/lib/races/link";
 import { buildAllHabits } from "@/lib/habits/build";
+import { BACKFILL_LIMIT, backfillRibbons, refreshHrMaxEstimate } from "@/lib/data/zone-ribbon";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -45,6 +46,19 @@ export async function GET(req: Request) {
       races = { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
 
+    // FC max estimée (sauf si saisie), puis rubans de zones en attente (jamais calculés, seuil changé, allure devenue FC) : jusqu'à 50 par nuit.
+    // Idempotent, et sans jamais faire échouer le cron. Avant les habitudes, qui ont leur propre échéance.
+    let ribbons: { ok: boolean; hrMax?: unknown; backfill?: unknown; error?: string };
+    try {
+      const hrMax = await refreshHrMaxEstimate(user.id, { background: false });
+      const backfill = await backfillRibbons(user.id, { limit: BACKFILL_LIMIT, deadline: t0 + 40_000 });
+      console.log(`[cron] FC max estimée ${hrMax.skipped ? "saisie, inchangée" : `${hrMax.after ?? "—"} bpm (${hrMax.source ?? "aucune donnée"})`} · rubans : ${backfill.ribbons} calculés, ${backfill.none} sans ruban, ${backfill.errors} en erreur`);
+      ribbons = { ok: true, hrMax, backfill };
+    } catch (e) {
+      console.error("[cron] rubans de zones", e);
+      ribbons = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
     // Nouvelles traces GPS : habitudes recalculées (noms de lieux seulement s'il reste du temps), sans faire échouer le cron.
     let habits: { ok: boolean; error?: string } | undefined;
     const fresh = intervals.status === "fulfilled" && intervals.value.saved + intervals.value.backfilled > 0;
@@ -55,7 +69,7 @@ export async function GET(req: Request) {
 
     const failed = intervals.status === "rejected" || googleFit.status === "rejected" || calendar.status === "rejected";
     return NextResponse.json(
-      { intervals: report(intervals), googleFit: report(googleFit), calendar: report(calendar), races, habits },
+      { intervals: report(intervals), googleFit: report(googleFit), calendar: report(calendar), races, ribbons, habits },
       { status: failed ? 502 : 200 }
     );
   } catch (e) {

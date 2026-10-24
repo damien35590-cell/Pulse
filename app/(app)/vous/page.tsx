@@ -15,6 +15,7 @@ import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
 import { getRecordsBySport } from "@/lib/data/records";
 import { getZones } from "@/lib/data/zones";
+import { thresholdLabel } from "@/lib/zones";
 import { getEquipment } from "@/lib/workout/library-db";
 import { EQUIPMENT_LABELS } from "@/lib/workout/catalog";
 import { getPrefs } from "@/lib/notify/prefs";
@@ -49,8 +50,7 @@ export default async function ProfilePage() {
   const lvl = level(acts.reduce((t, a) => t + xpOf(a), 0));
   const st = stats.GLOBAL; // mêmes totaux que les badges, tous sports confondus
 
-  const est = (auto: boolean) => (auto ? " (estimée)" : "");
-  const seuils = `FTP ${zones.ftp ? `${zones.ftp} W${est(!zones.ftpManual)}` : "—"} · FC max ${zones.hrMax ? `${zones.hrMax} bpm${est(!zones.hrManual)}` : "—"}`;
+  const seuils = `${thresholdLabel("FTP", zones.ftp, "W", zones.ftpManual)} · ${thresholdLabel("FC max", zones.hrMax, "bpm", zones.hrManual)}`;
 
   return (
     <div className="space-y-6">

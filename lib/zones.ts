@@ -7,6 +7,10 @@ export const ZONES = [
   { id: 6, label: "Z6", name: "Anaérobie", color: "#8B5CF6" },
 ] as const;
 
+/** Seuil pour l'affichage : « FC max 187 bpm (estimée) », « FTP 250 W » (saisi), « FC max — » (inconnu). */
+export const thresholdLabel = (name: string, value: number | null, unit: string, manual: boolean) =>
+  `${name} ${value ? `${value} ${unit}${manual ? "" : " (estimée)"}` : "—"}`;
+
 /** Bornes hautes de Z1 à Z5, en % (Z6 = au-delà). Puissance : modèle de Coggan, % de la FTP. Cardio : % de la FC max. */
 export const POWER_PCT = [55, 75, 90, 105, 120];
 export const HR_PCT = [60, 70, 80, 90, 95];
