@@ -53,6 +53,15 @@ pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `
 - Ombres portées seulement sur ce qui flotte : `shadow-glow` (halo discret du bouton + de la nav, jamais sur un bouton posé dans une carte), `shadow-pop` (feuilles, menus).
 - Espacement : `p-4` dans les cartes, `gap-3` entre cartes, `space-y-8` entre sections.
 
+## Marque (`components/brand/logo.tsx`)
+
+- **`<PulseMark size>`** : le symbole seul (battement de cœur Volt sur fond `bg-bg`). Pour les petits espaces et les rappels de marque : barre du haut, avatar d'app, état vide.
+- **`<PulseLogo size>`** : symbole + mot-symbole « Pulse » (`font-num` 600, `text-ink`). Seulement là où l'on présente l'app : connexion, écran d'accueil, à propos. Jamais deux fois sur le même écran.
+- **Taille minimale** : 16 px pour `PulseMark` (taille du favicon, encore lisible), 24 px pour `PulseLogo` (sinon le mot-symbole devient trop petit).
+- **Zone de protection** : laisser vide autour du logo au moins ¼ de `size` (8 px pour un symbole de 32 px). Ne pas le coller à un bord de carte ni à un texte.
+- **Uniquement les tokens** : trait `stroke-brand` (vire au vert foncé `--brand-text` en thème clair pour rester lisible), fond `bg-bg`. Pas de recoloration, de dégradé, d'ombre ni de déformation, et pas de SVG recopié à la main : toujours passer par ces composants.
+- Fichiers sources dans `assets/brand/` (master, maskable, monochrome). Les icônes d'app (`app/icon.svg`, `favicon.ico`, `apple-icon.png`, `public/icons/*`) sont générées par `npm run icons` : modifier le SVG, relancer, committer le résultat.
+
 ## Recettes (`lib/ui.ts`)
 
 `ui.card`, `ui.pressCard` (carte cliquable), `ui.label`, `ui.btnPrimary`, `ui.btnSecondary`, `ui.btnDanger`, `ui.iconBtn`, `ui.chip`.
