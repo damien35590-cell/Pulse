@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { parseRibbon, refsChange, zoneRibbon as ribbonOf, RIBBON_BUCKETS, type RibbonOpts, type RibbonRefs, type RibbonSegment, type RibbonStream } from "../lib/art/zone-ribbon";
 import { paceSeries, type PacePoint } from "../lib/art/pace";
-import { hasIntervalStructure, shortTitle } from "../lib/art/effort";
+import { hasIntervalStructure, hasPaceIntervalStructure, shortTitle } from "../lib/art/effort";
 import { exerciseCode, setGroups } from "../lib/art/set-bars";
 import { cardArt } from "../lib/art/card";
 
@@ -106,6 +106,17 @@ const paceReps = paceOf(paceRepsPlan)!;
 assert.ok(hasIntervalStructure(paceReps.segments), "10 × 90 s détecté sur l'allure");
 assert.ok(!hasIntervalStructure(easy.segments), "un footing régulier non");
 assert.deepEqual(cardArt({ type: "RUN", hasRoute: true, zoneRibbon: paceReps.segments }), { effort: { segments: paceReps.segments } }, "séance d'intervalles à l'allure : EffortStrip");
+
+// Règle d'allure plus stricte : blocs durs d'au moins 2 tranches, récupération Z1–Z2 entre eux, 15 % du temps en Z4+ au moins.
+const B = 1 / 40, seg = (...a: [number, number][]): RibbonSegment[] => a.map(([z, n]) => ({ z: z as RibbonSegment["z"], f: n * B }));
+const many = (n: number, hard: [number, number], rec: [number, number]) => Array.from({ length: n }, () => [hard, rec]).flat() as [number, number][];
+assert.ok(hasPaceIntervalStructure(seg([2, 6], ...many(5, [5, 2], [2, 2]), [2, 4])), "5 blocs de 2 tranches, 25 % en dur");
+assert.ok(!hasPaceIntervalStructure(seg([2, 10], ...many(5, [5, 1], [2, 5]), [2, 5])), "blocs d'une tranche = bruit");
+assert.ok(!hasPaceIntervalStructure(seg([2, 6], ...many(3, [5, 2], [2, 4]), [2, 4])), "3 blocs seulement");
+assert.ok(!hasPaceIntervalStructure(seg([3, 4], ...many(5, [4, 2], [3, 3]), [3, 4])), "séparés par du Z3 seulement : un seul bloc");
+assert.ok(hasPaceIntervalStructure(seg([2, 14], ...many(4, [4, 2], [2, 4]), [2, 2])), "4 blocs de 2 tranches = 20 % du temps : détecté");
+// Le ruban FC garde l'ancienne règle.
+assert.ok(hasIntervalStructure(seg([2, 10], ...many(5, [5, 1], [2, 5]), [2, 5])), "FC : un bloc d'une tranche compte");
 
 // Seuils qui bougent : FC max ≥ 2 bpm, FTP ≥ 2 W, VMA au dixième ; un seuil qui apparaît ou disparaît compte toujours.
 assert.deepEqual(refsChange({ hrMax: 185 }, { hrMax: 186 }), { stale: [], appeared: false });

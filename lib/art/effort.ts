@@ -29,3 +29,23 @@ export function hasIntervalStructure(ribbon: RibbonSegment[]): boolean {
   }
   return blocks >= 4 && hard >= 0.1 && hard <= 0.7;
 }
+
+/**
+ * Variante pour un ruban d'allure (GPS, plus bruité que la FC). Un bloc dur = au moins 2 tranches de suite en Z4+ (une seule = bruit,
+ * ignorée) ; deux blocs ne sont distincts que s'ils sont séparés par de la récupération en Z1–Z2 (un simple Z3 ne sépare pas : ils fusionnent) ;
+ * il en faut au moins 4, et 15 à 70 % du temps en Z4+ (hors tranches isolées).
+ */
+const BUCKET = 1 / 40;
+export function hasPaceIntervalStructure(ribbon: RibbonSegment[]): boolean {
+  let blocks = 0, hard = 0, run = 0, recovered = true, last = false;
+  const close = () => { // fin d'une suite de Z4+
+    if (run >= 2 * BUCKET - 1e-9) { if (recovered || !last) blocks++; hard += run; last = true; recovered = false; }
+    run = 0;
+  };
+  for (const s of ribbon) {
+    if (s.z >= 4) run += s.f;
+    else { close(); if (s.z <= 2) recovered = true; }
+  }
+  close();
+  return blocks >= 4 && hard >= 0.15 && hard <= 0.7;
+}

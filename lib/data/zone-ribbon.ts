@@ -58,7 +58,9 @@ export async function refreshZoneRibbon(activityId: string, zones?: RibbonZones)
 }
 
 // ───────── Rattrapage et recalcul ─────────
-export const BACKFILL_LIMIT = 50;
+/** Plafond de sécurité d'un passage ; en pratique c'est l'échéance de temps qui borne la tâche de nuit. */
+export const BACKFILL_CAP = 2000;
+const DEFAULT_LIMIT = 50;
 /** Un ruban d'allure dont l'activité a pourtant une FC (et qui n'a pas pu passer en FC : trop de trous) n'est réessayé qu'après ce délai. */
 const PACE_HR_RETRY_DAYS = 7;
 const ZONE_REF: Record<RibbonSource, keyof RibbonZones> = { hr: "hrMax", power: "ftp", pace: "vma" };
@@ -102,7 +104,7 @@ export async function backfillRibbons(userId: string, o: { limit?: number; deadl
   const zones = o.zones ?? (await getRibbonZones(userId));
   const out: BackfillStats = { examined: 0, ribbons: 0, none: 0, errors: 0, bySource: { hr: 0, power: 0, pace: 0 }, timedOut: false };
   const skip = o.skip ?? [];
-  for (const id of await pendingRibbonIds(userId, zones, o.limit ?? BACKFILL_LIMIT, skip)) {
+  for (const id of await pendingRibbonIds(userId, zones, o.limit ?? DEFAULT_LIMIT, skip)) {
     if (o.deadline && Date.now() > o.deadline) { out.timedOut = true; break; }
     out.examined++;
     skip.push(id);

@@ -20,7 +20,7 @@ import { getZones } from "../lib/data/zones";
 import { computeZoneRibbon, getRibbonZones, pendingRibbonIds, writeRibbon } from "../lib/data/zone-ribbon";
 import { estimateHrMax, refreshEstimatedHrMax } from "../lib/physio/hr-max";
 import { cardArt } from "../lib/art/card";
-import { hasIntervalStructure } from "../lib/art/effort";
+import { hasIntervalStructure, hasPaceIntervalStructure } from "../lib/art/effort";
 
 const dryRun = process.argv.includes("--dry-run"), all = process.argv.includes("--all");
 const fmt = (m: Map<string, number>) => [...m].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", ") || "aucun";
@@ -69,9 +69,9 @@ async function main() {
       total.ribbon++;
       bump(bySource, r.source);
       bump(byType, a?.type ?? "?");
-      const interval = hasIntervalStructure(r.segments);
+      const interval = (r.source === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(r.segments);
       if (interval) { total.interval++; bump(intervalBySource, r.source); }
-      const art = a && cardArt({ type: a.type, hasRoute: true, zoneRibbon: r.segments, plannedSession: a.plannedSession });
+      const art = a && cardArt({ type: a.type, hasRoute: true, zoneRibbon: r.segments, zoneRibbonSource: r.source, plannedSession: a.plannedSession });
       if (art?.effort) { total.effort++; if (a?.plannedSession) total.keyLinked++; }
     }
 

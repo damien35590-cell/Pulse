@@ -6,7 +6,7 @@
  * - Le reste : inchangé.
  * Fonction pure (tests : tools/test-zone-ribbon.ts).
  */
-import { EFFORT_KINDS, hasIntervalStructure, shortTitle } from "./effort";
+import { EFFORT_KINDS, hasIntervalStructure, hasPaceIntervalStructure, shortTitle } from "./effort";
 import { setGroups, type SetExercise, type SetGroup } from "./set-bars";
 import { parseRibbon, type RibbonSegment } from "./zone-ribbon";
 
@@ -25,6 +25,8 @@ export type ArtActivity = {
   /** Une trace GPS exploitable existe (la vignette de carte s'affichera). */
   hasRoute: boolean;
   zoneRibbon?: unknown;
+  /** "hr" | "power" | "pace" : l'allure, plus bruitée, a une détection d'intervalles plus stricte. */
+  zoneRibbonSource?: string | null;
   plannedSession?: { kind: string; title: string } | null;
   exercises?: SetExercise[];
 };
@@ -40,7 +42,7 @@ export function cardArt(a: ArtActivity): CardArt {
   if (!ribbon) return {};
   const key = a.plannedSession && EFFORT_KINDS.includes(a.plannedSession.kind) ? a.plannedSession : null;
   if (key) return { effort: { segments: ribbon, label: shortTitle(key.title) } };
-  if (hasIntervalStructure(ribbon)) return { effort: { segments: ribbon } };
+  if ((a.zoneRibbonSource === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(ribbon)) return { effort: { segments: ribbon } };
   if (a.hasRoute || (a.type === "RIDE" && a.source === "mywhoosh")) return { ribbon };
   return {};
 }

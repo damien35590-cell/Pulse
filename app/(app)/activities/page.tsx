@@ -33,7 +33,7 @@ const SORTS: Record<string, { label: string; orderBy: Prisma.ActivityOrderByWith
 const PERIODS: Record<string, string> = { all: "Tout", "30": "30 derniers jours", "90": "3 derniers mois", year: "Cette année" };
 const FULL = {
   id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, polyline: true, avgHr: true, avgPower: true,
-  source: true, zoneRibbon: true, plannedSession: { select: { kind: true, title: true } }, // art de la carte (lib/art/card.ts) : jamais le flux brut
+  source: true, zoneRibbon: true, zoneRibbonSource: true, plannedSession: { select: { kind: true, title: true } }, // art de la carte (lib/art/card.ts) : jamais le flux brut
   exercises: { orderBy: { position: "asc" }, select: { name: true, sets: true, reps: true, loadKg: true, setsDetail: true } },
 } satisfies Prisma.ActivitySelect;
 type Full = Prisma.ActivityGetPayload<{ select: typeof FULL }>;

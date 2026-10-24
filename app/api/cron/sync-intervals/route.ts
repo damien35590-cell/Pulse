@@ -6,9 +6,11 @@ import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
 import { matchRaceActivities } from "@/lib/races/link";
 import { buildAllHabits } from "@/lib/habits/build";
-import { BACKFILL_LIMIT, backfillRibbons, refreshHrMaxEstimate } from "@/lib/data/zone-ribbon";
+import { BACKFILL_CAP, backfillRibbons, refreshHrMaxEstimate } from "@/lib/data/zone-ribbon";
 
 export const maxDuration = 60;
+/** Temps écoulé après lequel on ne démarre plus de ruban (la fonction est limitée à 60 s). */
+const RIBBON_BUDGET_MS = 40_000;
 export const dynamic = "force-dynamic";
 const same = (a: string, b: string) => timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
 
@@ -46,13 +48,13 @@ export async function GET(req: Request) {
       races = { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
 
-    // FC max estimée (sauf si saisie), puis rubans de zones en attente (jamais calculés, seuil changé, allure devenue FC) : jusqu'à 50 par nuit.
+    // FC max estimée (sauf si saisie), puis rubans de zones en attente (jamais calculés, seuil changé, allure devenue FC) : autant que le budget de temps le permet (plus de nouvelle activité après 40 s), le reste à la nuit suivante.
     // Idempotent, et sans jamais faire échouer le cron. Avant les habitudes, qui ont leur propre échéance.
     let ribbons: { ok: boolean; hrMax?: unknown; backfill?: unknown; error?: string };
     try {
       const hrMax = await refreshHrMaxEstimate(user.id, { background: false });
-      const backfill = await backfillRibbons(user.id, { limit: BACKFILL_LIMIT, deadline: t0 + 40_000 });
-      console.log(`[cron] FC max estimée ${hrMax.skipped ? "saisie, inchangée" : `${hrMax.after ?? "—"} bpm (${hrMax.source ?? "aucune donnée"})`} · rubans : ${backfill.ribbons} calculés, ${backfill.none} sans ruban, ${backfill.errors} en erreur`);
+      const backfill = await backfillRibbons(user.id, { limit: BACKFILL_CAP, deadline: t0 + RIBBON_BUDGET_MS });
+      console.log(`[cron] FC max estimée ${hrMax.skipped ? "saisie, inchangée" : `${hrMax.after ?? "—"} bpm (${hrMax.source ?? "aucune donnée"})`} · rubans : ${backfill.examined} traités${backfill.timedOut ? " (budget de temps atteint, suite demain)" : ""}, ${backfill.ribbons} avec ruban, ${backfill.none} sans ruban, ${backfill.errors} en erreur`);
       ribbons = { ok: true, hrMax, backfill };
     } catch (e) {
       console.error("[cron] rubans de zones", e);
