@@ -8,6 +8,7 @@
  */
 import { EFFORT_KINDS, hasIntervalStructure, hasPaceIntervalStructure, shortTitle } from "./effort";
 import { setGroups, type SetExercise, type SetGroup } from "./set-bars";
+import { isSessionType } from "./session-type";
 import { parseRibbon, type RibbonSegment } from "./zone-ribbon";
 
 export type CardArt = {
@@ -29,6 +30,8 @@ export type ArtActivity = {
   zoneRibbonSource?: string | null;
   /** Détection à 10 s (lib/art/interval.ts) ; null = non évalué, on retombe sur la règle du ruban. */
   isInterval?: boolean | null;
+  /** Choix manuel (lib/art/session-type.ts) : prime sur la détection et sur la séance clé du programme. */
+  sessionType?: string | null;
   plannedSession?: { kind: string; title: string } | null;
   exercises?: SetExercise[];
 };
@@ -42,6 +45,11 @@ export function cardArt(a: ArtActivity): CardArt {
 
   const ribbon = parseRibbon(a.zoneRibbon);
   if (!ribbon) return {};
+  // Choix manuel : « fractionné » force l'EffortStrip, « footing » et « compétition » ne la montrent jamais (carte + ruban).
+  const manual = isSessionType(a.sessionType) ? a.sessionType : null;
+  if (manual === "interval") return { effort: { segments: ribbon, label: a.plannedSession && EFFORT_KINDS.includes(a.plannedSession.kind) ? shortTitle(a.plannedSession.title) : undefined } };
+  if (manual && (a.hasRoute || (a.type === "RIDE" && a.source === "mywhoosh"))) return { ribbon };
+  if (manual) return {};
   const key = a.plannedSession && EFFORT_KINDS.includes(a.plannedSession.kind) ? a.plannedSession : null;
   if (key) return { effort: { segments: ribbon, label: shortTitle(key.title) } };
   if (a.isInterval ?? (a.zoneRibbonSource === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(ribbon)) return { effort: { segments: ribbon } };

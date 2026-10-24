@@ -213,4 +213,16 @@ assert.deepEqual(cardArt({ type: "HIKE", hasRoute: true, zoneRibbon: ribbon }), 
 assert.deepEqual(cardArt({ type: "WALK", hasRoute: true, zoneRibbon: ribbon }), {});
 assert.deepEqual(cardArt({ type: "WORKOUT", hasRoute: false, exercises: [] }), {}, "muscu sans exercices : inchangée");
 assert.equal(cardArt({ type: "WORKOUT", hasRoute: false, exercises: [{ name: "A3 - pompes", sets: 3, reps: 10 }] }).sets?.length, 1);
+// Type de séance choisi à la main : prime sur la détection et la séance clé.
+import { effectiveSessionType } from "../lib/art/session-type";
+const keyRun = { type: "RUN", hasRoute: true, zoneRibbon: ribbon, plannedSession: { kind: "THRESHOLD", title: "Seuil · 3 × 10′" } };
+assert.deepEqual(cardArt({ ...keyRun, sessionType: "race" }), { ribbon }, "compétition : carte + ruban, jamais d'EffortStrip");
+assert.deepEqual(cardArt({ ...keyRun, sessionType: "easy" }), { ribbon }, "footing forcé sur une séance clé");
+assert.deepEqual(cardArt({ type: "RUN", hasRoute: true, zoneRibbon: reps, sessionType: "race" }), { ribbon: reps }, "intervalles détectés mais compétition");
+assert.deepEqual(cardArt({ type: "RUN", hasRoute: true, zoneRibbon: ribbon, sessionType: "interval" }), { effort: { segments: ribbon, label: undefined } }, "fractionné forcé");
+assert.deepEqual(cardArt({ ...keyRun, isInterval: false }), { effort: { segments: ribbon, label: "3×10′" } }, "auto : la séance clé garde l'EffortStrip");
+assert.equal(effectiveSessionType({ isInterval: true }), "interval");
+assert.equal(effectiveSessionType({ isInterval: false }), "easy");
+assert.equal(effectiveSessionType({ isInterval: true, sessionType: "race" }), "race");
+assert.equal(effectiveSessionType({ sessionType: "bogus" }), "easy");
 console.log("art du fil : ok");

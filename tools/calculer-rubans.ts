@@ -50,6 +50,8 @@ async function main() {
     console.log(`\n${who} : FC max ${hrNote} · FTP ${zones.ftp ?? "inconnue"} W · VMA ${zones.vma ?? "inconnue"} km/h`);
 
     // Une activité à la fois : les séries et traces sont volumineuses.
+    // Types choisis à la main : jamais touchés par le script ; « compétition » exclu des stats d'intervalles.
+    const manualRace = new Set((await prisma.activity.findMany({ where: { userId: u.id, sessionType: "race" }, select: { id: true } })).map((x) => x.id));
     const seen = new Set<string>(), queue: string[] = [];
     if (all) queue.push(...(await prisma.activity.findMany({ where: { userId: u.id }, select: { id: true }, orderBy: { startedAt: "asc" } })).map((a) => a.id));
     for (let i = 0; ; i++) {
@@ -69,7 +71,7 @@ async function main() {
       total.ribbon++;
       bump(bySource, r.source);
       bump(byType, a?.type ?? "?");
-      const interval = r.interval ? r.interval.is : (r.source === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(r.segments);
+      const interval = !manualRace.has(id) && (r.interval ? r.interval.is : (r.source === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(r.segments));
       if (interval) { total.interval++; bump(intervalBySource, r.source); }
       const art = a && cardArt({ type: a.type, hasRoute: true, zoneRibbon: r.segments, zoneRibbonSource: r.source, isInterval: r.interval?.is ?? null, plannedSession: a.plannedSession });
       if (art?.effort) { total.effort++; if (a?.plannedSession) total.keyLinked++; }

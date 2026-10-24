@@ -29,6 +29,8 @@ import { buildStream, type StreamData } from "@/lib/stream";
 import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote, FeelPrompt } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
+import { SessionTypeControl } from "@/components/activity/session-type";
+import { detectedSessionType } from "@/lib/art/session-type";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
 import { getGear } from "@/lib/data/gear";
@@ -121,6 +123,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         }
         sections={
           <>
+            {(a.type === "RUN" || a.type === "RIDE" || a.type === "HIKE") && a.zoneRibbon != null && <SessionTypeControl id={a.id} detected={detectedSessionType(a.isInterval)} current={(a.sessionType as "interval" | "easy" | "race" | null)} />}
             {note && (
               <section aria-label="Note du coach" className={cn(ui.card, "flex gap-3 p-4")}>
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><MessageSquareText className="size-4" aria-hidden /></span>

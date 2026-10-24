@@ -13,6 +13,7 @@ import type { RaceDraft } from "@/types/race";
 import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { createRunProgram, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
 import { revokeLostBadges } from "@/lib/data/badges";
+import { isSessionType } from "@/lib/art/session-type";
 import { getZones } from "@/lib/data/zones";
 import { onThresholdsChange } from "@/lib/data/zone-ribbon";
 import { refreshEstimatedHrMax } from "@/lib/physio/hr-max";
@@ -377,6 +378,16 @@ export async function retireGear(id: string) {
 }
 
 export async function deleteGear(id: string) { const userId = await uid(); await prisma.gear.deleteMany({ where: { id, userId } }); gearPaths(); }
+
+/** Type de séance choisi à la main (null = retour à la détection). Seule écriture de Activity.sessionType. */
+export async function setSessionType(id: string, value: string | null): Promise<Res> {
+  const userId = await uid();
+  if (value !== null && !isSessionType(value)) return { ok: false, error: "Type inconnu." };
+  const r = await prisma.activity.updateMany({ where: { id, userId }, data: { sessionType: value } });
+  if (r.count === 0) return { ok: false, error: "Activité introuvable." };
+  revalidatePath("/activities"); revalidatePath(`/activities/${id}`); revalidatePath("/");
+  return { ok: true };
+}
 
 /** Champ vide = retour à l'estimation automatique. Un seuil qui change de façon sensible fait recalculer les rubans de zones en arrière-plan. */
 export async function saveZones(fd: FormData) {
