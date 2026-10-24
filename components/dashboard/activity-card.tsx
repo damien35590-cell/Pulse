@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { routePath } from "@/lib/polyline";
 import { Leaf } from "lucide-react";
-import { SPORTS, isSoft, sportColor, sportTint } from "@/lib/sports";
+import { isSoft, sportColor } from "@/lib/sports";
+import { activityStyle } from "@/lib/activity-style";
 import { cn } from "@/lib/utils";
 import { fmtKm, fmtDuration, fmtNum, fmtPace } from "@/lib/format";
 
@@ -32,14 +33,14 @@ export function cells(a: A): Cell[] {
 const COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
 
 export function ActivityCard({ a, tz = "Europe/Paris" }: { a: A; tz?: string }) {
-  const color = sportColor(a.type), r = a.polyline ? routePath(a.polyline, 320, 110, 12) : null, Icon = (SPORTS[a.type] ?? SPORTS.OTHER).icon;
+  const color = sportColor(a.type), r = a.polyline ? routePath(a.polyline, 320, 110, 12) : null, { icon: Icon, fg, soft: softBg } = activityStyle(a.type);
   const when = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZone: tz }).format(a.startedAt);
   // Activités douces (E-bike, marche) : carte compacte et discrète, sans tracé ni anecdote.
   const soft = isSoft(a.type), grid = soft ? cells(a).slice(0, 3) : cells(a);
   return (
     <Link href={`/activities/${a.id}`} className={cn("block overflow-hidden rounded-xl border border-line transition-colors active:bg-surface-2", soft ? "border-dashed bg-surface/60" : "bg-surface")}>
       <div className="flex items-center gap-3 px-4 pt-3.5">
-        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2", soft ? "text-ink-soft" : sportTint(a.type))}><Icon className="h-[18px] w-[18px]" aria-hidden /></span>
+        <span className={cn("grid size-12 shrink-0 place-items-center rounded-tile", softBg, fg)}><Icon className="size-6" aria-hidden /></span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[12px] capitalize text-ink-soft">{when}</p>
           <p className={cn("truncate text-base leading-tight", soft ? "font-semibold" : "font-bold")}>{a.title}</p>

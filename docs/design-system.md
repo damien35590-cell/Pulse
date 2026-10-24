@@ -28,6 +28,7 @@ Cible : PWA installée sur Pixel, sombre par défaut, lisible en plein effort.
 | `brand-ink` | #0A0A0C | texte sur fond citron, dans les deux thèmes (jamais de blanc sur Volt) | |
 | `brand-text` | #C6F432 (clair : #4D7C0F) | utilisé automatiquement par `text-brand`, `border-brand`, `ring-brand`, `outline-brand`, `stroke-brand` : le citron ne se lit pas sur fond blanc | ≥ 5:1 |
 | `good` / `warn` / `bad` | vert / ambre / rouge | progrès, vigilance, baisse | ≥ 4,9:1 |
+| `act-run` / `-strength` / `-ride` / `-hike` / `-other` (+ `-soft`) | corail #FF8A5C (clair #D9561F), indigo #8E92FF (#5457E0), lagon #3FCADB (#0E8A9C), vert-bleu #45CBA2 (#1A8A66), `ink-mute` | types d'activité uniquement, via `lib/activity-style.ts` (`fg` / `soft` / `dot`) : tuile `size-12 rounded-tile bg-act-x-soft` + icône `text-act-x`, point `size-2` dans les filtres. `-soft` = 18 % (clair 14 %). Ne jamais réutiliser `z6` ni `good` ; pas de nage | icône / fond doux ≥ 3:1 |
 | `z1` … `z6` | gris, bleu, vert, jaune, rouge, violet | zones cardio / puissance uniquement | |
 | `tier-bronze` / `-silver` / `-gold` (+ `-soft`, `-ink`) | bronze, argent, or | paliers de badges uniquement (`components/profile/tier-medal.tsx`) | |
 | `bg-holo`, `bg-holo-ring`, `tier-gem`, `tier-diamond-soft/-ink` | dégradé holographique | palier Diamant : anneau animé autour d'une gemme sombre, le badge ultime | |

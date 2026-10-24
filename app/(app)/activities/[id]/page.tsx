@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { decodePolyline } from "@/lib/polyline";
 import { haversine } from "@/lib/geo";
 import { SPORTS } from "@/lib/sports";
+import { activityStyle } from "@/lib/activity-style";
 import { fmtDuration, fmtKm, fmtNum, fmtPace } from "@/lib/format";
 import { RouteMapLazy } from "@/components/activity/route-map-lazy";
 import { TopoMapLazy } from "@/components/activity/topo-map-lazy";
@@ -69,6 +70,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const step = Math.max(1, Math.ceil(full.length / 120));
   const profile = full.filter((_, i) => i % step === 0);
 
+  const { icon: SportIcon, fg: sportFg, soft: sportSoft } = activityStyle(a.type);
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const w = a.weather as { tempC?: number | null; precipMm?: number | null } | null;
   const stats = [
@@ -83,7 +85,10 @@ export default async function ActivityPage({ params }: { params: { id: string } 
     <article className="space-y-5">
       <Link href="/activities" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="h-5 w-5" aria-hidden />Activités</Link>
       <header>
-        <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt)}</p>
+        <div className="flex items-center gap-3">
+          <span className={`grid size-12 shrink-0 place-items-center rounded-tile ${sportSoft} ${sportFg}`}><SportIcon className="size-6" aria-hidden /></span>
+          <p className="text-sm capitalize text-ink-soft">{SPORTS[a.type]?.label}, {new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(a.startedAt)}</p>
+        </div>
         {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand">🏁 Course · {a.raceEvent.name}</Link>}
         <EditableTitle activityId={a.id} title={a.title} />
         {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}

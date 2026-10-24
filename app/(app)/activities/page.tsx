@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { cn, uniqueById } from "@/lib/utils";
 import { fmtDuration, fmtKm } from "@/lib/format";
 import { ui } from "@/lib/ui";
-import { SPORTS, SPORT_ORDER, isSoft, sportTint } from "@/lib/sports";
+import { SPORTS, SPORT_ORDER, isSoft } from "@/lib/sports";
+import { activityStyle } from "@/lib/activity-style";
 import { ActivityCard } from "@/components/dashboard/activity-card";
 import { SoftRow } from "@/components/activity/soft-row";
 import { FilterSheet } from "@/components/activity/filter-sheet";
@@ -123,7 +124,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
         <div className="sticky top-bar z-20 -mx-4 flex items-center gap-1 bg-bg/80 py-1 pl-4 pr-1 backdrop-blur-xl">
           <div className="no-scrollbar -ml-4 flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-contain pl-4 pr-2">
             <Link href={qs({ t: "", m: "", n: "" })} aria-current={T === null ? "page" : undefined} className={chip(T === null)}>Tous</Link>
-            {pool.map((k) => { const I = SPORTS[k].icon; return <Link key={k} href={qs({ t: k, m: "", n: "" })} aria-current={T === k ? "page" : undefined} className={chip(T === k)}><I className={cn("size-4", T !== k && sportTint(k))} aria-hidden />{SPORTS[k].label}</Link>; })}
+            {pool.map((k) => <Link key={k} href={qs({ t: k, m: "", n: "" })} aria-current={T === k ? "page" : undefined} className={chip(T === k)}><span className={cn("size-2 shrink-0 rounded-full", activityStyle(k).dot)} aria-hidden />{SPORTS[k].label}</Link>)}
           </div>
           <FilterSheet sort={sortKey} soft={soft} period={period}
             sorts={Object.entries(SORTS).map(([k, v]) => [k, v.label])} periods={Object.entries(PERIODS)} />

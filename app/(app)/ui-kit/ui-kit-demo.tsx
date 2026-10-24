@@ -6,6 +6,7 @@ import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
 import { HR_MAX, fitness, goal, hrBands, liftSession, nextRace, recent, rideWeather, routeSuggestion, runs, today, week, workout } from "@/lib/mock/ui-kit";
+import { activityStyle } from "@/lib/activity-style";
 import { PulseLogo, PulseMark } from "@/components/brand/logo";
 import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
@@ -325,6 +326,20 @@ function Tokens() {
             {swatch("good", "bg-good", "progrès")}
             {swatch("warn", "bg-warn", "vigilance")}
             {swatch("bad", "bg-bad", "baisse")}
+          </div>
+        </Section>
+
+        <Section title="Types d'activité">
+          <div className="grid grid-cols-5 gap-2">
+            {[["RUN", "run"], ["WORKOUT", "force"], ["RIDE", "vélo"], ["HIKE", "rando"], ["OTHER", "autre"]].map(([t, n]) => {
+              const { icon: Icon, fg, soft, dot } = activityStyle(t);
+              return (
+                <div key={t} className="flex min-w-0 flex-col items-center gap-1.5">
+                  <span className={cn("grid size-12 place-items-center rounded-tile", soft, fg)}><Icon className="size-6" aria-hidden /></span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-ink-soft"><span className={cn("size-2 rounded-full", dot)} aria-hidden />{n}</span>
+                </div>
+              );
+            })}
           </div>
         </Section>
 

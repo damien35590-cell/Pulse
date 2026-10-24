@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { SPORTS, sportTint } from "@/lib/sports";
+import { activityStyle } from "@/lib/activity-style";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { Metric } from "@/components/ui/metric";
@@ -24,12 +24,12 @@ export type ActivitySummaryData = {
  * Hiérarchie : titre → 3 chiffres → bande de zones → une seule phrase d'analyse. Tout le reste est dans le détail.
  */
 export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData; href?: string; onSelect?: () => void }) {
-  const Icon = (SPORTS[a.type] ?? SPORTS.OTHER).icon;
+  const { icon: Icon, fg, soft } = activityStyle(a.type);
   const body = (
     <>
       <div className="flex items-center gap-3">
-        <span className={cn("grid size-10 shrink-0 place-items-center rounded-full bg-surface-2", sportTint(a.type) || "text-ink")}>
-          <Icon className="size-5" aria-hidden />
+        <span className={cn("grid size-12 shrink-0 place-items-center rounded-tile", soft, fg)}>
+          <Icon className="size-6" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold leading-tight text-ink">{a.title}</p>
