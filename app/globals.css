@@ -90,7 +90,9 @@
   }
   img, svg { -webkit-user-drag: none; }
 
-  :focus-visible { @apply outline-2 outline-offset-2 outline-brand; }
+  /* Anneau de focus : clavier seulement, jamais après un toucher. */
+  :focus:not(:focus-visible) { outline: none; }
+  @media (hover: hover) and (pointer: fine) { :focus-visible { @apply outline-2 outline-offset-2 outline-brand; } }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 }
 /* Cartes Leaflet aux couleurs du thème (sélecteurs préfixés par html : leaflet.css est chargé après). */

@@ -90,7 +90,7 @@ export function ChatView({ chatId: initialId, initial, configured }: { chatId: s
           ref={input} rows={1} value={draft} maxLength={1000} enterKeyHint="send" placeholder="Ta question…" aria-label="Ta question au coach" disabled={!configured}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(draft); } }}
-          className="min-h-12 flex-1 resize-none rounded-tile bg-surface px-4 py-3 text-base text-ink shadow-card outline-none placeholder:text-ink-mute focus:ring-2 focus:ring-brand/40"
+          className="min-h-12 flex-1 resize-none rounded-tile bg-surface px-4 py-3 text-base text-ink shadow-card outline-none placeholder:text-ink-mute focus-visible:ring-2 focus-visible:ring-brand/40"
         />
         <button type="submit" disabled={pending || !draft.trim() || !configured} aria-label="Envoyer" className="grid size-12 shrink-0 place-items-center rounded-full bg-brand text-brand-ink transition active:scale-90 disabled:opacity-40">
           {pending ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ArrowUp className="size-5" strokeWidth={2.5} aria-hidden />}

@@ -332,7 +332,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
                   maxLength={60}
                   autoComplete="off"
                   enterKeyHint="done"
-                  className="mt-1 h-14 w-full rounded-tile bg-surface px-4 text-base font-semibold text-ink caret-brand outline-none ring-1 ring-inset ring-line focus:ring-brand"
+                  className="mt-1 h-14 w-full rounded-tile bg-surface px-4 text-base font-semibold text-ink caret-brand outline-none ring-1 ring-inset ring-line focus-visible:ring-brand"
                 />
               </label>
             )}

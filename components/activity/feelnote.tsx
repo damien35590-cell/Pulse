@@ -121,7 +121,7 @@ export function FeelNote({ activityId, movingTimeS, initialFeel, initialComment,
           placeholder="Notes sur la séance : jambes, météo, sensations…"
           rows={3}
           aria-label="Notes sur la séance"
-          className="w-full resize-none rounded-tile bg-surface-2 p-3 text-base text-ink placeholder:text-ink-mute focus:outline-none focus:ring-2 focus:ring-ink/40"
+          className="w-full resize-none rounded-tile bg-surface-2 p-3 text-base text-ink placeholder:text-ink-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
         />
       </div>
     </Section>

@@ -83,7 +83,7 @@ export function EditProfile({ name, image, email }: Props) {
         <label className="mt-5 block">
           <span className={ui.label}>Nom</span>
           <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={40} autoComplete="nickname" disabled={pending}
-            className="mt-1.5 h-14 w-full rounded-xl bg-surface-3 px-4 text-base text-ink outline-none focus:ring-2 focus:ring-brand" />
+            className="mt-1.5 h-14 w-full rounded-xl bg-surface-3 px-4 text-base text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand" />
         </label>
         {error && <p role="alert" className="mt-3 text-sm font-medium text-bad">{error}</p>}
         <button type="button" onClick={save} disabled={disabled} className={cn(ui.btnPrimary, "mt-6 w-full")}>{pending ? "Enregistrement…" : "Enregistrer"}</button>

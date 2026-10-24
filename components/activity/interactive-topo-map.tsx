@@ -206,7 +206,7 @@ export default function InteractiveTopoMap({ points, cursor, className, hero = f
           // Bas de la carte : 24 px sont recouverts par la carte de contenu, les contrôles flottent juste au-dessus.
           <div className={cn("pointer-events-none absolute inset-x-2 z-[1000] flex items-end justify-between gap-2", full ? "bottom-[calc(0.5rem_+_env(safe-area-inset-bottom))]" : "bottom-8")}>
             {colored ? (
-              <div className="pointer-events-auto min-w-0 rounded-tile bg-surface/90 p-1 shadow-pop backdrop-blur">
+              <div className="pointer-events-auto min-w-0 max-w-[calc(100%_-_3.5rem)] overflow-hidden rounded-tile bg-surface/90 p-1 shadow-pop backdrop-blur">
                 {tabs.length > 1 && <Segmented size="sm" options={tabs.map(([value, label]) => ({ value, label }))} value={mode} onChange={setMode} />}
                 {legendRow}
               </div>
