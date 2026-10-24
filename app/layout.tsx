@@ -22,12 +22,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover", // contenu sous la barre d'état / la barre de gestes du Pixel : les safe areas sont gérées en CSS
   interactiveWidget: "resizes-content", // le clavier Android réduit la page : les boutons du bas restent au-dessus du clavier
-  themeColor: "#0A0A0C",
+  // Thème système ; un thème forcé (data-theme) réécrit ces balises (THEME_SCRIPT au chargement, setTheme ensuite).
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F7FA" },
+    { media: "(prefers-color-scheme: dark)", color: "#0A0A0C" },
+  ],
   colorScheme: "light dark",
 };
 
-// Exécuté avant l'affichage : applique le thème forcé sans flash.
-const THEME_SCRIPT = `try{var t=localStorage.getItem("pulse-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
+// Exécuté avant l'affichage : applique le thème forcé sans flash, et sa couleur à la barre d'état
+// (rejoué au DOMContentLoaded au cas où les balises theme-color arrivent après ce script).
+const THEME_SCRIPT = `try{var t=localStorage.getItem("pulse-theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="light"?"#F7F7FA":"#0A0A0C",m=function(){document.querySelectorAll('meta[name="theme-color"]').forEach(function(e){e.content=c})};m();document.addEventListener("DOMContentLoaded",m)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
