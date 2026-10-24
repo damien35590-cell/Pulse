@@ -38,7 +38,7 @@ export async function myEquipment(): Promise<Equipment[]> {
 
 export async function saveEquipment(list: string[]): Promise<Equipment[]> {
   const saved = await setEquipment(await userId(), list);
-  revalidatePath("/profile");
+  revalidatePath("/profile/settings");
   return saved;
 }
 

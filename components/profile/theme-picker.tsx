@@ -4,7 +4,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
 
 const OPTIONS = [
-  { value: "system", label: "Automatique" },
+  { value: "system", label: "Auto" },
   { value: "light", label: "Clair" },
   { value: "dark", label: "Sombre" },
 ] as const;

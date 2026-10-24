@@ -62,12 +62,11 @@ export function EditProfile({ name, image, email }: Props) {
           <Avatar name={name} image={image} className="size-16 text-3xl" />
           <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-brand text-brand-ink"><Pencil className="size-3" aria-hidden /></span>
         </button>
-        <div className="min-w-0 flex-1">
+        <button type="button" onClick={openSheet} tabIndex={-1} className="min-w-0 flex-1 select-none touch-manipulation text-left active:opacity-60">
           <h1 className="truncate font-display text-3xl font-bold leading-none">{name}</h1>
           <p className="truncate text-sm text-ink-soft">{email}</p>
-        </div>
+        </button>
       </header>
-      <button type="button" onClick={openSheet} className={cn(ui.btnSecondary, "-mt-2 h-12 w-full text-sm")}>Modifier le profil</button>
 
       <BottomSheet open={open} onClose={() => !pending && setOpen(false)} title="Modifier le profil">
         <div className="mt-4 flex flex-col items-center gap-3">
