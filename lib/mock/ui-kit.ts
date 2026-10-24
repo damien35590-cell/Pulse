@@ -14,6 +14,8 @@ import type { RouteView } from "@/lib/data/routes";
 import type { RideWeather } from "@/lib/weather/open-meteo";
 import { encodePolyline } from "@/lib/polyline";
 import { simplifyTrack } from "@/lib/map/track";
+import { zoneRibbon } from "@/lib/art/zone-ribbon";
+import { setGroups } from "@/lib/art/set-bars";
 
 export const HR_MAX = 191;
 const HR_BOUNDS = bounds(HR_MAX, HR_PCT); // [115, 134, 153, 172, 181]
@@ -147,8 +149,33 @@ const runPreview = (r: (typeof runs)[number]): ActivitySummaryData => ({
   ],
 });
 
+// ─── Art : ruban de zones, profil d'effort, séries (components/art), tous dérivés de séries fictives ───
+/** 10 × 400 m : échauffement, 10 × (90 s vite, 75 s trot), retour au calme ; la FC suit la consigne avec du retard, comme un vrai capteur. */
+function intervalHr() {
+  const plan: [number, number][] = [[600, 125]];
+  for (let i = 0; i < 10; i++) plan.push([90, 178], [75, 132]);
+  plan.push([480, 118]);
+  const hr: number[] = [];
+  let cur = 110;
+  for (const [sec, target] of plan) for (let k = 0; k < sec; k++) { cur += (target - cur) * 0.12; hr.push(Math.round(cur)); }
+  return hr;
+}
+export const artDemo = {
+  /** Le tempo de 10 km, sa FC → ruban sous la carte. */
+  ribbon: zoneRibbon({ hr: runs[0].hr }, { hrMax: HR_MAX })!,
+  /** Fractionné : profil d'effort à la place de la carte, étiquette de la séance prévue. */
+  effort: { segments: zoneRibbon({ hr: intervalHr() }, { hrMax: HR_MAX })!, label: "10×400" },
+  /** Séance Lafay : B2 (6 séries, cible 10 non atteinte partout), A3, E4 au chrono (secondes), G. */
+  sets: setGroups([
+    { name: "B2 - dips", sets: 6, reps: 10, setsDetail: [10, 10, 9, 9, 8, 8].map((reps) => ({ reps, done: true })) },
+    { name: "A3 - pompes", sets: 5, reps: 12, setsDetail: [12, 12, 12, 11, 10].map((reps) => ({ reps, done: true })) },
+    { name: "E4 - flexions latérales", sets: 4, reps: 45, setsDetail: [45, 45, 40, 35].map((reps) => ({ reps, done: true })) },
+    { name: "G - crunch", sets: 4, reps: 20, setsDetail: [20, 20, 18, 15].map((reps) => ({ reps, done: true })) },
+  ]),
+};
+
 export const recent: ActivitySummaryData[] = [
-  runPreview(runs[0]),
+  { ...runPreview(runs[0]), ribbon: artDemo.ribbon },
   {
     id: liftSession.id, type: "WORKOUT", title: `${liftSession.title} · prise de masse`, when: liftSession.when,
     metrics: [
@@ -158,8 +185,15 @@ export const recent: ActivitySummaryData[] = [
     ],
     tags: ["Dos", "Biceps", "Arrière d'épaule"],
     insight: { text: "2ᵉ séance de la semaine", tone: "neutral" },
+    sets: artDemo.sets,
   },
   runPreview(runs[1]),
+  {
+    id: "vma-10x400", type: "RUN", title: "VMA courte · 10 × 400 m", when: "mar. 13 oct. · 18:30",
+    metrics: [{ label: "Distance", value: "8,40", unit: "km" }, { label: "Temps", value: "45:30" }, { label: "Allure", value: "5:25", unit: "/km" }],
+    insight: { text: "Dans ta moyenne habituelle", tone: "neutral" },
+    effort: artDemo.effort,
+  },
 ];
 
 // ─── Tableau de bord ───

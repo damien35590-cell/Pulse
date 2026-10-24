@@ -193,6 +193,7 @@ model Activity {
   srpe           Int?                    // charge ressentie (sRPE, Foster) = RPE × durée en minutes ; null sans RPE
   kind           WorkoutKind?            // muscu : moitié du corps travaillée (null = séance d'avant ce champ, déduite des exercices)
   templateId     String?                 // muscu : modèle dont la séance est partie
+  zoneRibbon     Json?                   // [{ z: 1..6, f: fraction du temps }] : ruban de zones FC (puissance en vélo sans FC), lib/art/zone-ribbon.ts ; null sans FC ni puissance
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

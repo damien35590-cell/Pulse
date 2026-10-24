@@ -5,6 +5,7 @@ import { storyForActivity } from "@/lib/coach/story";
 import type { Story } from "@/lib/insights/types";
 import { awardBadges } from "@/lib/data/badges";
 import { refreshLoad } from "@/lib/data/load";
+import { refreshZoneRibbon } from "@/lib/data/zone-ribbon";
 import { linkActivityToPlannedSession } from "@/lib/data/training";
 
 /** Deux activités se recouvrant sur plus de 70 % sont la même sortie, enregistrée par deux sources. */
@@ -188,6 +189,10 @@ export async function processActivity(activityId: string, hint?: { points?: Pt[]
   // Après la fusion : l'activité conservée a pu récupérer une série, une FC ou un ressenti.
   try { await refreshLoad(a.id); }
   catch (e) { fail("charge", e); }
+
+  // Ruban de zones de la liste d'activités : calculé une fois la série finale connue (fusion comprise).
+  try { await refreshZoneRibbon(a.id); }
+  catch (e) { fail("ruban", e); }
 
   try { res.records = await updateRecords(a, res.activityId === activityId ? hint?.points : undefined); }
   catch (e) { fail("records", e); }

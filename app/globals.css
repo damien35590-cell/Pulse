@@ -17,6 +17,10 @@
     --good: 34 197 94; --warn: 245 158 11; --bad: 239 68 68;
     /* Zones (cardio et puissance) : mêmes teintes qu'avant, désormais en tokens (bg-z4, text-z2…). */
     --z1: 138 138 149; --z2: 59 130 246; --z3: 34 197 94; --z4: 234 179 8; --z5: 239 68 68; --z6: 139 92 246;
+    /* Art (components/art) : couvertures et bandes dérivées des données, toujours sombres, mêmes valeurs en clair et en sombre.
+       Jamais derrière un chiffre, jamais dans une séance en direct, jamais de Volt. Les zones y reprennent z1–z6. */
+    --art-run-bg: 18 35 63; --art-run-fg: 90 169 255; --art-gym-bg: 42 24 16; --art-gym-fg: 255 138 61;
+    --art-ink: 245 245 247; --art-ink-soft-run: 201 216 240; --art-ink-soft-gym: 243 217 200;
     --sport-ride: var(--brand); --sport-swim: var(--brand);
     --sport-hike: var(--brand); --sport-workout: var(--brand); --sport-other: var(--brand);
     /* Couleurs par type d'activité (lib/activity-style.ts) : une famille, même luminosité et chroma OKLCH, sans concurrencer Volt. */

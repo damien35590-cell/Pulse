@@ -1,0 +1,46 @@
+/**
+ * Quel art pour une carte du fil d'activités (règle 8 du design system : l'art ne vient que de données réelles).
+ * - Muscu : SetBars (une barre par série) à la place de la tête de carte.
+ * - Course, vélo, rando : la carte reste, le ruban de zones se pose dessous ; une séance clé du programme (VMA, seuil) ou une structure
+ *   en intervalles nette passe en EffortStrip à la place de la carte ; un tour MyWhoosh (pas de GPS) n'a que le ruban.
+ * - Le reste : inchangé.
+ * Fonction pure (tests : tools/test-zone-ribbon.ts).
+ */
+import { EFFORT_KINDS, hasIntervalStructure, shortTitle } from "./effort";
+import { setGroups, type SetExercise, type SetGroup } from "./set-bars";
+import { parseRibbon, type RibbonSegment } from "./zone-ribbon";
+
+export type CardArt = {
+  /** Sous la carte (ou seul pour un tour MyWhoosh). */
+  ribbon?: RibbonSegment[];
+  /** À la place de la carte. */
+  effort?: { segments: RibbonSegment[]; label?: string };
+  /** À la place de la tête de carte (muscu). */
+  sets?: SetGroup[];
+};
+
+export type ArtActivity = {
+  type: string;
+  source?: string | null;
+  /** Une trace GPS exploitable existe (la vignette de carte s'affichera). */
+  hasRoute: boolean;
+  zoneRibbon?: unknown;
+  plannedSession?: { kind: string; title: string } | null;
+  exercises?: SetExercise[];
+};
+
+export function cardArt(a: ArtActivity): CardArt {
+  if (a.type === "WORKOUT") {
+    const groups = setGroups(a.exercises ?? []);
+    return groups.length ? { sets: groups } : {};
+  }
+  if (a.type !== "RUN" && a.type !== "RIDE" && a.type !== "HIKE") return {};
+
+  const ribbon = parseRibbon(a.zoneRibbon);
+  if (!ribbon) return {};
+  const key = a.plannedSession && EFFORT_KINDS.includes(a.plannedSession.kind) ? a.plannedSession : null;
+  if (key) return { effort: { segments: ribbon, label: shortTitle(key.title) } };
+  if (hasIntervalStructure(ribbon)) return { effort: { segments: ribbon } };
+  if (a.hasRoute || (a.type === "RIDE" && a.source === "mywhoosh")) return { ribbon };
+  return {};
+}

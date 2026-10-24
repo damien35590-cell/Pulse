@@ -6,7 +6,7 @@ import "./globals.css";
 // Texte : Inter avec l'axe optique (variante « Display » automatique sur les grands titres).
 const body = Inter({ subsets: ["latin"], axes: ["opsz"], variable: "--font-body", display: "swap" });
 // Chiffres : Barlow Semi Condensed, dessinée d'après la signalétique routière (lisible vite et de loin).
-const num = Barlow_Semi_Condensed({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-num", display: "swap" });
+const num = Barlow_Semi_Condensed({ subsets: ["latin"], weight: ["500", "600", "700", "800"], variable: "--font-num", display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Pulse", template: "%s · Pulse" },

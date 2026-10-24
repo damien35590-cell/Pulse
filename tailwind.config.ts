@@ -30,6 +30,11 @@ const config: Config = {
         stack: { workout: c("stack-workout"), run: c("stack-run"), ride: c("stack-ride"), hike: c("stack-hike"), other: c("stack-other") },
         act: Object.fromEntries(["run", "strength", "ride", "hike", "other"].map((k) => [k, { DEFAULT: c(`act-${k}`), soft: `var(--act-${k}-soft)` }])),
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
+        // Art : toujours sombre, identique dans les deux thèmes (bg-art-run-bg, text-art-gym-fg, text-art-ink…).
+        art: {
+          "run-bg": c("art-run-bg"), "run-fg": c("art-run-fg"), "gym-bg": c("art-gym-bg"), "gym-fg": c("art-gym-fg"),
+          ink: c("art-ink"), "ink-soft-run": c("art-ink-soft-run"), "ink-soft-gym": c("art-ink-soft-gym"),
+        },
       },
       // text-brand, border-brand, ring-brand… prennent la variante lisible de la marque (le citron Volt
       // ne se lit pas sur fond blanc) ; bg-brand reste l'aplat citron.
@@ -53,6 +58,10 @@ const config: Config = {
         "metric-lg": ["1.75rem", { lineHeight: "1", letterSpacing: "-0.01em", fontWeight: "600" }],
         "metric-xl": ["2.5rem", { lineHeight: "1", letterSpacing: "-0.015em", fontWeight: "600" }],
         "metric-hero": ["3.5rem", { lineHeight: "1", letterSpacing: "-0.02em", fontWeight: "600" }],
+        // Art (components/art) : étiquette de l'EffortStrip, code d'exercice et total des SetBars.
+        "art-label": ["2.75rem", { lineHeight: "1", letterSpacing: "-0.01em", fontWeight: "800" }],
+        "art-code": ["1.125rem", { lineHeight: "1.2", fontWeight: "700" }],
+        "art-total": ["0.875rem", { lineHeight: "1.2", fontWeight: "600" }],
       },
       spacing: {
         "safe-top": "env(safe-area-inset-top)",

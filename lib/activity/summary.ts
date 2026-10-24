@@ -2,12 +2,16 @@ import { fmtKm, fmtDuration, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
 import { previewTrack } from "@/lib/map/track";
 import { isSoft } from "@/lib/sports";
 import { insightLine } from "@/lib/activity/comparables";
+import { cardArt } from "@/lib/art/card";
+import type { SetExercise } from "@/lib/art/set-bars";
 import type { ActivityInsight } from "@/lib/data/activity-insight";
 import type { ActivitySummaryData } from "@/components/dashboard/activity-summary";
 
 export type SummaryActivity = {
   id: string; type: string; title: string; story: string | null; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; polyline: string | null;
-  avgHr?: number | null; avgPower?: number | null; exercises?: { sets: number; reps: number; loadKg: number | null }[];
+  avgHr?: number | null; avgPower?: number | null; exercises?: ({ sets: number; reps: number; loadKg: number | null } & Partial<SetExercise>)[];
+  /** Art (lib/art/card.ts) : tous facultatifs, sans eux la carte reste celle d'avant. */
+  source?: string | null; zoneRibbon?: unknown; plannedSession?: { kind: string; title: string } | null;
 };
 export type Cell = { l: string; v: string; u?: string };
 
@@ -35,11 +39,17 @@ export function cells(a: SummaryActivity): Cell[] {
  * vignette du tracé simplifiée ici, côté serveur (~200 points). Activités douces : pas de tracé.
  */
 export function summaryData(a: SummaryActivity, insight: ActivityInsight | undefined, tz: string, extra?: Partial<ActivitySummaryData>): ActivitySummaryData {
+  const route = isSoft(a.type) ? undefined : previewTrack(a.polyline);
+  // Art : ruban, profil d'effort ou séries de muscu selon les données (jamais pour une activité douce).
+  const art = isSoft(a.type) ? {} : cardArt({
+    type: a.type, source: a.source, hasRoute: !!route && route.length > 1, zoneRibbon: a.zoneRibbon, plannedSession: a.plannedSession,
+    exercises: a.exercises?.flatMap((e) => (e.name ? [{ name: e.name, sets: e.sets, reps: e.reps, setsDetail: e.setsDetail }] : [])),
+  });
   return {
     id: a.id, type: a.type, title: a.title, when: fmtWhen(a.startedAt, tz),
     metrics: cells(a).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
     insight: insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
-    route: isSoft(a.type) ? undefined : previewTrack(a.polyline),
+    route, ...art,
     ...extra,
   };
 }

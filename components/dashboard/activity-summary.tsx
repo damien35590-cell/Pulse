@@ -6,6 +6,11 @@ import { Metric } from "@/components/ui/metric";
 import { ZoneBar, type ZoneSlice } from "@/components/activity/zone-bar";
 import { RoutePreview } from "@/components/activity/route-preview";
 import { InsightLine } from "@/components/activity/insight-line";
+import { ZoneRibbon } from "@/components/art/zone-ribbon";
+import { EffortStrip } from "@/components/art/effort-strip";
+import { SetBars } from "@/components/art/set-bars";
+import type { RibbonSegment } from "@/lib/art/zone-ribbon";
+import type { SetGroup } from "@/lib/art/set-bars";
 import type { InsightLine as Line } from "@/lib/activity/comparables";
 import type { LatLng } from "@/lib/polyline";
 
@@ -23,6 +28,10 @@ export type ActivitySummaryData = {
   badge?: string;
   /** Trace GPS simplifiée (~200 points, previewTrack) : absente en intérieur ou en muscu, et alors pas de carte. */
   route?: LatLng[];
+  /** Art dérivé des données (lib/art/card.ts), au plus un des trois : ruban sous la carte, profil d'effort à sa place, ou séries de muscu en tête. */
+  ribbon?: RibbonSegment[];
+  effort?: { segments: RibbonSegment[]; label?: string };
+  sets?: SetGroup[];
 };
 
 /**
@@ -31,8 +40,10 @@ export type ActivitySummaryData = {
  */
 export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData; href?: string; onSelect?: () => void }) {
   const { icon: Icon, fg, soft } = activityStyle(a.type);
+  const hasMap = !!a.route && a.route.length > 1;
   const body = (
     <>
+      {a.sets && <SetBars groups={a.sets} className="-mx-4 -mt-4 mb-4 w-[calc(100%_+_2rem)] rounded-t-card" />}
       <div className="flex items-center gap-3">
         <span className={cn("grid size-12 shrink-0 place-items-center rounded-tile", soft, fg)}>
           <Icon className="size-6" aria-hidden />
@@ -55,7 +66,14 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         </ul>
       )}
       {a.insight && <InsightLine line={a.insight} className="mt-3" />}
-      {a.route && a.route.length > 1 && <RoutePreview points={a.route} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />}
+      {a.effort
+        ? <EffortStrip segments={a.effort.segments} label={a.effort.label} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />
+        : (hasMap || a.ribbon) && (
+          <div className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] overflow-hidden rounded-b-card">
+            {hasMap && <RoutePreview points={a.route!} />}
+            {a.ribbon && <ZoneRibbon segments={a.ribbon} />}
+          </div>
+        )}
     </>
   );
   const cls = cn(ui.card, ui.pressCard, "block w-full p-4 text-left");

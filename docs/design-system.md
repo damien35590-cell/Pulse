@@ -12,6 +12,7 @@ Cible : PWA installée sur Pixel, sombre par défaut, lisible en plein effort.
 5. **Jamais de couleur en dur dans un composant** : uniquement les tokens ci-dessous (ils suivent le thème).
 6. **Jamais `confirm()` / `alert()`** : `<ConfirmSheet>` / `<BottomSheet>` (`components/ui/bottom-sheet.tsx`).
 7. **Toujours `cn()`** (`lib/utils.ts`) pour combiner des classes : il connaît les tailles et rayons du thème.
+8. **L'art ne vit que sur des couvertures, des en-têtes et des bandes dérivées des données** : palette `art-*`, toujours sombre ; jamais derrière un chiffre, jamais dans une séance en direct (SetLogger), un graphique ou un `Metric`.
 
 ## Couleurs (tokens, `app/globals.css`)
 
@@ -30,6 +31,8 @@ Cible : PWA installée sur Pixel, sombre par défaut, lisible en plein effort.
 | `good` / `warn` / `bad` | vert / ambre / rouge | progrès, vigilance, baisse | ≥ 4,9:1 |
 | `act-run` / `-strength` / `-ride` / `-hike` / `-other` (+ `-soft`) | corail #FF8A5C (clair #D9561F), indigo #8E92FF (#5457E0), lagon #3FCADB (#0E8A9C), vert-bleu #45CBA2 (#1A8A66), `ink-mute` | types d'activité uniquement, via `lib/activity-style.ts` (`fg` / `soft` / `dot`) : tuile `size-12 rounded-tile bg-act-x-soft` + icône `text-act-x`, point `size-2` dans les filtres ; tuile pleine `size-10 rounded-tile bg-act-x` + icône `text-bg` (`dot`) en tête de fiche d'activité. `-soft` = 18 % (clair 14 %). Ne jamais réutiliser `z6` ni `good` ; pas de nage | icône / fond doux ≥ 3:1 |
 | `z1` … `z6` | gris, bleu, vert, jaune, rouge, violet | zones cardio / puissance uniquement | |
+| `art-run-bg` / `-run-fg` / `-gym-bg` / `-gym-fg` | #12233F, #5AA9FF, #2A1810, #FF8A3D | **Art** (règle 8) : fond et trait des couvertures course (bleu nuit) et muscu (brun). **Identiques en clair et en sombre.** Jamais Volt dans l'art |  |
+| `art-ink` / `art-ink-soft-run` / `art-ink-soft-gym` | #F5F5F7, #C9D8F0, #F3D9C8 | texte sur une couverture d'art : étiquette, puis total en demi-teinte (course, muscu). Les zones y reprennent `z1`–`z6` | |
 | `tier-bronze` / `-silver` / `-gold` (+ `-soft`, `-ink`) | bronze, argent, or | paliers de badges uniquement (`components/profile/tier-medal.tsx`) | |
 | `bg-holo`, `bg-holo-ring`, `tier-gem`, `tier-diamond-soft/-ink` | dégradé holographique | palier Diamant : anneau animé autour d'une gemme sombre, le badge ultime | |
 
@@ -44,6 +47,7 @@ pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `
 - Échelle des chiffres (graisse 600 : en sombre, le 700 « bave ») :
   `text-metric-hero` 56 · `text-metric-xl` 40 · `text-metric-lg` 28 · `text-metric-md` 22 · `text-metric-sm` 17.
 - Libellés : `text-label uppercase text-ink-mute` (12 px, interlettrage 0,06em).
+- Art (couvertures uniquement) : `text-art-label` 44 px 800 (étiquette d'EffortStrip), `text-art-code` 18 px 700 (code d'exercice), `text-art-total` 14 px 600 (total), tous en `font-num`.
 - Micro : `text-micro` (10 px), réservé aux crédits des cartes (`<MapAttribution>`, voir Composants).
 - Titres : grand titre de page 32 px bold (via `<TopBar>`), titre de section = `text-label uppercase text-ink-soft` (via `<Section>`).
 - Pas de nouvelles tailles arbitraires `text-[13px]` : utiliser l'échelle.
@@ -106,6 +110,10 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `LibrarySheet` | `components/workout/library-sheet.tsx` | bibliothèque de modèles (Lafay T1/T2, mes programmes, SuperPhysique) → « Ajouter à mes modèles » |
 | `EquipmentSettings` | `components/profile/equipment-settings.tsx` | réglage « Matériel de muscu » (/vous/materiel-muscu) |
 | `SessionFlow` | `components/workout/session-flow.tsx` | parcours `/record/session` : feuille → préparation → SetLogger → enregistrement ; reprise de la séance en cours |
+| `ZoneRibbon` | `components/art/zone-ribbon.tsx` | art du fil : bande de 14 px collée sous la vignette de carte (ou seule pour un tour MyWhoosh), un tronçon par plage de même zone, largeur = part du temps, 2 px d'écart, `z1`–`z6`, `aria-hidden`. Données : `Activity.zoneRibbon` (`lib/art/zone-ribbon.ts`, ~40 tranches de durée égale, FC, puissance pour le vélo sans FC ; calculé à l'import dans `processActivity`, rattrapage `tools/calculer-rubans.ts`, à relancer avec `--all` après un changement de FC max / FTP). Jamais le flux brut vers la liste |
+| `EffortStrip` | `components/art/effort-strip.tsx` | art du fil : mêmes données dessinées en horizon, 96 px sur `art-run-bg`, hauteur par zone (26, 40, 54, 68, 82, 94 px). À la place de la vignette pour une sortie qui réalise une séance clé du programme (VMA, seuil) ou dont le ruban montre au moins 4 blocs durs (`lib/art/effort.ts`) ; étiquette (« 10×400 ») = titre court de la séance prévue liée, sinon aucune. La fiche garde la carte |
+| `SetBars` | `components/art/set-bars.tsx` | art du fil pour la muscu, en tête de carte : 4 exercices au plus dans l'ordre de la séance, une barre de 11 px par série (reps, ou secondes pour un exercice au chrono), `art-gym-fg` sur `art-gym-bg`, pointillé à la cible du jour (`WorkoutExercise.reps`, repli : max de l'exercice), séries sous la cible à 50 %, code + total dessous. Données : `lib/art/set-bars.ts`. Jamais dans le SetLogger |
+| choix de l'art | `lib/art/card.ts` | quel art pour quelle carte (course / vélo / rando : vignette + ruban, EffortStrip pour les séances clés ; muscu : SetBars ; le reste inchangé) |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
 | fond de carte | `lib/map/basemap.ts` | toutes les cartes : Stadia Maps (`alidade_smooth_dark` en sombre, `alidade_bright` en clair, constante `BASEMAP` ; endpoint UE, auth par domaine : aucune clé) selon le thème, `useMapTheme()` ; jamais d'URL de tuiles en dur dans un composant |
 | `MapAttribution` | `components/map/map-attribution.tsx` | crédits de toutes les cartes : « i » replié (zone tactile 32 px, `bg-surface/80 backdrop-blur text-ink-soft`), une ligne `text-micro` au toucher ; l'attribution Leaflet est désactivée (`attributionControl: false`) ; `inLink` dans le fil (pas de lien imbriqué) ; démo sur /ui-kit |

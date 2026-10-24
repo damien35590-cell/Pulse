@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
-import { HR_MAX, fitness, goal, hrBands, liftSession, nextRace, profileOf, recent, rideWeather, routeSuggestion, runs, today, tracks, week, workout } from "@/lib/mock/ui-kit";
+import { HR_MAX, artDemo, fitness, goal, hrBands, liftSession, nextRace, profileOf, recent, rideWeather, routeSuggestion, runs, today, tracks, week, workout } from "@/lib/mock/ui-kit";
 import { activityStyle } from "@/lib/activity-style";
 import { PulseLogo, PulseMark } from "@/components/brand/logo";
 import { TopBar } from "@/components/layout/top-bar";
@@ -22,6 +22,9 @@ import { ElevationChart } from "@/components/activity/elevation-chart";
 import { RoutePreview } from "@/components/activity/route-preview";
 import { MapAttribution } from "@/components/map/map-attribution";
 import { ZoneBar } from "@/components/activity/zone-bar";
+import { ZoneRibbon } from "@/components/art/zone-ribbon";
+import { EffortStrip } from "@/components/art/effort-strip";
+import { SetBars } from "@/components/art/set-bars";
 import { Splits } from "@/components/activity/splits";
 import { RpePicker } from "@/components/activity/rpe-picker";
 import { ShareActivity } from "@/components/activity/share-activity";
@@ -371,6 +374,32 @@ function Tokens() {
             {(["bg-z1", "bg-z2", "bg-z3", "bg-z4", "bg-z5", "bg-z6"] as const).map((c, i) => (
               <span key={c} className={cn("grid h-10 flex-1 place-items-center rounded-lg font-num text-sm font-bold text-black/80", c)}>Z{i + 1}</span>
             ))}
+          </div>
+        </Section>
+
+        <Section title="Art · couvertures dérivées des données">
+          <div className="space-y-3">
+            <figure>
+              <div className={cn(ui.card, "overflow-hidden")}>
+                <RoutePreview points={tracks["tempo-10k"]} />
+                <ZoneRibbon segments={artDemo.ribbon} />
+              </div>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">ZoneRibbon · 14 px sous la carte, largeur = part du temps, z1–z6</figcaption>
+            </figure>
+            <figure>
+              <div className={cn(ui.card, "overflow-hidden")}><EffortStrip segments={artDemo.effort.segments} label={artDemo.effort.label} /></div>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">EffortStrip · 96 px, hauteur = zone, étiquette = séance prévue liée</figcaption>
+            </figure>
+            <figure>
+              <div className={cn(ui.card, "overflow-hidden")}><SetBars groups={artDemo.sets} /></div>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">SetBars · une barre par série, pointillé = cible du jour, E4 au chrono (secondes)</figcaption>
+            </figure>
+            <div className="grid grid-cols-7 gap-1.5">
+              {[["art-run-bg", "bg-art-run-bg"], ["art-run-fg", "bg-art-run-fg"], ["art-gym-bg", "bg-art-gym-bg"], ["art-gym-fg", "bg-art-gym-fg"], ["art-ink", "bg-art-ink"], ["soft-run", "bg-art-ink-soft-run"], ["soft-gym", "bg-art-ink-soft-gym"]].map(([n, c]) => (
+                <div key={n} className="min-w-0"><div className={cn("h-10 rounded-lg ring-1 ring-inset ring-white/10", c)} /><p className="mt-1 truncate text-micro text-ink-mute">{n}</p></div>
+              ))}
+            </div>
+            <p className="px-1 text-xs text-ink-soft">Toujours sombre, mêmes valeurs en clair et en sombre (bascule le thème en haut). Jamais derrière un chiffre, jamais dans une séance en direct.</p>
           </div>
         </Section>
 

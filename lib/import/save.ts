@@ -5,6 +5,7 @@ import { encodePolyline } from "@/lib/polyline";
 import type { Pt } from "@/lib/geo";
 import { defaultGear } from "@/lib/gear";
 import { compareRichness, overlapRatio, OVERLAP_RATIO, processActivity } from "@/lib/pipeline/post-import";
+import { refreshZoneRibbon } from "@/lib/data/zone-ribbon";
 import { compactTrack } from "./track";
 import { activityCreateData, gpsOf, prepStream } from "./build";
 import type { ParsedActivity } from "./types";
@@ -60,7 +61,13 @@ export async function saveActivities(uid: string, raw: ParsedActivity[]) {
     }
     if (e.stream) continue;
     const s = prepStream(a);
-    if (s) { try { await prisma.activityStream.create({ data: { activityId: e.id, ...s } }); backfilled++; } catch { /* déjà rattrapée */ } }
+    if (s) {
+      try {
+        await prisma.activityStream.create({ data: { activityId: e.id, ...s } });
+        backfilled++;
+        await refreshZoneRibbon(e.id).catch((err) => console.error("[import] ruban de zones", e.id, err)); // la série vient d'arriver : le ruban aussi
+      } catch { /* déjà rattrapée */ }
+    }
   }
 
   const fresh = items.filter((a) => !match(a) && !covered(a));
