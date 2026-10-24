@@ -44,7 +44,7 @@ pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `
 - Échelle des chiffres (graisse 600 : en sombre, le 700 « bave ») :
   `text-metric-hero` 56 · `text-metric-xl` 40 · `text-metric-lg` 28 · `text-metric-md` 22 · `text-metric-sm` 17.
 - Libellés : `text-label uppercase text-ink-mute` (12 px, interlettrage 0,06em).
-- Micro : `text-micro` (10 px), réservé aux mentions d'attribution des cartes (`text-ink-soft` sur pastille `bg-surface/70 backdrop-blur rounded-full px-1.5`, en bas à droite, 6 px de marge ; Leaflet : même rendu via `.leaflet-control-attribution` dans globals.css).
+- Micro : `text-micro` (10 px), réservé aux crédits des cartes (`<MapAttribution>`, voir Composants).
 - Titres : grand titre de page 32 px bold (via `<TopBar>`), titre de section = `text-label uppercase text-ink-soft` (via `<Section>`).
 - Pas de nouvelles tailles arbitraires `text-[13px]` : utiliser l'échelle.
 
@@ -98,7 +98,8 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `EquipmentSettings` | `components/profile/equipment-settings.tsx` | réglage « Mon matériel » (page Vous) |
 | `SessionFlow` | `components/workout/session-flow.tsx` | parcours `/record/session` : feuille → préparation → SetLogger → enregistrement ; reprise de la séance en cours |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
-| fond de carte | `lib/map/basemap.ts` | toutes les cartes : Stadia Maps (`alidade_smooth_dark` ou `alidade_smooth`, endpoint UE, auth par domaine : aucune clé) selon le thème, `useMapTheme()` ; jamais d'URL de tuiles en dur dans un composant |
+| fond de carte | `lib/map/basemap.ts` | toutes les cartes : Stadia Maps (`alidade_smooth_dark` en sombre, `alidade_bright` en clair, constante `BASEMAP` ; endpoint UE, auth par domaine : aucune clé) selon le thème, `useMapTheme()` ; jamais d'URL de tuiles en dur dans un composant |
+| `MapAttribution` | `components/map/map-attribution.tsx` | crédits de toutes les cartes : « i » replié (zone tactile 32 px, `bg-surface/80 backdrop-blur text-ink-soft`), une ligne `text-micro` au toucher ; l'attribution Leaflet est désactivée (`attributionControl: false`) ; `inLink` dans le fil (pas de lien imbriqué) ; démo sur /ui-kit |
 | `RouteCard` | `components/routes/route-card.tsx` | boucle proposée (Itinéraires) : nom, temps / km / D+, vignette, phrase « pourquoi » |
 | `WeatherBanner`, `WeatherAlerts`, `WeatherCredit` | `components/routes/weather.tsx` | météo d'une sortie (ressenti, pluie, vent fléché, coucher), alertes en `warn` / `bad`, crédit Open-Meteo obligatoire (CC BY 4.0) |
 | `PlacePicker` | `components/routes/place-picker.tsx` (+ `pick-map.tsx`) | choisir un lieu : recherche Photon, lieux récents, toucher sur la carte pour placer ou ajuster le point |

@@ -15,31 +15,23 @@ export type BasemapStyle = { style: string; filter?: string };
 /** CHOIX DU FOND DE CARTE : changer de fond = modifier cette constante (un style, un filtre éventuel, par thème). */
 export const BASEMAP: Record<MapTheme, BasemapStyle> = {
   dark: { style: "alidade_smooth_dark" },
-  light: { style: "alidade_smooth" },
+  light: { style: "alidade_bright" },
 };
 
 export const styleUrl = (style: string) => `https://tiles-eu.stadiamaps.com/tiles/${style}/{z}/{x}/{y}{r}.png`;
 
 export const BASEMAP_URL: Record<MapTheme, string> = { dark: styleUrl(BASEMAP.dark.style), light: styleUrl(BASEMAP.light.style) };
 
-/** Variantes comparées dans /ui-kit (temporaire). Stadia n'a pas de version sombre de bright ni d'outdoors : alidade_smooth_dark les remplace. */
-export const BASEMAP_VARIANTS: { id: string; label: string; basemap: Record<MapTheme, BasemapStyle> }[] = [
-  { id: "a", label: "a) alidade_smooth (actuel)", basemap: { light: { style: "alidade_smooth" }, dark: { style: "alidade_smooth_dark" } } },
-  {
-    id: "b",
-    label: "b) alidade_smooth + filtre tuiles contrast(1.08) saturate(1.4)",
-    basemap: { light: { style: "alidade_smooth", filter: "contrast(1.08) saturate(1.4)" }, dark: { style: "alidade_smooth_dark", filter: "contrast(1.08) saturate(1.4)" } },
-  },
-  { id: "c", label: "c) alidade_bright (sombre : pas de version, alidade_smooth_dark)", basemap: { light: { style: "alidade_bright" }, dark: { style: "alidade_smooth_dark" } } },
-  { id: "d", label: "d) outdoors (sombre : pas de version, alidade_smooth_dark)", basemap: { light: { style: "outdoors" }, dark: { style: "alidade_smooth_dark" } } },
-];
 export const BASEMAP_MAX_ZOOM = 20;
-export const BASEMAP_ATTRIBUTION = '© <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-/** Version texte (vignette statique, sans lien : la carte entière mène au détail). */
-export const BASEMAP_CREDIT = "© Stadia Maps © OpenMapTiles © OpenStreetMap";
+/** Crédits affichés par <MapAttribution> (obligatoires : Stadia Maps, OpenMapTiles, OpenStreetMap). */
+export const BASEMAP_CREDITS = [
+  { label: "Stadia Maps", href: "https://stadiamaps.com/" },
+  { label: "OpenMapTiles", href: "https://openmaptiles.org/" },
+  { label: "OpenStreetMap", href: "https://www.openstreetmap.org/copyright" },
+] as const;
 
 /** Options communes de L.tileLayer ({r} = « @2x » sur écran haute densité, géré par Leaflet). */
-export const basemapOptions = { maxZoom: BASEMAP_MAX_ZOOM, attribution: BASEMAP_ATTRIBUTION } as const;
+export const basemapOptions = { maxZoom: BASEMAP_MAX_ZOOM } as const;
 
 /** Tuile en erreur : on la masque pour laisser voir le fond surface-2 du conteneur (le tracé reste visible), pas d'image cassée. */
 export function hideBrokenTiles(layer: TileLayer) {

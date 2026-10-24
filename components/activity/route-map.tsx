@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MapAttribution } from "@/components/map/map-attribution";
 import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
@@ -50,9 +51,8 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
     if (!el.current || points.length < 2) return;
     const still = !interactive;
     const m = L.map(el.current, {
-      zoomControl: false, scrollWheelZoom: false, dragging: !still, touchZoom: !still, doubleClickZoom: !still, boxZoom: !still, keyboard: !still,
+      zoomControl: false, attributionControl: false, scrollWheelZoom: false, dragging: !still, touchZoom: !still, doubleClickZoom: !still, boxZoom: !still, keyboard: !still,
     });
-    m.attributionControl.setPrefix(false);
     base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     const brand = token("brand-text", "#C6F432"), good = token("good", "#22C55E"), ring = token("surface", "#141417");
     const line = L.polyline(points, { color: brand, weight: still ? 4 : 5, opacity: 0.95, lineJoin: "round", interactive: false }).addTo(m);
@@ -99,6 +99,7 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
     <div className={cn("isolate overflow-hidden bg-surface-2", full ? "fixed inset-0 z-50" : cn("relative h-72 w-full rounded-xl", className))}>
       <div ref={el} className={cn("size-full", !interactive && "pointer-events-none")} role="img" aria-label="Carte du parcours" />
       {slots.map((s) => createPortal(<span className="grid size-full place-items-center"><PoiIcon type={s.poi.type} marker active={s.poi.id === focusId} /></span>, s.el, s.poi.id))}
+      <MapAttribution />
       {expandable && (
         <button
           type="button"

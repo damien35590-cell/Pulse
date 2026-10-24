@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MapAttribution } from "@/components/map/map-attribution";
 import { cn } from "@/lib/utils";
 import type { LatLng } from "@/lib/polyline";
 import { TILE, project } from "@/lib/map/track";
-import { BASEMAP, BASEMAP_CREDIT, tileUrl, useMapTheme, type BasemapStyle, type MapTheme } from "@/lib/map/basemap";
+import { BASEMAP, tileUrl, useMapTheme, type BasemapStyle, type MapTheme } from "@/lib/map/basemap";
 
 const PAD = 0.12, MAX_ZOOM = 16;
 
@@ -89,7 +90,7 @@ export function RoutePreview({ points, className, basemap = BASEMAP, theme: forc
             {!g.loop && <circle cx={g.end[0]} cy={g.end[1]} r={4.5} className="fill-ink stroke-surface" strokeWidth={2} />}
             <circle cx={g.start[0]} cy={g.start[1]} r={4.5} className="fill-good stroke-surface" strokeWidth={2} />
           </svg>
-          <span className="absolute bottom-1.5 right-1.5 rounded-full bg-surface/70 px-1.5 text-micro text-ink-soft backdrop-blur">{BASEMAP_CREDIT}</span>
+          <MapAttribution inLink />
         </div>
       )}
     </div>

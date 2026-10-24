@@ -25,7 +25,7 @@ assert.ok(previewTrack(encodePolyline(wiggly))!.length <= 200);
 
 // ── Tuiles Stadia Maps (endpoint UE, sans clé) ──
 assert.equal(tileUrl("dark", 16, 32462, 22750), "https://tiles-eu.stadiamaps.com/tiles/alidade_smooth_dark/16/32462/22750.png");
-assert.equal(tileUrl("light", 3, 1, 2, true), "https://tiles-eu.stadiamaps.com/tiles/alidade_smooth/3/1/2@2x.png");
+assert.equal(tileUrl("light", 3, 1, 2, true), "https://tiles-eu.stadiamaps.com/tiles/alidade_bright/3/1/2@2x.png");
 assert.ok(!/api_key|cartocdn/.test(tileUrl("dark", 1, 0, 0)));
 
 // ── Axe d'altitude : 3 valeurs rondes, jamais depuis 0, données dans l'axe ──

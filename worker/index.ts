@@ -8,9 +8,9 @@ self.addEventListener("message", (event) => {
 });
 
 // Fond de carte : l'ancien cache CARTO contient des tuiles filigrane « clé requise ». Purgé à l'activation ;
-// le cache Stadia est versionné dans next.config.mjs (stadia-tiles-v1) : au prochain changement, ajouter l'ancien nom ici.
+// le cache Stadia est versionné dans next.config.mjs (stadia-tiles-v2) : au prochain changement, ajouter l'ancien nom ici.
 self.addEventListener("activate", (event) => {
-  event.waitUntil(Promise.all(["carto-tiles"].map((name) => caches.delete(name))));
+  event.waitUntil(Promise.all(["carto-tiles", "stadia-tiles-v1"].map((name) => caches.delete(name))));
 });
 
 // Notifications Web Push (lib/push/send.ts) : { title, body, url, tag } chiffré par le serveur, déchiffré par le navigateur.

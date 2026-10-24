@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
+import { MapAttribution } from "@/components/map/map-attribution";
 import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 import { tap } from "@/lib/haptics";
 
@@ -36,8 +37,7 @@ export default function PickMap({ center, value, onPick, className }: Props) {
   useEffect(() => {
     if (!el.current) return;
     const start = value ?? center;
-    const m = L.map(el.current, { zoomControl: false, scrollWheelZoom: false }).setView(start ? [start.lat, start.lng] : FRANCE, start ? (value ? 15 : 13) : 5);
-    m.attributionControl.setPrefix(false);
+    const m = L.map(el.current, { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView(start ? [start.lat, start.lng] : FRANCE, start ? (value ? 15 : 13) : 5);
     base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     m.on("click", (e: L.LeafletMouseEvent) => { tap(8); pick.current({ lat: e.latlng.lat, lng: e.latlng.lng }); });
     map.current = m;
@@ -55,5 +55,10 @@ export default function PickMap({ center, value, onPick, className }: Props) {
     if (!m.getBounds().pad(-0.15).contains(ll) || m.getZoom() < 12) m.setView(ll, Math.max(m.getZoom(), 15));
   }, [value?.lat, value?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div ref={el} className={cn("isolate h-48 w-full overflow-hidden rounded-tile bg-surface-2", className)} role="application" aria-label="Carte : touche pour choisir le départ" />;
+  return (
+    <div className={cn("relative isolate h-48 w-full overflow-hidden rounded-tile bg-surface-2", className)}>
+      <div ref={el} className="size-full" role="application" aria-label="Carte : touche pour choisir le départ" />
+      <MapAttribution />
+    </div>
+  );
 }

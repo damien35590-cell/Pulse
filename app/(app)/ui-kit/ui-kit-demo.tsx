@@ -20,7 +20,7 @@ import { ActivitySummary } from "@/components/dashboard/activity-summary";
 import { TraceChart } from "@/components/activity/trace-chart";
 import { ElevationChart } from "@/components/activity/elevation-chart";
 import { RoutePreview } from "@/components/activity/route-preview";
-import { BASEMAP_VARIANTS } from "@/lib/map/basemap";
+import { MapAttribution } from "@/components/map/map-attribution";
 import { ZoneBar } from "@/components/activity/zone-bar";
 import { Splits } from "@/components/activity/splits";
 import { SetLogger } from "@/components/workout/set-logger";
@@ -400,19 +400,11 @@ function Tokens() {
           </div>
         </Section>
 
-        <Section title="Fonds de carte">
-          <div className="grid gap-4">
-            {BASEMAP_VARIANTS.map((v) => (
-              <div key={v.id}>
-                <p className="mb-1.5 text-xs text-ink-soft">{v.label}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["light", "dark"] as const).map((t) => (
-                    <div key={t} className={cn(ui.card, "overflow-hidden")}>
-                      <RoutePreview points={tracks["tempo-10k"]} basemap={v.basemap} theme={t} />
-                      <p className="px-2 py-1 text-micro text-ink-mute">{t === "light" ? "clair" : "sombre"} · {v.basemap[t].style}</p>
-                    </div>
-                  ))}
-                </div>
+        <Section title="Attribution des cartes · repliée, dépliée">
+          <div className="grid grid-cols-2 gap-2">
+            {[false, true].map((o) => (
+              <div key={String(o)} className={cn(ui.card, "relative h-24 overflow-hidden bg-surface-2")}>
+                <MapAttribution defaultOpen={o} />
               </div>
             ))}
           </div>

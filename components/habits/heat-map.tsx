@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
+import { MapAttribution } from "@/components/map/map-attribution";
 import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
 import type { Junction } from "@/lib/habits/grid";
 
@@ -39,8 +40,7 @@ export default function HeatMap({ lat0, cellM, cells, junctions, highlight, focu
 
   useEffect(() => {
     if (!el.current) return;
-    const m = L.map(el.current, { zoomControl: false, scrollWheelZoom: false, preferCanvas: true });
-    m.attributionControl.setPrefix(false);
+    const m = L.map(el.current, { zoomControl: false, attributionControl: false, scrollWheelZoom: false, preferCanvas: true });
     base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     const renderer = L.canvas({ padding: 0.3 });
     const brand = token("brand-text", "#C6F432");
@@ -84,5 +84,10 @@ export default function HeatMap({ lat0, cellM, cells, junctions, highlight, focu
     }
   }, [cells, junctions, highlight, focus]);
 
-  return <div ref={el} className={cn("isolate h-80 w-full overflow-hidden rounded-card bg-surface-2", className)} role="img" aria-label="Carte de chaleur de tes sorties" />;
+  return (
+    <div className={cn("relative isolate h-80 w-full overflow-hidden rounded-card bg-surface-2", className)}>
+      <div ref={el} className="size-full" role="img" aria-label="Carte de chaleur de tes sorties" />
+      <MapAttribution />
+    </div>
+  );
 }

@@ -4,6 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MapAttribution } from "@/components/map/map-attribution";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { Segmented } from "@/components/ui/segmented";
@@ -68,8 +69,7 @@ export default function InteractiveTopoMap({ points, cursor, className }: { poin
     const box = el.current;
     if (!box || points.length < 2) return;
     const touch = matchMedia(COARSE).matches;
-    const m = L.map(box, { zoomControl: !touch, scrollWheelZoom: false, dragging: !touch, touchZoom: true, zoomSnap: 0.5, preferCanvas: true });
-    m.attributionControl.setPrefix(false);
+    const m = L.map(box, { zoomControl: !touch, scrollWheelZoom: false, dragging: !touch, touchZoom: true, zoomSnap: 0.5, preferCanvas: true, attributionControl: false });
     base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     layer.current = L.layerGroup().addTo(m);
     bounds.current = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
@@ -181,6 +181,7 @@ export default function InteractiveTopoMap({ points, cursor, className }: { poin
         >
           {full ? <Minimize2 className="size-5" aria-hidden /> : <Maximize2 className="size-5" aria-hidden />}
         </button>
+        <MapAttribution />
       </div>
       {colored && (
         <div className="mt-2 flex items-center gap-2 font-num text-xs tabular-nums text-ink-soft">

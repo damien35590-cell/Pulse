@@ -54,7 +54,7 @@ export default async () => {
           urlPattern: /^https:\/\/tiles-eu\.stadiamaps\.com\/.*/i,
           handler: "CacheFirst",
           options: {
-            cacheName: "stadia-tiles-v1",
+            cacheName: "stadia-tiles-v2",
             expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 14 },
             cacheableResponse: { statuses: [200] },
           },
