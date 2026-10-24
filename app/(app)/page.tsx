@@ -15,7 +15,9 @@ import { WeekCard } from "@/components/dashboard/week-card";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { ActivitySummary } from "@/components/dashboard/activity-summary";
 import { PendingResultCard } from "@/components/dashboard/pending-result-card";
-import { cells } from "@/components/dashboard/activity-card";
+import { summaryData } from "@/lib/activity/summary";
+import { getActivityInsights } from "@/lib/data/activity-insight";
+import { getZones } from "@/lib/data/zones";
 import { GearAlert } from "@/components/gear/gear-alert";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ProgramCard, StartProgramCard, cheer } from "@/components/training/program-card";
@@ -23,15 +25,11 @@ import { PlanRouteCard } from "@/components/routes/plan-route-card";
 import { PendingBadgesCard } from "@/components/profile/pending-badges-card";
 import { CoachCard } from "@/components/dashboard/coach-card";
 import { getCoach } from "@/lib/coach/load";
-import { fmtWhen } from "@/lib/format";
-import { isSoft } from "@/lib/sports";
-import { previewTrack } from "@/lib/map/track";
 
 export const dynamic = "force-dynamic";
 
 const TZ = "Europe/Paris";
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
-// Les 3 chiffres de cells() (identiques à la carte du fil).
 
 /**
  * Accueil : la semaine en tête, puis la séance du jour (carte « Aujourd'hui » du coach, seul bouton Volt de l'écran),
@@ -50,16 +48,9 @@ export default async function DashboardPage() {
   const phrase = run && run.status === "ACTIVE" ? cheer(run.weekDone, run.sessionsPerWeek) : null;
   const goal = d.goals[0];
   const race = d.events[0];
-  const recent = d.recent.map((a) => {
-    const picked = cells(a);
-    return {
-      id: a.id, type: a.type, title: a.title, story: a.story ?? undefined, tags: a.muscles.length ? a.muscles : undefined,
-      when: fmtWhen(a.startedAt, TZ),
-      metrics: picked.slice(0, 3).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
-      // Trace simplifiée ici, côté serveur : la vignette ne reçoit que ~200 points. Activités douces : pas de tracé (comme ActivityCard).
-      route: isSoft(a.type) ? undefined : previewTrack(a.polyline),
-    };
-  });
+  // Même phrase de comparaison que la fiche, en une passe pour les 3 cartes.
+  const insights = await getActivityInsights(s.user.id, d.recent.map((a) => a.id), TZ, (await getZones(s.user.id)).hrMax).catch((e) => { console.error("[insight] accueil", e); return undefined; });
+  const recent = d.recent.map((a) => summaryData(a, insights?.get(a.id), TZ, { tags: a.muscles.length ? a.muscles : undefined }));
 
   return (
     <>

@@ -8,6 +8,7 @@ import type { ZoneSlice } from "@/components/activity/zone-bar";
 import type { Split } from "@/components/activity/splits";
 import type { Band } from "@/components/activity/trace-chart";
 import type { LiftExercise } from "@/components/workout/set-logger";
+import type { InsightLine } from "@/lib/activity/comparables";
 import type { ActivitySummaryData } from "@/components/dashboard/activity-summary";
 import type { RouteView } from "@/lib/data/routes";
 import type { RideWeather } from "@/lib/weather/open-meteo";
@@ -67,13 +68,15 @@ type RunSpec = {
   id: string; title: string; when: string; paceS: number[]; hrBase: number[]; seed: number;
   /** Bout de parcours après le dernier km plein : distance (km) et temps (s). */
   tail: [number, number]; cadence: number; kcal: number; rpe: number; insight?: string; badge?: string;
+  /** Phrase de comparaison du fil (lib/activity/comparables.ts : insightLine). */
+  compare?: InsightLine;
 };
 
 function buildRun(r: RunSpec) {
   const sim = simulateRun(r.paceS, r.hrBase, r.seed), distanceKm = r.paceS.length + r.tail[0], movingS = sim.totalS + r.tail[1];
   const elev = simulateElevation(distanceKm, r.seed * 0.4);
   return {
-    id: r.id, title: r.title, when: r.when, badge: r.badge, insight: r.insight,
+    id: r.id, title: r.title, when: r.when, badge: r.badge, insight: r.insight, compare: r.compare,
     distanceKm, movingS, pace: fmtPaceS(movingS / distanceKm),
     avgHr: sim.avgHr, maxHr: sim.maxHr, gain: elev.gain, cadence: r.cadence, kcal: r.kcal, rpe: r.rpe,
     hr: sim.hr, ele: elev.ele, splits: sim.splits, zones: sim.zones,
@@ -88,12 +91,14 @@ export const runs = [
     id: "tempo-10k", title: "Tempo 10 km", when: "ven. 16 oct. · 18:42", seed: 1, tail: [0.02, 6],
     paceS: TEMPO_PACE, hrBase: [141, 152, 157, 160, 162, 164, 166, 168, 171, 177],
     cadence: 176, kcal: 712, rpe: 7, badge: "Record",
+    compare: { text: "9 s/km plus rapide que tes séances de seuil / VMA similaires", tone: "good" },
     insight: `Dernier kilomètre en ${fmtPaceS(TEMPO_PACE[9])} : ton finish le plus rapide depuis mars, sans exploser (Z5 seulement à la fin).`,
   }),
   buildRun({
     id: "footing", title: "Footing endurance", when: "mar. 13 oct. · 07:15", seed: 3, tail: [0.21, 64],
     paceS: [318, 312, 310, 309, 311, 310, 308, 306], hrBase: [122, 127, 129, 130, 131, 132, 132, 134],
     cadence: 168, kcal: 548, rpe: 3,
+    compare: { text: "Dans ta moyenne habituelle", tone: "neutral" },
   }),
 ];
 export const tempo = runs[0];
@@ -134,7 +139,7 @@ export const profileOf = (r: (typeof runs)[number]) => r.ele.map((ele, i) => ({ 
 
 const km2 = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const runPreview = (r: (typeof runs)[number]): ActivitySummaryData => ({
-  id: r.id, type: "RUN", title: r.title, when: r.when, badge: r.badge, zones: r.zones, story: r.insight, route: tracks[r.id],
+  id: r.id, type: "RUN", title: r.title, when: r.when, badge: r.badge, zones: r.zones, insight: r.compare, route: tracks[r.id],
   metrics: [
     { label: "Distance", value: km2(r.distanceKm), unit: "km" },
     { label: "Temps", value: fmtClock(r.movingS) },
@@ -152,7 +157,7 @@ export const recent: ActivitySummaryData[] = [
       { label: "Volume", value: (liftSession.volumeKg / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 }), unit: "t" },
     ],
     tags: ["Dos", "Biceps", "Arrière d'épaule"],
-    story: "+2,5 kg au rowing barre : troisième séance de progression d'affilée.",
+    insight: { text: "2ᵉ séance de la semaine", tone: "neutral" },
   },
   runPreview(runs[1]),
 ];

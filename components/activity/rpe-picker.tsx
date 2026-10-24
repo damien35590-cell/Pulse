@@ -2,38 +2,37 @@
 import { tap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
-/** Échelle d'effort ressenti 1-10 (Borg CR-10 adaptée), du vert au rouge. `ink` : couleur du chiffre sur la pastille choisie. */
-export const RPE: { v: number; label: string; color: string; ink: string }[] = [
-  { v: 1, label: "Très facile", color: "#16A34A", ink: "#fff" },
-  { v: 2, label: "Facile", color: "#22C55E", ink: "#052e16" },
-  { v: 3, label: "Modéré", color: "#65A30D", ink: "#fff" },
-  { v: 4, label: "Soutenu", color: "#84CC16", ink: "#1a2e05" },
-  { v: 5, label: "Dur", color: "#EAB308", ink: "#422006" },
-  { v: 6, label: "Dur +", color: "#F59E0B", ink: "#451a03" },
-  { v: 7, label: "Très dur", color: "#F97316", ink: "#431407" },
-  { v: 8, label: "Très dur +", color: "#EA580C", ink: "#fff" },
-  { v: 9, label: "Extrême", color: "#EF4444", ink: "#fff" },
-  { v: 10, label: "Maximal", color: "#DC2626", ink: "#fff" },
+/** Échelle d'effort ressenti 1-10 (Borg CR-10 adaptée). */
+export const RPE: { v: number; label: string }[] = [
+  { v: 1, label: "Très facile" }, { v: 2, label: "Facile" }, { v: 3, label: "Modéré" }, { v: 4, label: "Soutenu" }, { v: 5, label: "Dur" },
+  { v: 6, label: "Dur +" }, { v: 7, label: "Très dur" }, { v: 8, label: "Très dur +" }, { v: 9, label: "Extrême" }, { v: 10, label: "Maximal" },
 ];
+
+/** Tonalité du chiffre choisi : vert jusqu'à 4, ambre jusqu'à 7, rouge au-delà. */
+export const rpeTone = (v: number) => (v <= 4 ? "text-good" : v <= 7 ? "text-warn" : "text-bad");
 
 type Props = { value: number | null; onChange: (v: number | null) => void; className?: string };
 
-/** Ligne « Effort » : 10 pastilles tactiles (44 px min), un second appui sur la pastille choisie l'efface. */
+/**
+ * Ligne « Effort » : 10 pastilles sur une seule ligne, sans défilement. Chaque cible fait toute la hauteur (48 px) et toute sa part
+ * de largeur (pas d'espace mort entre les pastilles). Un dégradé good → warn → bad (tokens) remplit les pastilles jusqu'à la valeur
+ * choisie ; chaque pastille montre sa tranche du dégradé. Un second appui sur la pastille choisie l'efface.
+ */
 export function RpePicker({ value, onChange, className }: Props) {
   const current = value ? RPE[value - 1] : null;
   return (
     <div className={className}>
-      <p className="mb-2 flex items-baseline justify-between text-sm text-ink-soft">
+      <p className="mb-1 flex items-baseline justify-between text-sm text-ink-soft">
         <span className="font-semibold text-ink">Effort</span>
         {current ? (
-          <span><span className="font-display text-base font-bold" style={{ color: current.color }}>{current.v}/10</span> · {current.label.toLowerCase()}</span>
+          <span><span className={cn("font-num text-metric-sm tabular-nums", rpeTone(current.v))}>{current.v}/10</span> · {current.label.toLowerCase()}</span>
         ) : (
           <span>Effort ressenti, de 1 à 10</span>
         )}
       </p>
-      <div role="radiogroup" aria-label="Effort ressenti, de 1 à 10" className="grid grid-cols-5 gap-1.5">
-        {RPE.map(({ v, label, color, ink }) => {
-          const active = value === v;
+      <div role="radiogroup" aria-label="Effort ressenti, de 1 à 10" className="flex">
+        {RPE.map(({ v, label }, i) => {
+          const active = value === v, filled = value != null && v <= value;
           return (
             <button
               key={v}
@@ -41,20 +40,25 @@ export function RpePicker({ value, onChange, className }: Props) {
               role="radio"
               aria-checked={active}
               aria-label={`${v}, ${label.toLowerCase()}`}
-              onClick={() => { tap(10); onChange(active ? null : v); }}
-              className={cn(
-                "relative flex min-h-11 min-w-11 items-center justify-center overflow-hidden rounded-lg font-display text-lg font-bold tabular-nums transition active:scale-95",
-                active ? "shadow-sm" : "bg-surface-2 text-ink-soft hover:text-ink"
-              )}
-              style={active ? { backgroundColor: color, color: ink } : undefined}
+              onClick={() => { tap(); onChange(active ? null : v); }}
+              className="group flex h-12 min-w-0 flex-1 items-center px-0.5 select-none touch-manipulation"
             >
-              {v}
-              {!active && <span className="absolute inset-x-0 bottom-0 h-1" style={{ backgroundColor: color, opacity: value != null && v <= value ? 1 : 0.45 }} aria-hidden />}
+              <span
+                className={cn(
+                  "grid h-9 w-full place-items-center rounded-full font-num text-metric-sm tabular-nums transition duration-150 ease-snappy group-active:scale-90",
+                  filled ? "bg-gradient-to-r from-good via-warn to-bad text-brand-ink" : "bg-surface-2 text-ink-soft",
+                  active && "scale-110 ring-2 ring-ink/70",
+                )}
+                // Dégradé à l'échelle de la ligne entière : la pastille i en affiche la i-ème tranche.
+                style={filled ? { backgroundSize: `${RPE.length * 100}% 100%`, backgroundPosition: `${(i / (RPE.length - 1)) * 100}% 0` } : undefined}
+              >
+                {v}
+              </span>
             </button>
           );
         })}
       </div>
-      <p className="mt-1.5 flex justify-between text-xs text-ink-soft" aria-hidden><span>1 très facile</span><span>10 maximal</span></p>
+      <p className="mt-1 flex justify-between text-xs text-ink-mute" aria-hidden><span>1 très facile</span><span>10 maximal</span></p>
     </div>
   );
 }

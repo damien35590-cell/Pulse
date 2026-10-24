@@ -1,25 +1,33 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CloudRain, Equal, Flag, Thermometer, TrendingDown, TrendingUp } from "lucide-react";
+import { CloudRain, Flag, MessageSquareText, Thermometer } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodePolyline } from "@/lib/polyline";
-import { SPORTS } from "@/lib/sports";
+import { isSoft, SPORTS } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
 import { fmtClock, fmtKm, fmtNum, fmtPace, fmtWhenShort } from "@/lib/format";
 import { ActivityHero } from "@/components/activity/activity-hero";
 import { Delta, Metric } from "@/components/ui/metric";
+import { Section } from "@/components/ui/section";
 import { getActivityInsight } from "@/lib/data/activity-insight";
-import type { PaceInsight } from "@/lib/activity/comparables";
+import { isAverageStory } from "@/lib/activity/comparables";
+import { kmSplits } from "@/lib/activity/splits";
+import { heartRate } from "@/lib/activity/heart";
+import { getActivityNote } from "@/lib/coach/activity-note";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
+import { INSIGHT_TONE } from "@/components/activity/insight-line";
+import { Splits } from "@/components/activity/splits";
+import { HeartRate } from "@/components/activity/heart-rate";
+import { ShareActivity } from "@/components/activity/share-activity";
 import { TimeInZones } from "@/components/activity/time-in-zones";
 import { getZones } from "@/lib/data/zones";
-import { bounds, HR_PCT, POWER_PCT, timeInZones } from "@/lib/zones";
+import { bounds, POWER_PCT, timeInZones } from "@/lib/zones";
 import { detectIntervals } from "@/lib/detect-intervals";
-import type { StreamData } from "@/lib/stream";
+import { buildStream, type StreamData } from "@/lib/stream";
 import { PowerChart } from "@/components/activity/power-chart";
-import { FeelNote } from "@/components/activity/feelnote";
+import { FeelNote, FeelPrompt } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
@@ -29,12 +37,6 @@ import { selectableGear } from "@/lib/gear";
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
 type TP = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
-
-const INSIGHT: Record<PaceInsight["tone"], { icon: typeof Equal; cls: string }> = {
-  good: { icon: TrendingUp, cls: "bg-good/15 text-good" },
-  warn: { icon: TrendingDown, cls: "bg-warn/15 text-warn" },
-  neutral: { icon: Equal, cls: "bg-surface-2 text-ink-soft" },
-};
 
 function feelingToInt(feeling: string | null): number | null {
   switch (feeling) {
@@ -47,6 +49,10 @@ function feelingToInt(feeling: string | null): number | null {
   }
 }
 
+/**
+ * Fiche d'activité. Ordre : tête (carte, titre, chiffres, comparaison) → note du coach → allure par km → fréquence cardiaque
+ * → altitude → ressenti, puis « Partager » en bas, dans la zone du pouce.
+ */
 export default async function ActivityPage({ params }: { params: { id: string } }) {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
@@ -63,20 +69,26 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const series = raw.filter((p) => p.power != null || p.hr != null).map((p) => ({ min: (p.t - t0) / 60000, power: p.power, hr: p.hr }));
   // Carte + profil d'altitude : seulement ce dont ils ont besoin part vers le navigateur (pas la FC ni la puissance).
   const gps = raw.filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: p.lat!, lng: p.lng!, ele: p.ele, t: p.t }));
-  
+
   const st = (a.stream?.data ?? null) as StreamData | null, zones = await getZones(s.user.id);
   const powerTiz = st?.power?.length && zones.ftp ? timeInZones(st.power, bounds(zones.ftp, POWER_PCT)) : null;
-  const hrTiz = st?.hr?.length && zones.hrMax ? timeInZones(st.hr, bounds(zones.hrMax, HR_PCT), true) : null;
   const thr = zones.ftp ? Math.round(zones.ftp * 0.9) : 0;
   const intervals = st?.power?.length && thr ? detectIntervals(st.power.map((p, k) => ({ t: k, power: p, hr: st.hr[k] })), thr) : [];
   const mmss = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, "0")}`;
-  
+  // FC : la série à 1 Hz enregistrée, sinon reconstruite depuis la trace. Section masquée sans mesure.
+  const hr1hz = st?.hr?.length ? st.hr : buildStream(raw)?.hr ?? [];
+  const heart = heartRate(hr1hz, zones.hrMax);
+  // Allure par km : course et rando avec GPS horodaté (FC du km lue dans la trace).
+  const splits = (a.type === "RUN" || a.type === "HIKE") ? kmSplits(raw.filter((p) => p.lat != null && p.lng != null) as { lat: number; lng: number; t: number; hr?: number }[]) : [];
 
   const { icon: SportIcon, fg: sportFg, dot: sportSolid } = activityStyle(a.type);
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const w = a.weather as { tempC?: number | null; precipMm?: number | null } | null;
   const insight = await getActivityInsight(s.user.id, a.id, TZ, zones.hrMax);
-  const ins = insight.pace ? INSIGHT[insight.pace.tone] : null;
+  const note = await getActivityNote(s.user.id, a.id, TZ, insight.cls).catch((e) => { console.error("[coach] note d'activité", e); return null; });
+  const ins = insight.pace ? INSIGHT_TONE[insight.pace.tone] : null;
+  // Anecdote en repli, sauf l'ancienne comparaison à la moyenne des 30 jours (remplacée par la comparaison ci-dessus).
+  const story = a.story && !isAverageStory(a.story) ? a.story : null;
   // Chiffre vedette : la distance, ou la durée pour une activité sans distance (muscu…). Puis une ligne de 3 chiffres, le reste en petit.
   const hasDist = a.type !== "WORKOUT" && a.distanceM >= 100;
   type M = { label: string; value: string; unit?: string; hint?: React.ReactNode };
@@ -91,6 +103,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   ].filter(Boolean) as M[]);
   const [row, more] = [metrics.slice(0, 3), metrics.slice(3)];
   const points = gps.length > 1 ? gps : route.map(([lat, lng]) => ({ lat, lng }));
+  const shareText = [hasDist && `${fmtKm(a.distanceM)} km`, fmtClock(a.movingTimeS), pace && `${pace.value} ${pace.unit}`].filter(Boolean).join(" · ");
 
   return (
     <article>
@@ -105,6 +118,66 @@ export default async function ActivityPage({ params }: { params: { id: string } 
             <span className={cn("grid size-10 shrink-0 place-items-center rounded-tile text-bg", sportSolid)}><SportIcon className="size-5" strokeWidth={2.2} aria-hidden /></span>
             <p className="min-w-0 truncate text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhenShort(a.startedAt, TZ)}</p>
           </div>
+        }
+        sections={
+          <>
+            {note && (
+              <section aria-label="Note du coach" className={cn(ui.card, "flex gap-3 p-4")}>
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><MessageSquareText className="size-4" aria-hidden /></span>
+                <div className="min-w-0">
+                  <p className={ui.label}>Coach</p>
+                  <p className="mt-1 leading-snug text-ink">{note}</p>
+                </div>
+              </section>
+            )}
+            {a.exercises.length > 0 && (
+              <Section title="Exercices">
+                <ul className={cn(ui.card, "divide-y divide-line")}>
+                  {a.exercises.map((e) => (
+                    <li key={e.id} className="px-4 py-3">
+                      <p className="font-semibold text-ink">{e.name}</p>
+                      <p className="text-sm text-ink-soft">{e.sets} × {e.reps}{e.loadKg != null ? ` à ${fmtNum(e.loadKg)} kg` : ""}{e.restS != null ? `, repos ${e.restS} s` : ""}</p>
+                      {Array.isArray(e.setsDetail) && <p className="font-num text-sm tabular-nums text-ink">Réel : {(e.setsDetail as { reps: number; loadKg: number | null; done: boolean }[]).map((s) => `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`).join(" · ")}</p>}
+                      {e.comment && <p className="mt-1 text-sm text-ink-soft">{e.comment}</p>}
+                    </li>
+                  ))}
+                </ul>
+                {a.type === "WORKOUT" && <SaveTemplateButton activityId={a.id} defaultName={a.title} />}
+              </Section>
+            )}
+            {splits.length > 1 && (
+              <Section title="Allure par km">
+                <div className={cn(ui.card, "px-3 py-4")}><Splits splits={splits} /></div>
+              </Section>
+            )}
+            {heart && (
+              <HeartRate
+                values={heart.values} durationS={heart.durationS} upper={heart.upper} zones={heart.zones}
+                note={zones.hrMax ? `FC max ${zones.hrMax} bpm${zones.hrManual ? "" : " (estimée)"}` : undefined}
+              />
+            )}
+            {series.some((p) => p.power != null) && (
+              <Section title="Puissance">
+                <div className={cn(ui.card, "space-y-4 p-4")}>
+                  <PowerChart data={series} />
+                  {powerTiz && <TimeInZones power={powerTiz} />}
+                  {zones.ftp && powerTiz && <p className="text-xs text-ink-mute">FTP {zones.ftp} W{zones.ftpManual ? "" : " (estimée)"}. Réglable dans l’onglet Vous.</p>}
+                </div>
+              </Section>
+            )}
+            {intervals.length > 0 && (
+              <Section title="Intervalles détectés">
+                <div className={cn(ui.card, "overflow-x-auto")}>
+                  <table className="w-full text-sm tabular-nums">
+                    <thead className="text-left text-label uppercase text-ink-mute"><tr><th className="px-3 py-2 font-medium">Début</th><th className="px-3 py-2 font-medium">Durée</th><th className="px-3 py-2 font-medium">P moy.</th><th className="px-3 py-2 font-medium">PN</th><th className="px-3 py-2 font-medium">FC moy.</th></tr></thead>
+                    <tbody className="divide-y divide-line">{intervals.map((iv) => <tr key={iv.startTime}><td className="px-3 py-2">{mmss(iv.startTime)}</td><td className="px-3 py-2">{mmss(iv.endTime - iv.startTime + 1)}</td><td className="px-3 py-2 font-semibold">{iv.avgWatts} W</td><td className="px-3 py-2">{iv.normalizedPower} W</td><td className="px-3 py-2">{iv.avgHeartRate ? `${iv.avgHeartRate} bpm` : "–"}</td></tr>)}</tbody>
+                  </table>
+                </div>
+                <p className="px-1 text-xs text-ink-mute">Blocs d’au moins 1 min au-dessus de {thr} W (90 % de la FTP{zones.ftpManual ? "" : ", estimée"}). PN : puissance normalisée.</p>
+              </Section>
+            )}
+            {st?.power?.length && !zones.ftp ? <p className="px-1 text-sm text-ink-soft">Pas encore de FTP : renseigne-la dans l’onglet Vous pour voir les zones et les intervalles.</p> : null}
+          </>
         }
       >
         {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand"><Flag className="size-4" aria-hidden />Course · {a.raceEvent.name}</Link>}
@@ -139,61 +212,23 @@ export default async function ActivityPage({ params }: { params: { id: string } 
               <ul className="flex flex-wrap gap-2">{insight.chips.map((c) => <li key={c} className={ui.chip}>{c}</li>)}</ul>
             )}
           </div>
-        ) : a.story && <p className="mt-5 border-t border-line pt-4 text-sm leading-snug text-ink-soft">{a.story}</p>}
+        ) : story && <p className="mt-5 border-t border-line pt-4 text-sm leading-snug text-ink-soft">{story}</p>}
+        {!isSoft(a.type) && <div className="mt-4 empty:hidden"><FeelPrompt filled={a.feeling != null && a.rpe != null} /></div>}
       </ActivityHero>
-      <div className="mt-8 space-y-5">
-      {series.length > 5 && <section><h2 className="mb-2 font-display text-lg font-bold">Puissance et cardio</h2><PowerChart data={series} /></section>}
-      {(powerTiz || hrTiz) && (
-        <section>
-          <h2 className="mb-2 font-display text-lg font-bold">Temps par zone</h2>
-          <TimeInZones power={powerTiz ?? undefined} hr={hrTiz ?? undefined} />
-          <p className="mt-1 text-xs text-ink-soft">{zones.ftp && powerTiz ? `FTP ${zones.ftp} W${zones.ftpManual ? "" : " (estimée)"}. ` : ""}{zones.hrMax && hrTiz ? `FC max ${zones.hrMax} bpm${zones.hrManual ? "" : " (estimée)"}.` : ""} Réglable dans l’onglet Vous.</p>
-        </section>
-      )}
-      {intervals.length > 0 && (
-        <section>
-          <h2 className="mb-2 font-display text-lg font-bold">Intervalles détectés</h2>
-          <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-            <table className="w-full text-sm tabular-nums">
-              <thead className="text-left text-xs text-ink-soft"><tr><th className="px-3 py-2 font-medium">Début</th><th className="px-3 py-2 font-medium">Durée</th><th className="px-3 py-2 font-medium">P moy.</th><th className="px-3 py-2 font-medium">PN</th><th className="px-3 py-2 font-medium">FC moy.</th></tr></thead>
-              <tbody className="divide-y divide-line">{intervals.map((iv) => <tr key={iv.startTime}><td className="px-3 py-2">{mmss(iv.startTime)}</td><td className="px-3 py-2">{mmss(iv.endTime - iv.startTime + 1)}</td><td className="px-3 py-2 font-semibold">{iv.avgWatts} W</td><td className="px-3 py-2">{iv.normalizedPower} W</td><td className="px-3 py-2">{iv.avgHeartRate ? `${iv.avgHeartRate} bpm` : "–"}</td></tr>)}</tbody>
-            </table>
-          </div>
-          <p className="mt-1 text-xs text-ink-soft">Blocs d’au moins 1 min au-dessus de {thr} W (90 % de la FTP{zones.ftpManual ? "" : ", estimée"}). PN : puissance normalisée.</p>
-        </section>
-      )}
-      {st?.power?.length && !zones.ftp && <p className="text-sm text-ink-soft">Pas encore de FTP : renseignez-la dans l’onglet Vous pour voir les zones et les intervalles.</p>}
-      {(w || a.feeling) && (
-        <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-soft">
-          {w?.tempC != null && <span className="inline-flex items-center gap-1.5"><Thermometer className="h-4 w-4" aria-hidden />{Math.round(w.tempC)} °C au départ</span>}
-          {(w?.precipMm ?? 0) >= 1 && <span className="inline-flex items-center gap-1.5"><CloudRain className="h-4 w-4" aria-hidden />{fmtNum(w!.precipMm!, 1)} mm de pluie</span>}
-        </p>
-      )}
-      {a.exercises.length > 0 && (
-        <section>
-          <h2 className="mb-2 font-display text-lg font-bold">Exercices</h2>
-          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-            {a.exercises.map((e) => (
-              <li key={e.id} className="px-4 py-3">
-                <p className="font-semibold">{e.name}</p>
-                <p className="text-sm text-ink-soft">{e.sets} × {e.reps}{e.loadKg != null ? ` à ${fmtNum(e.loadKg)} kg` : ""}{e.restS != null ? `, repos ${e.restS} s` : ""}</p>
-                {Array.isArray(e.setsDetail) && <p className="text-sm tabular-nums">Réel : {(e.setsDetail as { reps: number; loadKg: number | null; done: boolean }[]).map((s) => `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`).join(" · ")}</p>}
-                {e.comment && <p className="mt-1 text-sm">{e.comment}</p>}
-              </li>
-            ))}
-          </ul>
-          {a.type === "WORKOUT" && <div className="mt-3"><SaveTemplateButton activityId={a.id} defaultName={a.title} /></div>}
-        </section>
-      )}
-      
-      {gearOpts.length > 0 && <GearPicker activityId={a.id} options={gearOpts} selected={a.gear.filter((g) => !g.retiredAt).map((g) => g.id)} retired={a.gear.filter((g) => g.retiredAt).map((g) => g.name)} />}
 
-      <FeelNote 
-        activityId={a.id} 
-        initialFeel={feelingToInt(a.feeling)} 
-        initialComment={a.notes}
-        initialRpe={a.rpe}
-      />
+      <div className="mt-8 space-y-8">
+        <FeelNote activityId={a.id} movingTimeS={a.movingTimeS} initialFeel={feelingToInt(a.feeling)} initialComment={a.notes} initialRpe={a.rpe} />
+
+        {(w?.tempC != null || (w?.precipMm ?? 0) >= 1) && (
+          <p className="flex flex-wrap gap-x-5 gap-y-1 px-1 text-sm text-ink-soft">
+            {w?.tempC != null && <span className="inline-flex items-center gap-1.5"><Thermometer className="size-4" aria-hidden />{Math.round(w.tempC)} °C au départ</span>}
+            {(w?.precipMm ?? 0) >= 1 && <span className="inline-flex items-center gap-1.5"><CloudRain className="size-4" aria-hidden />{fmtNum(w!.precipMm!, 1)} mm de pluie</span>}
+          </p>
+        )}
+
+        {gearOpts.length > 0 && <GearPicker activityId={a.id} options={gearOpts} selected={a.gear.filter((g) => !g.retiredAt).map((g) => g.id)} retired={a.gear.filter((g) => g.retiredAt).map((g) => g.name)} />}
+
+        <ShareActivity title={a.title} summary={shareText} />
       </div>
     </article>
   );

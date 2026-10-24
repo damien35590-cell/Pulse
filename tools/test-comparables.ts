@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-comparables.ts
 import assert from "node:assert/strict";
-import { classContext, contextChips, paceInsight, paceWording, selectComparables, sessionClass, type Candidate } from "../lib/activity/comparables";
+import { classContext, contextChips, insightLine, paceInsight, paceWording, selectComparables, sessionClass, type Candidate } from "../lib/activity/comparables";
 
 const TZ = "Europe/Paris";
 const T = new Date("2026-10-13T10:36:00Z"); // mardi
@@ -57,7 +57,13 @@ assert.ok(ins, "3 comparables : comparaison");
 assert.equal(ins.text, "25 s/km plus lent que tes footings similaires");
 assert.equal(ins.basis, "Comparé à 3 footings des 90 derniers jours");
 assert.equal(paceInsight(target, [keep[0], keep[1], ...drop], ctx), null, "2 comparables : pas de comparaison");
-assert.equal(paceInsight({ ...target, type: "RIDE" }, pool.map((c) => ({ ...c, type: "RIDE" })), ctx), null, "pas d'allure à vélo");
+assert.equal(paceInsight({ ...target, type: "WALK" }, pool.map((c) => ({ ...c, type: "WALK" })), ctx), null, "la marche n'est pas comparée");
+assert.equal(paceInsight({ ...target, type: "HIKE" }, pool.map((c) => ({ ...c, type: "HIKE" })), ctx), null, "la rando non plus");
+const quality = (pace: number, id?: string) => run({ id, startedAt: id ? T : daysAgo(7), pace, planned: { kind: "THRESHOLD", isKeySession: true } });
+const q = paceInsight(quality(300, "k"), [quality(310), quality(310), quality(310)], ctx)!;
+assert.equal(q.text, "10 s/km plus rapide que tes séances de seuil / VMA similaires");
+assert.equal(q.basis, "Comparé à 3 séances de seuil / VMA des 90 derniers jours");
+assert.equal(paceInsight({ ...target, type: "RIDE" },pool.map((c) => ({ ...c, type: "RIDE" })), ctx), null, "pas d'allure à vélo");
 assert.equal(paceInsight(run({ id: "l", startedAt: T, planned: { kind: "LONG_RUN", isKeySession: false } }), [
   run({ planned: { kind: "LONG_RUN", isKeySession: false }, pace: 340 }), run({ planned: { kind: "LONG_RUN", isKeySession: false }, pace: 340 }), run({ planned: { kind: "LONG_RUN", isKeySession: false }, pace: 340 }),
 ], ctx)?.text, "10 s/km plus rapide que tes sorties longues similaires");
@@ -78,3 +84,11 @@ const lift = (o: Partial<Candidate>): Candidate => ({ id: `w${++n}`, type: "WORK
 assert.deepEqual(contextChips(lift({ id: "w" }), [lift({ startedAt: mon })], { tz: TZ }), ["2ᵉ séance de la semaine"]);
 
 console.log("comparables : ok");
+
+// ── Phrase du fil ──
+assert.deepEqual(insightLine({ pace: ins, chips: ["Record sur 5 km"] }, "Bravo"), { text: ins.text, tone: "warn" }, "l'allure d'abord");
+assert.deepEqual(insightLine({ pace: null, chips: ["2ᵉ sortie de la semaine"] }), { text: "2ᵉ sortie de la semaine", tone: "neutral" });
+assert.equal(insightLine({ pace: null, chips: [] }, "Allure en baisse de 4 % sur la moyenne des 30 derniers jours."), null, "ancienne comparaison écartée");
+assert.equal(insightLine({ pace: null, chips: [] }, "120 m de D+ de plus que ta moyenne."), null);
+assert.deepEqual(insightLine({ pace: null, chips: [] }, "Série en cours : 4 jours consécutifs d'activité."), { text: "Série en cours : 4 jours consécutifs d'activité.", tone: "neutral" });
+console.log("phrase du fil : ok");

@@ -22,8 +22,8 @@ export type Candidate = {
 
 export type ClassContext = { medianDistanceM?: number | null; hrMax?: number | null };
 
-/** Sports où l'allure (s/km) a un sens. */
-export const PACE_SPORTS = new Set(["RUN", "WALK", "HIKE"]);
+/** Sports comparés à l'allure : la course, route et trail (importés en RUN). Marche et rando ne sont pas de l'entraînement (doctrine). */
+export const PACE_SPORTS = new Set(["RUN"]);
 export const WINDOW_DAYS = 90;
 export const DISTANCE_TOLERANCE = 0.3;
 export const MIN_COMPARABLES = 3;
@@ -79,12 +79,9 @@ export function selectComparables(target: Candidate, pool: Candidate[], ctx: Cla
     usable(c) && Math.abs(c.distanceM - target.distanceM) <= DISTANCE_TOLERANCE * target.distanceM && sessionClass(c, ctx) === kind);
 }
 
-const NOUNS: Record<string, Partial<Record<SessionClass, string>> & { all: string }> = {
-  RUN: { easy: "footings", long: "sorties longues", key: "séances de qualité", all: "sorties" },
-  HIKE: { all: "randos" },
-  WALK: { all: "marches" },
-};
-export const sessionNoun = (type: string, kind: SessionClass) => (NOUNS[type]?.[kind] ?? NOUNS[type]?.all ?? "sorties");
+const NOUNS: Record<SessionClass, string> = { easy: "footings", long: "sorties longues", key: "séances de seuil / VMA" };
+/** « footings », « sorties longues », « séances de seuil / VMA » : seule la course est comparée. */
+export const sessionNoun = (type: string, kind: SessionClass) => (type === "RUN" ? NOUNS[kind] : "sorties");
 
 export type PaceInsight = {
   tone: "good" | "warn" | "neutral";
@@ -147,3 +144,17 @@ export function contextChips(target: Candidate, pool: Candidate[], o: { tz: stri
 
   return out.slice(0, 2);
 }
+
+export type InsightLine = { text: string; tone: PaceInsight["tone"] };
+
+/**
+ * La phrase unique d'une carte du fil, même formulation que la fiche : écart d'allure, sinon première pastille, sinon l'anecdote
+ * (Activity.story) sauf quand elle compare à la moyenne des 30 jours (ancienne comparaison, remplacée par celle-ci).
+ */
+export function insightLine(i: { pace: PaceInsight | null; chips: string[] }, story?: string | null): InsightLine | null {
+  if (i.pace) return { text: i.pace.text, tone: i.pace.tone };
+  if (i.chips[0]) return { text: i.chips[0], tone: "neutral" };
+  return story && !isAverageStory(story) ? { text: story, tone: "neutral" } : null;
+}
+/** Anecdote de type « écart à la moyenne des 30 jours » (lib/coach/story.ts : comparisonText). */
+export const isAverageStory = (story: string) => /\bmoyenne\b/i.test(story);

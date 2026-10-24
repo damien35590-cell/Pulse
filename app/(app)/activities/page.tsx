@@ -9,7 +9,10 @@ import { fmtDuration, fmtKm } from "@/lib/format";
 import { ui } from "@/lib/ui";
 import { SPORTS, SPORT_ORDER, isSoft } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
-import { ActivityCard } from "@/components/dashboard/activity-card";
+import { ActivitySummary } from "@/components/dashboard/activity-summary";
+import { summaryData } from "@/lib/activity/summary";
+import { getActivityInsights, type ActivityInsight } from "@/lib/data/activity-insight";
+import { getZones } from "@/lib/data/zones";
 import { SoftRow } from "@/components/activity/soft-row";
 import { FilterSheet } from "@/components/activity/filter-sheet";
 import { TopBar } from "@/components/layout/top-bar";
@@ -79,6 +82,12 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
     flat = uniqueById(rows.slice(0, n)); // filet de sécurité : jamais deux cartes pour le même id
     total = count;
   }
+  // Phrase de comparaison des cartes affichées (hors activités douces) : une passe pour toute la page, pas une requête par carte.
+  const shown = (byDate ? [...full.values()] : flat).filter((a) => !isSoft(a.type)).map((a) => a.id);
+  const insights: Map<string, ActivityInsight> = shown.length
+    ? await getActivityInsights(s.user.id, shown, TZ, (await getZones(s.user.id)).hrMax).catch((e) => { console.error("[insight] activités", e); return new Map(); })
+    : new Map();
+  const card = (a: Full) => <ActivitySummary key={a.id} a={summaryData(a, insights.get(a.id), TZ)} />;
 
   const qs = (o: Sp) => {
     const v = { t: T ?? "", sort: sortKey, soft: soft ? "1" : "", p: period, m: searchParams.m ?? "", n: searchParams.n ?? "", ...o };
@@ -99,8 +108,8 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
     const sport = list.filter((a) => !isSoft(a.type)), softs = list.filter((a) => isSoft(a.type));
     const softRows = <div className="divide-y divide-line">{softs.map((a) => <SoftRow key={a.id} a={a} />)}</div>;
     return (
-      <div className="space-y-2.5 pt-2.5">
-        {sport.map((a) => <ActivityCard key={a.id} a={a} />)}
+      <div className="space-y-3 pt-3">
+        {sport.map(card)}
         {softs.length > 0 && (
           <details open={sport.length === 0} className="group/soft overflow-hidden rounded-xl border border-dashed border-line bg-surface/60">
             <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-4 text-sm [&::-webkit-details-marker]:hidden">
@@ -172,10 +181,10 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
       })}
 
       {!byDate && flat.length > 0 && (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {flat.map((a) => isSoft(a.type)
             ? <div key={a.id} className="overflow-hidden rounded-xl border border-dashed border-line bg-surface/60"><SoftRow a={a} /></div>
-            : <ActivityCard key={a.id} a={a} />)}
+            : card(a))}
           {hasMore && (
             <Link href={qs({ n: String(n + PAGE) })} scroll={false}
               className="flex min-h-12 items-center justify-center rounded-xl border border-line bg-surface text-sm font-semibold text-brand">

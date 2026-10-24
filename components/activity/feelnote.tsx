@@ -1,41 +1,51 @@
 "use client";
-import { useRef, useState } from "react";
-import { Check, Frown, Laugh, Meh, Smile, Zap, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Frown, Laugh, Meh, MessageCircleQuestion, Smile, Zap, type LucideIcon } from "lucide-react";
 import { tap } from "@/lib/haptics";
+import { sessionRpe } from "@/lib/load";
+import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
+import { Section } from "@/components/ui/section";
+import { Metric } from "@/components/ui/metric";
 import { RpePicker } from "./rpe-picker";
 
-// Même libellés que l'écran d'enregistrement ; couleurs alignées sur les zones.
-const FEELS: { v: number; Icon: LucideIcon; label: string; color: string }[] = [
-  { v: 1, Icon: Laugh, label: "Super", color: "#22C55E" },
-  { v: 2, Icon: Smile, label: "Bien", color: "#84CC16" },
-  { v: 3, Icon: Meh, label: "Correct", color: "#EAB308" },
-  { v: 4, Icon: Frown, label: "Fatigué", color: "#F97316" },
-  { v: 5, Icon: Zap, label: "Difficile", color: "#EF4444" },
+// Mêmes libellés que l'écran d'enregistrement ; tonalités en tokens (vert → ambre → rouge).
+const FEELS: { v: number; Icon: LucideIcon; label: string; tone: string }[] = [
+  { v: 1, Icon: Laugh, label: "Super", tone: "text-good" },
+  { v: 2, Icon: Smile, label: "Bien", tone: "text-good" },
+  { v: 3, Icon: Meh, label: "Correct", tone: "text-ink" },
+  { v: 4, Icon: Frown, label: "Fatigué", tone: "text-warn" },
+  { v: 5, Icon: Zap, label: "Difficile", tone: "text-bad" },
 ];
+
+/** Ancre de la section, et événement émis quand ressenti + effort sont remplis (la pastille du haut disparaît). */
+export const FEEL_ANCHOR = "ressenti";
+const FILLED_EVENT = "pulse:feel-filled";
 
 type Props = {
   activityId: string;
+  /** Durée en mouvement : charge ressentie = RPE × minutes. */
+  movingTimeS: number;
   initialFeel: number | null;
   initialComment: string | null;
   initialRpe?: number | null;
 };
 
-export function FeelNote({ activityId, initialFeel, initialComment, initialRpe = null }: Props) {
+/** Ressenti (humeur), effort 1-10 et notes : enregistrement automatique à chaque choix, retour haptique, charge ressentie dès que l'effort est noté. */
+export function FeelNote({ activityId, movingTimeS, initialFeel, initialComment, initialRpe = null }: Props) {
   const [feel, setFeel] = useState(initialFeel);
   const [comment, setComment] = useState(initialComment ?? "");
   const [rpe, setRpe] = useState(initialRpe);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  const load = sessionRpe(rpe, movingTimeS);
+
+  useEffect(() => { window.dispatchEvent(new CustomEvent(FILLED_EVENT, { detail: feel != null && rpe != null })); }, [feel, rpe]);
 
   async function save(body: { feel?: number | null; comment?: string | null; rpe?: number | null }) {
     setStatus("saving");
     try {
-      const r = await fetch(`/api/activities/${activityId}/note`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const r = await fetch(`/api/activities/${activityId}/note`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       setStatus(r.ok ? "saved" : "error");
     } catch {
       setStatus("error");
@@ -44,7 +54,7 @@ export function FeelNote({ activityId, initialFeel, initialComment, initialRpe =
 
   function pickFeel(v: number) {
     const next = feel === v ? null : v;
-    tap(10);
+    tap();
     setFeel(next);
     save({ feel: next });
   }
@@ -60,32 +70,23 @@ export function FeelNote({ activityId, initialFeel, initialComment, initialRpe =
     timer.current = setTimeout(() => save({ comment: text || null }), 800);
   }
 
-  const current = feel ? FEELS[feel - 1] : null;
-
   return (
-    <section>
-      <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="font-display text-lg font-bold">Ressenti</h2>
-        <span aria-live="polite" className="inline-flex items-center gap-1 text-xs text-ink-soft">
+    <Section
+      id={FEEL_ANCHOR}
+      title="Ressenti"
+      className="scroll-mt-24"
+      action={
+        <span aria-live="polite" className="inline-flex items-center gap-1 text-xs text-ink-mute">
           {status === "saving" && "Enregistrement…"}
-          {status === "saved" && <><Check className="h-3.5 w-3.5" aria-hidden />Enregistré</>}
-          {status === "error" && <span className="text-brand">Échec de l’enregistrement</span>}
+          {status === "saved" && <><Check className="size-3.5 text-good" aria-hidden />Enregistré</>}
+          {status === "error" && <span className="text-bad">Échec de l’enregistrement</span>}
         </span>
-      </div>
-
-      <div className="space-y-4 rounded-xl border border-line bg-surface p-4">
-        <p className="text-sm text-ink-soft">
-          {current ? (
-            <>Séance ressentie <span className="font-display text-xl font-bold" style={{ color: current.color }}>{current.label.toLowerCase()}</span></>
-          ) : (
-            "Comment s’est passée la séance ?"
-          )}
-        </p>
-
-        <div role="radiogroup" aria-label="Ressenti" className="grid grid-cols-5 gap-1.5">
-          {FEELS.map(({ v, Icon, label, color }) => {
-            const active = feel === v;
-            const filled = feel != null && v <= feel;
+      }
+    >
+      <div className={cn(ui.card, "space-y-5 p-4")}>
+        <div role="radiogroup" aria-label="Ressenti" className="grid grid-cols-5">
+          {FEELS.map(({ v, Icon, label, tone }) => {
+            const active = feel === v, muted = feel != null && !active;
             return (
               <button
                 key={v}
@@ -94,22 +95,13 @@ export function FeelNote({ activityId, initialFeel, initialComment, initialRpe =
                 aria-checked={active}
                 onClick={() => pickFeel(v)}
                 className={cn(
-                  "group flex min-h-16 flex-col items-center gap-1.5 rounded-lg pt-2 transition active:scale-95",
-                  active ? "bg-surface-2" : "hover:bg-surface-2/60"
+                  "flex min-h-16 flex-col items-center justify-center gap-1 rounded-tile select-none touch-manipulation transition duration-150 ease-snappy active:scale-95",
+                  active && "scale-105 bg-surface-2",
+                  muted && "opacity-45",
                 )}
               >
-                <Icon
-                  className={cn("h-6 w-6 transition", !active && "text-ink-soft opacity-60 group-hover:opacity-100")}
-                  style={active ? { color } : undefined}
-                  strokeWidth={active ? 2.25 : 1.75}
-                  aria-hidden
-                />
-                <span className={cn("text-xs", active ? "font-bold text-ink" : "text-ink-soft")}>{label}</span>
-                <span
-                  className="h-1.5 w-full rounded-full bg-surface-2 transition-colors"
-                  style={filled ? { backgroundColor: color } : undefined}
-                  aria-hidden
-                />
+                <Icon className={cn("size-6", active ? tone : "text-ink-soft")} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
+                <span className={cn("text-xs", active ? "font-semibold text-ink" : "text-ink-soft")}>{label}</span>
               </button>
             );
           })}
@@ -117,15 +109,42 @@ export function FeelNote({ activityId, initialFeel, initialComment, initialRpe =
 
         <RpePicker value={rpe} onChange={pickRpe} />
 
+        {load != null && (
+          <dl>
+            <Metric size="md" label="Charge" value={load} hint="Effort × minutes (sRPE)" />
+          </dl>
+        )}
+
         <textarea
           value={comment}
           onChange={(e) => onComment(e.target.value)}
           placeholder="Notes sur la séance : jambes, météo, sensations…"
           rows={3}
           aria-label="Notes sur la séance"
-          className="w-full resize-none rounded-xl border border-line bg-bg p-3 text-base placeholder:text-ink-soft/70 focus:border-brand focus:outline-none"
+          className="w-full resize-none rounded-tile bg-surface-2 p-3 text-base text-ink placeholder:text-ink-mute focus:outline-none focus:ring-2 focus:ring-ink/40"
         />
       </div>
-    </section>
+    </Section>
+  );
+}
+
+/** Pastille « Comment c'était ? » en tête de fiche, tant que ressenti ou effort manquent ; un appui fait défiler jusqu'à la section. */
+export function FeelPrompt({ filled: initial }: { filled: boolean }) {
+  const [filled, setFilled] = useState(initial);
+  useEffect(() => {
+    const on = (e: Event) => setFilled((e as CustomEvent<boolean>).detail);
+    window.addEventListener(FILLED_EVENT, on);
+    return () => window.removeEventListener(FILLED_EVENT, on);
+  }, []);
+  if (filled) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => { tap(); document.getElementById(FEEL_ANCHOR)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+      className={cn(ui.chip, "h-12 px-4 text-sm text-ink active:scale-[0.97] transition duration-150 ease-snappy")}
+    >
+      <MessageCircleQuestion className="size-4 text-ink-soft" aria-hidden />
+      Comment c’était ?
+    </button>
   );
 }

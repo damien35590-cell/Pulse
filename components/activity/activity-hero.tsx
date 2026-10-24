@@ -25,14 +25,16 @@ type Props = {
   meta: React.ReactNode;
   /** Sous le titre : chiffres clés, comparaison… */
   children: React.ReactNode;
+  /** Sections entre la carte de contenu et le profil d'altitude (note du coach, allure par km, FC). */
+  sections?: React.ReactNode;
 };
 
 /**
  * Tête de fiche d'activité : carte plein cadre (~40 % de l'écran) sous une barre transparente (retour, renommer, « … »),
  * puis une carte à coins de feuille qui chevauche le bas de la carte (titre, méta, chiffres). Sans GPS : barre normale, même carte.
- * Le profil d'altitude suit la carte de contenu et partage son curseur avec la carte.
+ * Les sections passées (`sections`) puis le profil d'altitude suivent la carte de contenu ; le profil et partage son curseur avec la carte.
  */
-export function ActivityHero({ id, title, points, gain, elevationColor, meta, children }: Props) {
+export function ActivityHero({ id, title, points, gain, elevationColor, meta, children, sections }: Props) {
   const [editing, setEditing] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null), titleRef = useRef<HTMLDivElement>(null);
   const hasMap = points.length > 1;
@@ -68,11 +70,16 @@ export function ActivityHero({ id, title, points, gain, elevationColor, meta, ch
         </div>
         {children}
       </section>
-      {profile.length > 5 && (
-        <Section title="Altitude" className="mt-8">
-          <ElevationChart points={profile} gain={gain} color={elevationColor} onCursor={setCursorKm} />
-        </Section>
-      )}
+      <div className="mt-8 space-y-8 empty:hidden">
+        {sections}
+        {profile.length > 5 && (
+          <Section title="Altitude">
+            <div className={cn(ui.card, "p-4")}>
+              <ElevationChart points={profile} gain={gain} color={elevationColor} onCursor={setCursorKm} />
+            </div>
+          </Section>
+        )}
+      </div>
     </>
   );
 }

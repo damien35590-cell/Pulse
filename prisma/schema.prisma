@@ -190,6 +190,7 @@ model Activity {
   rpe            Int?                    // effort ressenti 1-10 (échelle de Borg CR-10)
   load           Float?                  // charge d'entraînement calculée (lib/load.ts), en points type TSS
   loadSource     String?                 // "power" | "hr" | "rpe" | "estimate"
+  srpe           Int?                    // charge ressentie (sRPE, Foster) = RPE × durée en minutes ; null sans RPE
   kind           WorkoutKind?            // muscu : moitié du corps travaillée (null = séance d'avant ce champ, déduite des exercices)
   templateId     String?                 // muscu : modèle dont la séance est partie
   createdAt      DateTime     @default(now())

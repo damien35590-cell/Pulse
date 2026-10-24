@@ -23,6 +23,9 @@ import { RoutePreview } from "@/components/activity/route-preview";
 import { MapAttribution } from "@/components/map/map-attribution";
 import { ZoneBar } from "@/components/activity/zone-bar";
 import { Splits } from "@/components/activity/splits";
+import { RpePicker } from "@/components/activity/rpe-picker";
+import { ShareActivity } from "@/components/activity/share-activity";
+import { sessionRpe } from "@/lib/load";
 import { SetLogger } from "@/components/workout/set-logger";
 import { RouteCard } from "@/components/routes/route-card";
 import { WeatherBanner, WeatherCredit } from "@/components/routes/weather";
@@ -135,6 +138,7 @@ function List({ go }: { go: Go }) {
 /* ─────────────── Détail course : résumé d'abord, analyse ensuite ─────────────── */
 function RunDetail({ run, back }: { run: (typeof runs)[number]; back: () => void }) {
   const profile = useMemo(() => profileOf(run), [run]);
+  const [rpe, setRpe] = useState<number | null>(run.rpe);
   return (
     <>
       <TopBar
@@ -207,6 +211,15 @@ function RunDetail({ run, back }: { run: (typeof runs)[number]; back: () => void
             <ElevationChart points={profile} gain={run.gain} />
           </div>
         </Section>
+
+        <Section title="Ressenti">
+          <div className={cn(ui.card, "space-y-5 p-4")}>
+            <RpePicker value={rpe} onChange={setRpe} />
+            {rpe != null && <dl><Metric label="Charge" value={sessionRpe(rpe, run.movingS)} hint="Effort × minutes (sRPE)" /></dl>}
+          </div>
+        </Section>
+
+        <ShareActivity title={run.title} summary={`${km2(run.distanceKm)} km · ${fmtClock(run.movingS)} · ${run.pace} /km`} />
       </div>
     </>
   );

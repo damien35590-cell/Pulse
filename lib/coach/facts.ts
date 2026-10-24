@@ -45,7 +45,7 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
     const [acts, goal, plans] = await Promise.all([
       prisma.activity.findMany({
         where: { userId, type: "RUN", startedAt: { gte: new Date(Date.parse(f.prevStart + "T00:00:00Z") - 864e5), lte: now } }, orderBy: { startedAt: "asc" },
-        select: { type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true },
+        select: { type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true, rpe: true, srpe: true },
       }),
       getRunGoal(userId), getPlanAdherence(userId, period.startKey, period.endKey, todayKey, "RUN"),
     ]);
@@ -62,7 +62,7 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
       resume: { sorties: cur.length, km: km(cur), tempsMin: Math.round(cur.reduce((s, a) => s + a.movingTimeS, 0) / 60), allureMoyenne: pace(cur.reduce((s, a) => s + a.movingTimeS, 0), cur.reduce((s, a) => s + a.distanceM, 0)) },
       periodePrecedente: { sorties: prev.length, km: km(prev) },
       parSemaine: weekly,
-      dernieresSorties: cur.slice(-8).map((a) => ({ jour: dayKey(a.startedAt, tz), km: r1(a.distanceM / 1000), allure: pace(a.movingTimeS, a.distanceM), fcMoy: a.avgHr ?? null })),
+      dernieresSorties: cur.slice(-8).map((a) => ({ jour: dayKey(a.startedAt, tz), km: r1(a.distanceM / 1000), allure: pace(a.movingTimeS, a.distanceM), fcMoy: a.avgHr ?? null, effortRessenti: a.rpe ?? null, chargeRessentie: a.srpe ?? null })),
       objectif: goal ? { titre: goal.title, distanceKm: goal.distanceM ? r1(goal.distanceM / 1000) : null, tempsViseS: goal.targetTimeS, tempsPreditS: goal.predictedTimeS } : null,
       programmes: plans,
       cible: "2 à 3 sorties par semaine",
@@ -72,11 +72,22 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
 
   const plans = await getPlanAdherence(userId, period.startKey, period.endKey, todayKey);
   const o = await getOverview(userId, tz, weeks, now, { current, plans });
+  // Charge ressentie (sRPE = RPE × minutes) par semaine, seulement sur les séances notées, hors vélotaf et marche.
+  const rated = (await prisma.activity.findMany({
+    where: { userId, srpe: { not: null }, startedAt: { gte: new Date(Date.parse(period.startKey + "T00:00:00Z") - 864e5), lte: now } },
+    select: { type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, srpe: true },
+  })).filter((a) => !isCommute(a));
+  const srpeWeeks = o.weekly.map((w) => {
+    const end = new Date(Date.parse(w.weekStart) + 6 * 864e5).toISOString().slice(0, 10);
+    const l = rated.filter((a) => { const k = dayKey(a.startedAt, tz); return k >= w.weekStart && k <= end; });
+    return { semaineDu: w.weekStart, seancesNotees: l.length, chargeRessentie: l.reduce((s, a) => s + (a.srpe ?? 0), 0) };
+  });
   return {
     ...base, onglet: "tous les sports",
     resume: { seances: o.summary.sessions, tempsMin: Math.round(o.summary.timeS / 60), charge: o.summary.load, joursActifs: o.summary.activeDays },
     repartition: o.split.map((s) => ({ sport: s.group, seances: s.sessions, pctTemps: s.timePct })),
     heuresParSemaine: o.weekly.map((w) => ({ semaineDu: w.weekStart, heures: r1(Object.values(w.hours).reduce((a, b) => a + b, 0)) })),
+    chargeRessentieParSemaine: srpeWeeks,
     forme: o.form ? { fitness: Math.round(o.form.ctl), fatigue: Math.round(o.form.atl), fraicheur: Math.round(o.form.form), zone: o.form.zone.label } : null,
     regularite: { seancesParSemaine: r1(o.regularity.perWeek), semainesActivesDaffilee: o.regularity.activeStreak, cible: "4 à 6 (2-3 courses + 2-3 muscu)" },
     programmes: plans,
