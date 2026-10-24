@@ -82,7 +82,10 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `Sparkline` | `components/ui/sparkline.tsx` | tendance sans axe |
 | `ActivitySummary` | `components/dashboard/activity-summary.tsx` | carte d'activité du fil |
 | `TodayCard`, `WeekCard`, `StatTile` | `components/dashboard/*` | accueil |
-| `TraceChart` | `components/activity/trace-chart.tsx` | courbe au doigt (FC, altitude, puissance), bandes de zones |
+| `TraceChart` | `components/activity/trace-chart.tsx` | courbe au doigt (FC, altitude, puissance), bandes de zones ; axes optionnels (`yTicks`, `xTicks`), étiquette flottante (`tip`), `onCursor` |
+| `ElevationChart` | `components/activity/elevation-chart.tsx` | profil d'altitude : D+ / D− / min / max, 3 graduations rondes en m (jamais depuis 0), un repère par km |
+| `RoutePreview` | `components/activity/route-preview.tsx` | vignette statique du tracé (fil) : tuiles CARTO en `<img>` + SVG, aucune lib de carte ; trace simplifiée côté serveur (`previewTrack`, `lib/map/track.ts`) ; rien sans GPS |
+| `ActivityTrack` | `components/activity/activity-track.tsx` | fiche d'activité : carte Leaflet (gestes coopératifs, plein écran, Pente / Vitesse) + profil d'altitude au curseur partagé |
 | `ZoneBar` | `components/activity/zone-bar.tsx` | temps par zone (`compact` pour une carte) |
 | `Splits` | `components/activity/splits.tsx` | allure par km |
 | `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours (repos entre séries et après exercice, `onSave` asynchrone, option « Enregistrer comme modèle ») |
@@ -94,6 +97,7 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `EquipmentSettings` | `components/profile/equipment-settings.tsx` | réglage « Mon matériel » (page Vous) |
 | `SessionFlow` | `components/workout/session-flow.tsx` | parcours `/record/session` : feuille → préparation → SetLogger → enregistrement ; reprise de la séance en cours |
 | `RouteMap` | `components/activity/route-map.tsx` (+ `route-map-lazy.tsx`) | tracé Leaflet : `interactive={false}` pour une vignette, `pois`, `expandable` (plein écran) |
+| fond de carte | `lib/map/basemap.ts` | toutes les cartes : CARTO sombre (`dark_all`) ou clair (`voyager`) selon le thème, `useMapTheme()` ; jamais d'URL de tuiles en dur dans un composant |
 | `RouteCard` | `components/routes/route-card.tsx` | boucle proposée (Itinéraires) : nom, temps / km / D+, vignette, phrase « pourquoi » |
 | `WeatherBanner`, `WeatherAlerts`, `WeatherCredit` | `components/routes/weather.tsx` | météo d'une sortie (ressenti, pluie, vent fléché, coucher), alertes en `warn` / `bad`, crédit Open-Meteo obligatoire (CC BY 4.0) |
 | `PlacePicker` | `components/routes/place-picker.tsx` (+ `pick-map.tsx`) | choisir un lieu : recherche Photon, lieux récents, toucher sur la carte pour placer ou ajuster le point |

@@ -18,6 +18,7 @@ const twMerge = extendTailwindMerge({
       "font-size": [{ text: ["label", "metric-sm", "metric-md", "metric-lg", "metric-xl", "metric-hero"] }],
       rounded: [{ rounded: ["tile", "card", "sheet"] }],
       "rounded-t": [{ "rounded-t": ["sheet"] }],
+      "rounded-b": [{ "rounded-b": ["card"] }],
       shadow: [{ shadow: ["card", "pop", "glow"] }],
     },
   },

@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
+import { BASEMAP_URL, basemapOptions, getMapTheme, useMapTheme } from "@/lib/map/basemap";
 import { tap } from "@/lib/haptics";
 
 type LatLng = { lat: number; lng: number };
@@ -24,6 +25,10 @@ const token = (name: string, fallback: string) => {
 export default function PickMap({ center, value, onPick, className }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
+  const base = useRef<L.TileLayer | null>(null);
+  const theme = useMapTheme();
+  // Changement de thème : seules les tuiles changent, la vue reste.
+  useEffect(() => { base.current?.setUrl(BASEMAP_URL[theme]); }, [theme]);
   const pin = useRef<L.CircleMarker | null>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -33,7 +38,7 @@ export default function PickMap({ center, value, onPick, className }: Props) {
     const start = value ?? center;
     const m = L.map(el.current, { zoomControl: false, scrollWheelZoom: false }).setView(start ? [start.lat, start.lng] : FRANCE, start ? (value ? 15 : 13) : 5);
     m.attributionControl.setPrefix(false);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(m);
+    base.current = L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions).addTo(m);
     m.on("click", (e: L.LeafletMouseEvent) => { tap(8); pick.current({ lat: e.latlng.lat, lng: e.latlng.lng }); });
     map.current = m;
     return () => { m.remove(); map.current = null; pin.current = null; };

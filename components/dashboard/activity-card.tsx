@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { routePath } from "@/lib/polyline";
+import { previewTrack } from "@/lib/map/track";
+import { RoutePreview } from "@/components/activity/route-preview";
 import { Leaf } from "lucide-react";
 import { isSoft } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
@@ -33,10 +34,12 @@ export function cells(a: A): Cell[] {
 const COLS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
 
 export function ActivityCard({ a, tz = "Europe/Paris" }: { a: A; tz?: string }) {
-  const r = a.polyline ? routePath(a.polyline, 320, 110, 12) : null, { icon: Icon, fg, soft: softBg, stroke } = activityStyle(a.type);
+  const { icon: Icon, fg, soft: softBg } = activityStyle(a.type);
   const when = fmtWhen(a.startedAt, tz);
   // Activités douces (E-bike, marche) : carte compacte et discrète, sans tracé ni anecdote.
   const soft = isSoft(a.type), grid = soft ? cells(a).slice(0, 3) : cells(a);
+  // Vignette : trace simplifiée côté serveur (~200 points), fond de carte en tuiles statiques. Rien sans GPS.
+  const route = soft ? undefined : previewTrack(a.polyline);
   return (
     <Link href={`/activities/${a.id}`} className={cn("block overflow-hidden rounded-xl border border-line transition-colors active:bg-surface-2", soft ? "border-dashed bg-surface/60" : "bg-surface")}>
       <div className="flex items-center gap-3 px-4 pt-3.5">
@@ -48,7 +51,7 @@ export function ActivityCard({ a, tz = "Europe/Paris" }: { a: A; tz?: string }) 
         {soft && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-soft"><Leaf className="h-3 w-3" aria-hidden />Douce</span>}
       </div>
       {!soft && a.story && <p className="line-clamp-2 px-4 pt-1.5 text-[12.5px] leading-snug text-ink-soft">{a.story}</p>}
-      <dl className={cn("mt-3 grid divide-x divide-line border-t border-line", !soft && r && "border-b", COLS[grid.length] ?? "grid-cols-4")}>
+      <dl className={cn("mt-3 grid divide-x divide-line border-t border-line", route && "border-b", COLS[grid.length] ?? "grid-cols-4")}>
         {grid.map((c) => (
           <div key={c.l} className={cn("min-w-0 px-3", soft ? "py-1.5" : "py-2")}>
             <dt className="truncate text-[11px] text-ink-soft">{c.l}</dt>
@@ -56,13 +59,7 @@ export function ActivityCard({ a, tz = "Europe/Paris" }: { a: A; tz?: string }) 
           </div>
         ))}
       </dl>
-      {!soft && r && (
-        <div className="bg-surface-2">
-          <svg viewBox="0 0 320 110" width="100%" height="110" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d={r.d} className={stroke} strokeWidth="3.2" /><circle cx={r.end[0]} cy={r.end[1]} r="5" fill="currentColor" className={fg} stroke="rgb(var(--surface))" strokeWidth="2" />
-          </svg>
-        </div>
-      )}
+      {route && <RoutePreview points={route} />}
     </Link>
   );
 }

@@ -24,6 +24,8 @@ import { PendingBadgesCard } from "@/components/profile/pending-badges-card";
 import { CoachCard } from "@/components/dashboard/coach-card";
 import { getCoach } from "@/lib/coach/load";
 import { fmtWhen } from "@/lib/format";
+import { isSoft } from "@/lib/sports";
+import { previewTrack } from "@/lib/map/track";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +56,8 @@ export default async function DashboardPage() {
       id: a.id, type: a.type, title: a.title, story: a.story ?? undefined, tags: a.muscles.length ? a.muscles : undefined,
       when: fmtWhen(a.startedAt, TZ),
       metrics: picked.slice(0, 3).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
+      // Trace simplifiée ici, côté serveur : la vignette ne reçoit que ~200 points. Activités douces : pas de tracé (comme ActivityCard).
+      route: isSoft(a.type) ? undefined : previewTrack(a.polyline),
     };
   });
 

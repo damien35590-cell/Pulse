@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { Metric } from "@/components/ui/metric";
 import { ZoneBar, type ZoneSlice } from "@/components/activity/zone-bar";
+import { RoutePreview } from "@/components/activity/route-preview";
+import type { LatLng } from "@/lib/polyline";
 
 export type ActivitySummaryData = {
   id: string;
@@ -17,11 +19,13 @@ export type ActivitySummaryData = {
   tags?: string[];
   story?: string;
   badge?: string;
+  /** Trace GPS simplifiée (~200 points, previewTrack) : absente en intérieur ou en muscu, et alors pas de carte. */
+  route?: LatLng[];
 };
 
 /**
  * Carte de résumé (fil d'activités, accueil) : on y lit « comment ça s'est passé » en 2 secondes.
- * Hiérarchie : titre → 3 chiffres → bande de zones → une seule phrase d'analyse. Tout le reste est dans le détail.
+ * Hiérarchie : titre → 3 chiffres → bande de zones → une seule phrase d'analyse → vignette du tracé. Tout le reste est dans le détail.
  */
 export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData; href?: string; onSelect?: () => void }) {
   const { icon: Icon, fg, soft } = activityStyle(a.type);
@@ -54,6 +58,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
           <span className="line-clamp-2">{a.story}</span>
         </p>
       )}
+      {a.route && a.route.length > 1 && <RoutePreview points={a.route} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />}
     </>
   );
   const cls = cn(ui.card, ui.pressCard, "block w-full p-4 text-left");

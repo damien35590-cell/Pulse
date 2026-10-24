@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BASEMAP_URL, basemapOptions, getMapTheme, useMapTheme } from "@/lib/map/basemap";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import type { RoutePoi } from "@/lib/routes/poi";
@@ -35,6 +36,10 @@ const token = (name: string, fallback: string) => {
 export default function RouteMap({ points, pois, interactive = true, expandable, onPoi, focusId, className }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
+  const base = useRef<L.TileLayer | null>(null);
+  const theme = useMapTheme();
+  // Changement de thème : seules les tuiles changent, la vue reste.
+  useEffect(() => { base.current?.setUrl(BASEMAP_URL[theme]); }, [theme]);
   const bounds = useRef<L.LatLngBounds | null>(null);
   const [slots, setSlots] = useState<{ el: HTMLElement; poi: RoutePoi }[]>([]);
   const [full, setFull] = useState(false);
@@ -48,7 +53,7 @@ export default function RouteMap({ points, pois, interactive = true, expandable,
       zoomControl: false, scrollWheelZoom: false, dragging: !still, touchZoom: !still, doubleClickZoom: !still, boxZoom: !still, keyboard: !still,
     });
     m.attributionControl.setPrefix(false);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(m);
+    base.current = L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions).addTo(m);
     const brand = token("brand-text", "#C6F432"), good = token("good", "#22C55E"), ring = token("surface", "#141417");
     const line = L.polyline(points, { color: brand, weight: still ? 4 : 5, opacity: 0.95, lineJoin: "round", interactive: false }).addTo(m);
     const dot = (p: [number, number], c: string) => L.circleMarker(p, { radius: still ? 5 : 7, color: ring, weight: 3, fillColor: c, fillOpacity: 1, interactive: false }).addTo(m);

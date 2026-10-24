@@ -12,6 +12,7 @@ import type { ActivitySummaryData } from "@/components/dashboard/activity-summar
 import type { RouteView } from "@/lib/data/routes";
 import type { RideWeather } from "@/lib/weather/open-meteo";
 import { encodePolyline } from "@/lib/polyline";
+import { simplifyTrack } from "@/lib/map/track";
 
 export const HR_MAX = 191;
 const HR_BOUNDS = bounds(HR_MAX, HR_PCT); // [115, 134, 153, 172, 181]
@@ -115,9 +116,25 @@ export const liftSession = {
   volumeKg: PULL_A.reduce((v, e) => v + e.sets.reduce((w, x) => w + x.kg * x.reps * (unit2.has(e.name) ? 2 : 1), 0), 0),
 };
 
+/**
+ * Traces GPS fictives (Rennes) : une boucle pour le tempo, un aller simple le long du canal pour le footing.
+ * 400 points chacune, avec un léger zigzag de GPS ; simplifiées à ~200 points comme dans le vrai fil.
+ */
+const loopTrack: [number, number][] = Array.from({ length: 400 }, (_, i) => {
+  const a = (i / 399) * 2 * Math.PI, r = 0.0135 * (1 + 0.22 * Math.sin(3 * a) + 0.08 * Math.sin(7 * a + 1));
+  return [48.1147 + r * Math.sin(a) + 0.00008 * Math.sin(i * 1.7), -1.6794 + 1.5 * r * (1 - Math.cos(a)) + 0.00008 * Math.cos(i * 2.3)];
+});
+const lineTrack: [number, number][] = Array.from({ length: 400 }, (_, i) => {
+  const t = i / 399;
+  return [48.1012 + 0.034 * t + 0.0045 * Math.sin(9 * t), -1.7231 + 0.058 * t + 0.006 * Math.sin(13 * t + 1)];
+});
+export const tracks: Record<string, [number, number][]> = { "tempo-10k": simplifyTrack(loopTrack), footing: simplifyTrack(lineTrack) };
+/** Profil d'altitude d'une course (un point tous les 50 m), pour ElevationChart. */
+export const profileOf = (r: (typeof runs)[number]) => r.ele.map((ele, i) => ({ km: Math.min(r.distanceKm, i / 20), ele }));
+
 const km2 = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const runPreview = (r: (typeof runs)[number]): ActivitySummaryData => ({
-  id: r.id, type: "RUN", title: r.title, when: r.when, badge: r.badge, zones: r.zones, story: r.insight,
+  id: r.id, type: "RUN", title: r.title, when: r.when, badge: r.badge, zones: r.zones, story: r.insight, route: tracks[r.id],
   metrics: [
     { label: "Distance", value: km2(r.distanceKm), unit: "km" },
     { label: "Temps", value: fmtClock(r.movingS) },

@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dumbbell, Ellipsis, Flag, HeartPulse, RefreshCw, Sparkles, Target, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
-import { HR_MAX, fitness, goal, hrBands, liftSession, nextRace, recent, rideWeather, routeSuggestion, runs, today, week, workout } from "@/lib/mock/ui-kit";
+import { HR_MAX, fitness, goal, hrBands, liftSession, nextRace, profileOf, recent, rideWeather, routeSuggestion, runs, today, tracks, week, workout } from "@/lib/mock/ui-kit";
 import { activityStyle } from "@/lib/activity-style";
 import { PulseLogo, PulseMark } from "@/components/brand/logo";
 import { TopBar } from "@/components/layout/top-bar";
@@ -18,6 +18,8 @@ import { WeekCard } from "@/components/dashboard/week-card";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { ActivitySummary } from "@/components/dashboard/activity-summary";
 import { TraceChart } from "@/components/activity/trace-chart";
+import { ElevationChart } from "@/components/activity/elevation-chart";
+import { RoutePreview } from "@/components/activity/route-preview";
 import { ZoneBar } from "@/components/activity/zone-bar";
 import { Splits } from "@/components/activity/splits";
 import { SetLogger } from "@/components/workout/set-logger";
@@ -131,6 +133,7 @@ function List({ go }: { go: Go }) {
 
 /* ─────────────── Détail course : résumé d'abord, analyse ensuite ─────────────── */
 function RunDetail({ run, back }: { run: (typeof runs)[number]; back: () => void }) {
+  const profile = useMemo(() => profileOf(run), [run]);
   return (
     <>
       <TopBar
@@ -192,17 +195,15 @@ function RunDetail({ run, back }: { run: (typeof runs)[number]; back: () => void
           </div>
         </Section>
 
-        <Section title="Altitude" action={<span className="font-num text-sm tabular-nums text-ink-mute">{run.gain} m D+</span>}>
+        <Section title="Parcours" action={<span className="text-xs text-ink-mute">{run.id === "footing" ? "Aller simple" : "Boucle"}</span>}>
+          <div className={cn(ui.card, "overflow-hidden")}>
+            <RoutePreview points={tracks[run.id]} />
+          </div>
+        </Section>
+
+        <Section title="Altitude" action={<span className="text-xs text-ink-mute">Glisse le doigt sur la courbe</span>}>
           <div className={cn(ui.card, "p-4")}>
-            <TraceChart
-              values={run.ele}
-              unit="m"
-              label="Altitude"
-              color="text-ink-soft"
-              height={96}
-              ticks={QUARTERS.map((q, i) => `${fmtNum(q * run.distanceKm, 1)}${i === 4 ? " km" : ""}`)}
-              at={(f) => `km ${fmtNum(f * run.distanceKm, 1)}`}
-            />
+            <ElevationChart points={profile} gain={run.gain} />
           </div>
         </Section>
       </div>

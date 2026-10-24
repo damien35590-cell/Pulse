@@ -48,6 +48,16 @@ export default async () => {
           },
         },
         {
+          // Fond de carte CARTO (lib/map/basemap.ts) : vignettes du fil et cartes Leaflet.
+          urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*/i,
+          handler: "CacheFirst",
+          options: {
+            cacheName: "carto-tiles",
+            expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 14 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+        {
           urlPattern: /\.(?:png|jpg|jpeg|webp|avif|svg)$/i,
           handler: "StaleWhileRevalidate",
           options: { cacheName: "images", expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 } },
