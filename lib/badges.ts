@@ -1,4 +1,5 @@
 import { dayKey, shiftDay } from "./dates";
+import { isSoft } from "./sports";
 
 export type Discipline = "GLOBAL" | "RIDE" | "RUN" | "HIKE" | "WORKOUT";
 export type BadgeIcon =
@@ -178,6 +179,7 @@ export function buildBadgeStats(acts: ActRow[], exercises: ExRow[], tz: string, 
       if (temp !== null && temp >= 30) s.hot++;
       if (a.feeling === "GREAT") s.great++;
       if (a.feeling === "HARD") s.hard++;
+      if (isSoft(a.type)) continue; // E-bike, marche : ni jours actifs, ni mois, ni séries
       days[d].add(key);
       months[d].add(month);
       weekKm[d].set(week, (weekKm[d].get(week) ?? 0) + km);

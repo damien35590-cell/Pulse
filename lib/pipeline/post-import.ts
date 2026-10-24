@@ -1,7 +1,7 @@
 import type { ActivityType, Prisma, RecordKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { bestEffort, type Pt } from "@/lib/geo";
-import { commentForActivity } from "@/lib/coach/session-comment";
+import { storyForActivity } from "@/lib/coach/story";
 import type { Story } from "@/lib/insights/types";
 import { awardBadges } from "@/lib/data/badges";
 import { refreshLoad } from "@/lib/data/load";
@@ -144,10 +144,10 @@ async function updateRecords(a: Full, points?: Pt[]): Promise<RecordUpdate[]> {
   return out;
 }
 
-/** Étape d : commentaire de séance (verdict déterministe, ton sobre), seulement si l'activité n'en a pas encore. Aucun commentaire pour les activités douces. */
+/** Étape d : anecdote de l'activité (lib/coach/story.ts : record > série > écart à la moyenne 30 jours), seulement si elle n'en a pas encore. Aucune anecdote pour les activités douces ni quand rien n'est notable. */
 async function writeStory(a: Full, records: RecordUpdate[]): Promise<Story | null> {
   if (a.story) return null;
-  const c = await commentForActivity(a.id, records);
+  const c = await storyForActivity(a.id, records);
   if (!c) return null;
   await prisma.activity.update({ where: { id: a.id }, data: { story: c.text } });
   return { tag: c.kind, text: c.text };

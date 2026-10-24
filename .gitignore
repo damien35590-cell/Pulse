@@ -9,3 +9,4 @@ public/worker-*.js
 public/fallback-*.js
 tsconfig.tsbuildinfo
 .env*.local
+tools/backups/
