@@ -6,26 +6,27 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cn, uniqueById } from "@/lib/utils";
 import { fmtDuration, fmtKm } from "@/lib/format";
-import { SPORTS, SPORT_ORDER, SOFT_TYPES, isSoft } from "@/lib/sports";
+import { ui } from "@/lib/ui";
+import { SPORTS, SPORT_ORDER, isSoft, sportTint } from "@/lib/sports";
 import { ActivityCard } from "@/components/dashboard/activity-card";
 import { SoftRow } from "@/components/activity/soft-row";
-import { SortMenu } from "@/components/activity/sort-menu";
+import { FilterSheet } from "@/components/activity/filter-sheet";
+import { TopBar } from "@/components/layout/top-bar";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Activités" };
 const TZ = "Europe/Paris";
 const PAGE = 20;
 
-type Sp = { c?: string; t?: string; sort?: string; m?: string; n?: string };
-const CATS = [["all", "Toutes"], ["sport", "Sportives"], ["soft", "Douces"]] as const;
+type Sp = { t?: string; sort?: string; m?: string; n?: string; soft?: string; p?: string };
 const SPORT_TYPES = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
 const SORTS: Record<string, { label: string; orderBy: Prisma.ActivityOrderByWithRelationInput }> = {
   recent: { label: "Plus récentes", orderBy: { startedAt: "desc" } },
   old: { label: "Plus anciennes", orderBy: { startedAt: "asc" } },
-  dist: { label: "Distance", orderBy: { distanceM: "desc" } },
-  time: { label: "Durée", orderBy: { movingTimeS: "desc" } },
-  elev: { label: "Dénivelé", orderBy: { elevationGainM: "desc" } },
+  time: { label: "Plus longues", orderBy: { movingTimeS: "desc" } },
+  dist: { label: "Plus de distance", orderBy: { distanceM: "desc" } },
 };
+const PERIODS: Record<string, string> = { all: "Tout", "30": "30 derniers jours", "90": "3 derniers mois", year: "Cette année" };
 const FULL = {
   id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, polyline: true, avgHr: true, avgPower: true,
   exercises: { select: { sets: true, reps: true, loadKg: true } },
@@ -43,12 +44,14 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
 
-  const C = CATS.some(([k]) => k === searchParams.c) ? searchParams.c! : "all";
-  const pool: readonly string[] = C === "soft" ? SOFT_TYPES : C === "sport" ? SPORT_TYPES : SPORT_ORDER;
+  const soft = searchParams.soft === "1";
+  const pool: readonly string[] = soft ? SPORT_ORDER : SPORT_TYPES;
   const T = pool.includes(searchParams.t ?? "") ? searchParams.t! : null;
   const sortKey = searchParams.sort && SORTS[searchParams.sort] ? searchParams.sort : "recent";
-  const types = T ? [T] : C === "all" ? null : pool;
-  const where: Prisma.ActivityWhereInput = { userId: s.user.id, ...(types && { type: { in: types as ActivityType[] } }) };
+  const period = searchParams.p && PERIODS[searchParams.p] ? searchParams.p : "all";
+  const since = period === "all" ? null : period === "year" ? new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)) : new Date(Date.now() - Number(period) * 86_400_000);
+  const types = T ? [T] : soft ? null : SPORT_TYPES;
+  const where: Prisma.ActivityWhereInput = { userId: s.user.id, ...(types && { type: { in: types as ActivityType[] } }), ...(since && { startedAt: { gte: since } }) };
   const orderBy = [SORTS[sortKey].orderBy, { startedAt: "desc" as const }];
   const byDate = sortKey === "recent" || sortKey === "old";
 
@@ -77,58 +80,55 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   }
 
   const qs = (o: Sp) => {
-    const v = { c: C, t: T ?? "", sort: sortKey, m: searchParams.m ?? "", n: searchParams.n ?? "", ...o };
-    const p = new URLSearchParams(Object.entries(v).filter(([k, x]) => x && !(k === "c" && x === "all") && !(k === "sort" && x === "recent")));
+    const v = { t: T ?? "", sort: sortKey, soft: soft ? "1" : "", p: period, m: searchParams.m ?? "", n: searchParams.n ?? "", ...o };
+    const p = new URLSearchParams(Object.entries(v).filter(([k, x]) => x && !(k === "p" && x === "all") && !(k === "sort" && x === "recent")));
     return `/activities${p.size ? `?${p}` : ""}`;
   };
   const toggle = (mk: string) => { const next = openMonths.includes(mk) ? openMonths.filter((k) => k !== mk) : [...openMonths, mk]; return next.join(",") || "-"; };
-  const chip = (on: boolean) => cn("inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium", on ? "bg-brand text-brand-ink" : "bg-surface-2");
-  const counts = (l: Lite[]) => { const soft = l.filter((a) => isSoft(a.type)).length; return C === "all" && soft && soft < l.length ? `${l.length - soft} sport. · ${soft} douce${soft > 1 ? "s" : ""}` : plural(l.length, "activité"); };
-  const filtered = C !== "all" || T !== null;
+  const chip = (on: boolean) => cn("inline-flex h-12 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97]", on ? "bg-ink text-bg" : "bg-surface-2 text-ink-soft");
+  const counts = (l: Lite[]) => {
+    const nSoft = l.filter((a) => isSoft(a.type)).length;
+    if (!soft) return `${plural(l.length, "séance")} · ${fmtDuration(sum(l, (a) => a.movingTimeS))}`;
+    return nSoft && nSoft < l.length ? `${l.length - nSoft} sport. · ${nSoft} douce${nSoft > 1 ? "s" : ""}` : plural(l.length, "activité");
+  };
+  const filtered = T !== null || period !== "all";
 
   const monthBody = (lite: Lite[]) => {
     const list = lite.map((a) => full.get(a.id)).filter((a): a is Full => !!a);
-    const sport = list.filter((a) => !isSoft(a.type)), soft = list.filter((a) => isSoft(a.type));
-    const softRows = <div className="divide-y divide-line">{soft.map((a) => <SoftRow key={a.id} a={a} />)}</div>;
+    const sport = list.filter((a) => !isSoft(a.type)), softs = list.filter((a) => isSoft(a.type));
+    const softRows = <div className="divide-y divide-line">{softs.map((a) => <SoftRow key={a.id} a={a} />)}</div>;
     return (
       <div className="space-y-2.5 pt-2.5">
         {sport.map((a) => <ActivityCard key={a.id} a={a} />)}
-        {soft.length > 0 && (C === "soft" ? (
-          <div className="overflow-hidden rounded-xl border border-dashed border-line bg-surface/60">{softRows}</div>
-        ) : (
+        {softs.length > 0 && (
           <details open={sport.length === 0} className="group/soft overflow-hidden rounded-xl border border-dashed border-line bg-surface/60">
             <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-4 text-sm [&::-webkit-details-marker]:hidden">
               <Leaf className="h-4 w-4 shrink-0 text-ink-soft" aria-hidden />
-              <span className="font-semibold">{plural(soft.length, "activité")} douce{soft.length > 1 ? "s" : ""}</span>
-              <span className="truncate text-ink-soft">{fmtKm(sum(soft, (a) => a.distanceM))} km · {fmtDuration(sum(soft, (a) => a.movingTimeS))}</span>
+              <span className="font-semibold">{plural(softs.length, "activité")} douce{softs.length > 1 ? "s" : ""}</span>
+              <span className="truncate text-ink-soft">{fmtKm(sum(softs, (a) => a.distanceM))} km · {fmtDuration(sum(softs, (a) => a.movingTimeS))}</span>
               <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-ink-soft transition-transform group-open/soft:rotate-180" aria-hidden />
             </summary>
             <div className="border-t border-dashed border-line">{softRows}</div>
           </details>
-        ))}
+        )}
       </div>
     );
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-3xl font-bold leading-none">Activités</h1>
+      <TopBar title="Activités" />
 
-      <div className="space-y-2.5">
-        <nav aria-label="Catégorie" className="flex gap-1 rounded-full bg-surface-2 p-1">
-          {CATS.map(([k, l]) => (
-            <Link key={k} href={qs({ c: k, t: "", m: "", n: "" })} aria-current={C === k ? "page" : undefined}
-              className={cn("flex min-h-10 flex-1 items-center justify-center rounded-full text-sm", C === k ? "bg-surface font-bold shadow" : "text-ink-soft")}>{l}</Link>
-          ))}
-        </nav>
-        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-          <Link href={qs({ t: "", m: "", n: "" })} className={chip(T === null)}>Tous</Link>
-          {pool.map((k) => { const I = SPORTS[k].icon; return <Link key={k} href={qs({ t: k, m: "", n: "" })} className={chip(T === k)}><I className="h-4 w-4" aria-hidden />{SPORTS[k].label}</Link>; })}
+      <div className="space-y-3">
+        <div className="sticky top-bar z-20 -mx-4 flex items-center gap-1 bg-bg/80 py-1 pl-4 pr-1 backdrop-blur-xl">
+          <div className="no-scrollbar -ml-4 flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-contain pl-4 pr-2">
+            <Link href={qs({ t: "", m: "", n: "" })} aria-current={T === null ? "page" : undefined} className={chip(T === null)}>Tous</Link>
+            {pool.map((k) => { const I = SPORTS[k].icon; return <Link key={k} href={qs({ t: k, m: "", n: "" })} aria-current={T === k ? "page" : undefined} className={chip(T === k)}><I className={cn("size-4", T !== k && sportTint(k))} aria-hidden />{SPORTS[k].label}</Link>; })}
+          </div>
+          <FilterSheet sort={sortKey} soft={soft} period={period}
+            sorts={Object.entries(SORTS).map(([k, v]) => [k, v.label])} periods={Object.entries(PERIODS)} />
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-ink-soft">{plural(total, "activité")}</p>
-          <SortMenu value={sortKey} options={Object.entries(SORTS).map(([k, v]) => [k, v.label])} />
-        </div>
+        <p className={ui.label}>{plural(total, "activité")}</p>
       </div>
 
       {total === 0 && (filtered

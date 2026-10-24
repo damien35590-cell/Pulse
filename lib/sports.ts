@@ -6,6 +6,8 @@ export const SPORTS: Record<string, { label: string; icon: LucideIcon }> = {
   HIKE: { label: "Randonnée", icon: Mountain }, WALK: { label: "Marche", icon: Footprints }, WORKOUT: { label: "Musculation", icon: Dumbbell }, OTHER: { label: "Activité", icon: Activity },
 };
 export const sportColor = (_type?: string) => "rgb(var(--brand))";
+/** Teinte de l'icône d'un sport (tokens sport-*) ; les autres sports gardent la couleur du texte. */
+export const sportTint = (type?: string) => type === "RUN" ? "text-sport-run" : type === "WORKOUT" ? "text-sport-strength" : type === "RIDE" ? "text-sport-bike" : "";
 
 /** Les quatre sports de l'app. */
 export const MY_SPORTS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;

@@ -28,6 +28,7 @@ const config: Config = {
         },
         good: c("good"), warn: c("warn"), bad: c("bad"),
         stack: { workout: c("stack-workout"), run: c("stack-run"), ride: c("stack-ride"), hike: c("stack-hike"), other: c("stack-other") },
+        sport: { run: c("sport-run"), strength: c("sport-strength"), bike: c("sport-bike") },
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
       },
       // text-brand, border-brand, ring-brand… prennent la variante lisible de la marque (le citron Volt
@@ -55,6 +56,7 @@ const config: Config = {
       spacing: {
         "safe-top": "env(safe-area-inset-top)",
         "safe-bottom": "env(safe-area-inset-bottom)",
+        bar: "calc(3.5rem + env(safe-area-inset-top))",
         nav: "calc(4rem + env(safe-area-inset-bottom))",
       },
       borderRadius: { tile: "0.875rem", card: "1.25rem", sheet: "1.75rem" },

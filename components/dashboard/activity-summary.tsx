@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { SPORTS } from "@/lib/sports";
+import { SPORTS, sportTint } from "@/lib/sports";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { Metric } from "@/components/ui/metric";
@@ -28,7 +28,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
   const body = (
     <>
       <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-ink">
+        <span className={cn("grid size-10 shrink-0 place-items-center rounded-full bg-surface-2", sportTint(a.type) || "text-ink")}>
           <Icon className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
