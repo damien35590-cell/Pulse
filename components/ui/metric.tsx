@@ -38,10 +38,15 @@ export function Metric({ label, value, unit, size = "md", tone = "default", hint
   );
 }
 
-/** Petit écart chiffré (+12 s/km, −3 bpm…) : vert si c'est mieux, rouge si c'est moins bien. */
-export function Delta({ children, good }: { children: React.ReactNode; good: boolean }) {
+const DELTA = { good: "bg-good/15 text-good", warn: "bg-warn/15 text-warn", bad: "bg-bad/15 text-bad", neutral: "bg-surface-2 text-ink-soft" } as const;
+
+/**
+ * Petit écart chiffré (+12 s/km, −3 bpm…) : vert si c'est mieux, rouge si c'est moins bien.
+ * `tone` affine : « warn » (à surveiller, sans être une baisse), « neutral » (dans la moyenne).
+ */
+export function Delta({ children, good, tone }: { children: React.ReactNode; good?: boolean; tone?: keyof typeof DELTA }) {
   return (
-    <span className={cn("inline-flex h-5 items-center rounded-full px-1.5 font-num text-xs font-semibold tabular-nums", good ? "bg-good/15 text-good" : "bg-bad/15 text-bad")}>
+    <span className={cn("inline-flex h-5 items-center rounded-full px-1.5 font-num text-xs font-semibold tabular-nums", DELTA[tone ?? (good ? "good" : "bad")])}>
       {children}
     </span>
   );

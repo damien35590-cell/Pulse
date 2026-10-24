@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, CloudRain, Thermometer } from "lucide-react";
-import { DeleteActivity } from "@/components/activity/delete-activity";
+import { CloudRain, Equal, Flag, Thermometer, TrendingDown, TrendingUp } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodePolyline } from "@/lib/polyline";
 import { SPORTS } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
-import { fmtDuration, fmtKm, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
-import { ActivityTrack } from "@/components/activity/activity-track";
+import { fmtClock, fmtKm, fmtNum, fmtPace, fmtWhenShort } from "@/lib/format";
+import { ActivityHero } from "@/components/activity/activity-hero";
+import { Delta, Metric } from "@/components/ui/metric";
+import { getActivityInsight } from "@/lib/data/activity-insight";
+import type { PaceInsight } from "@/lib/activity/comparables";
+import { ui } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 import { TimeInZones } from "@/components/activity/time-in-zones";
 import { getZones } from "@/lib/data/zones";
 import { bounds, HR_PCT, POWER_PCT, timeInZones } from "@/lib/zones";
@@ -17,7 +21,6 @@ import type { StreamData } from "@/lib/stream";
 import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
-import { EditableTitle } from "@/components/activity/editable-title";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
 import { getGear } from "@/lib/data/gear";
@@ -26,6 +29,12 @@ import { selectableGear } from "@/lib/gear";
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
 type TP = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
+
+const INSIGHT: Record<PaceInsight["tone"], { icon: typeof Equal; cls: string }> = {
+  good: { icon: TrendingUp, cls: "bg-good/15 text-good" },
+  warn: { icon: TrendingDown, cls: "bg-warn/15 text-warn" },
+  neutral: { icon: Equal, cls: "bg-surface-2 text-ink-soft" },
+};
 
 function feelingToInt(feeling: string | null): number | null {
   switch (feeling) {
@@ -63,34 +72,76 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const mmss = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, "0")}`;
   
 
-  const { icon: SportIcon, fg: sportFg, soft: sportSoft } = activityStyle(a.type);
+  const { icon: SportIcon, fg: sportFg, dot: sportSolid } = activityStyle(a.type);
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const w = a.weather as { tempC?: number | null; precipMm?: number | null } | null;
-  const stats = [
-    a.type !== "WORKOUT" && { l: "Distance", v: `${fmtKm(a.distanceM)} km` }, { l: "Durée", v: fmtDuration(a.movingTimeS) },
-    pace && { l: pace.label, v: `${pace.value} ${pace.unit}` },
-    a.elevationGainM > 0 && { l: "Dénivelé +", v: `${fmtNum(a.elevationGainM, 0)} m` },
-    a.avgPower && { l: "Puissance moyenne", v: `${a.avgPower} W` }, a.maxPower && { l: "Puissance max", v: `${a.maxPower} W` },
-    a.calories && { l: "Calories", v: `${fmtNum(a.calories, 0)} kcal` }, a.avgHr && { l: "FC moyenne", v: `${a.avgHr} bpm` },
-  ].filter(Boolean) as { l: string; v: string }[];
+  const insight = await getActivityInsight(s.user.id, a.id, TZ, zones.hrMax);
+  const ins = insight.pace ? INSIGHT[insight.pace.tone] : null;
+  // Chiffre vedette : la distance, ou la durée pour une activité sans distance (muscu…). Puis une ligne de 3 chiffres, le reste en petit.
+  const hasDist = a.type !== "WORKOUT" && a.distanceM >= 100;
+  type M = { label: string; value: string; unit?: string; hint?: React.ReactNode };
+  const metrics = ([
+    hasDist && { label: "Durée", value: fmtClock(a.movingTimeS) },
+    pace && { label: pace.label, value: pace.value, unit: pace.unit, hint: insight.pace && <Delta tone={insight.pace.tone}>{insight.pace.delta}</Delta> },
+    hasDist && a.elevationGainM > 0 && { label: "D+", value: fmtNum(a.elevationGainM, 0), unit: "m" },
+    a.avgHr && { label: "FC moy.", value: String(a.avgHr), unit: "bpm" },
+    a.avgPower && { label: "Puiss. moy.", value: String(a.avgPower), unit: "W" },
+    a.calories && { label: "Calories", value: fmtNum(a.calories, 0), unit: "kcal" },
+    a.maxPower && { label: "Puiss. max", value: String(a.maxPower), unit: "W" },
+  ].filter(Boolean) as M[]);
+  const [row, more] = [metrics.slice(0, 3), metrics.slice(3)];
+  const points = gps.length > 1 ? gps : route.map(([lat, lng]) => ({ lat, lng }));
 
   return (
-    <article className="space-y-5">
-      <Link href="/activities" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="h-5 w-5" aria-hidden />Activités</Link>
-      <header>
-        <div className="flex items-center gap-3">
-          <span className={`grid size-12 shrink-0 place-items-center rounded-tile ${sportSoft} ${sportFg}`}><SportIcon className="size-6" aria-hidden /></span>
-          <p className="text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhen(a.startedAt, TZ, { year: true, prefixed: true })}</p>
-        </div>
-        {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand">🏁 Course · {a.raceEvent.name}</Link>}
-        <EditableTitle activityId={a.id} title={a.title} />
+    <article>
+      <ActivityHero
+        id={a.id}
+        title={a.title}
+        points={points}
+        gain={a.elevationGainM > 0 ? a.elevationGainM : undefined}
+        elevationColor={sportFg}
+        meta={
+          <div className="flex items-center gap-3">
+            <span className={cn("grid size-10 shrink-0 place-items-center rounded-tile text-bg", sportSolid)}><SportIcon className="size-5" strokeWidth={2.2} aria-hidden /></span>
+            <p className="min-w-0 truncate text-sm text-ink-soft">{SPORTS[a.type]?.label} · {fmtWhenShort(a.startedAt, TZ)}</p>
+          </div>
+        }
+      >
+        {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand"><Flag className="size-4" aria-hidden />Course · {a.raceEvent.name}</Link>}
         {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
-      </header>
-      {a.story && <p className="rounded-xl bg-surface-2 px-4 py-3 text-[17px] leading-snug">{a.story}</p>}
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">
-        {stats.map((x) => <div key={x.l} className="bg-surface px-4 py-3"><dt className="text-xs text-ink-soft">{x.l}</dt><dd className="font-display text-2xl font-bold tabular-nums">{x.v}</dd></div>)}
-      </dl>
-      {gps.length > 1 ? <ActivityTrack points={gps} gain={a.elevationGainM > 0 ? a.elevationGainM : undefined} /> : route.length > 1 && <ActivityTrack points={route.map(([lat, lng]) => ({ lat, lng }))} />}
+        <dl className="mt-5">
+          {hasDist
+            ? <Metric size="hero" label="Distance" value={fmtKm(a.distanceM)} unit="km" />
+            : <Metric size="hero" label="Durée" value={fmtClock(a.movingTimeS)} />}
+        </dl>
+        {row.length > 0 && (
+          <dl className="mt-5 grid grid-cols-3 gap-3">
+            {row.map((m) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} />)}
+          </dl>
+        )}
+        {more.length > 0 && (
+          <dl className="mt-4 grid grid-cols-3 gap-3">
+            {more.map((m) => <Metric key={m.label} size="sm" label={m.label} value={m.value} unit={m.unit} />)}
+          </dl>
+        )}
+        {insight.pace || insight.chips.length > 0 ? (
+          <div className="mt-5 space-y-3 border-t border-line pt-4">
+            {insight.pace && ins && (
+              <div className="flex items-start gap-3">
+                <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", ins.cls)}><ins.icon className="size-4" aria-hidden /></span>
+                <div className="min-w-0">
+                  <p className="font-semibold leading-snug text-ink">{insight.pace.text}</p>
+                  <p className="mt-0.5 text-sm text-ink-mute">{insight.pace.basis}</p>
+                </div>
+              </div>
+            )}
+            {insight.chips.length > 0 && (
+              <ul className="flex flex-wrap gap-2">{insight.chips.map((c) => <li key={c} className={ui.chip}>{c}</li>)}</ul>
+            )}
+          </div>
+        ) : a.story && <p className="mt-5 border-t border-line pt-4 text-sm leading-snug text-ink-soft">{a.story}</p>}
+      </ActivityHero>
+      <div className="mt-8 space-y-5">
       {series.length > 5 && <section><h2 className="mb-2 font-display text-lg font-bold">Puissance et cardio</h2><PowerChart data={series} /></section>}
       {(powerTiz || hrTiz) && (
         <section>
@@ -143,8 +194,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         initialComment={a.notes}
         initialRpe={a.rpe}
       />
-
-      <div className="pt-4"><DeleteActivity id={a.id} /></div>
+      </div>
     </article>
   );
 }

@@ -329,6 +329,13 @@ function Tokens() {
             {swatch("warn", "bg-warn", "vigilance")}
             {swatch("bad", "bg-bad", "baisse")}
           </div>
+          <div className="flex flex-wrap items-center gap-2 px-1">
+            <Delta tone="good">−12 s/km</Delta>
+            <Delta tone="warn">+25 s/km</Delta>
+            <Delta tone="bad">−8 W</Delta>
+            <Delta tone="neutral">+1 s/km</Delta>
+            <span className="text-xs text-ink-mute">{"<Delta tone>"}</span>
+          </div>
         </Section>
 
         <Section title="Types d'activité">

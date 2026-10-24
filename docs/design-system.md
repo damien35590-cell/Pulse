@@ -28,7 +28,7 @@ Cible : PWA installée sur Pixel, sombre par défaut, lisible en plein effort.
 | `brand-ink` | #0A0A0C | texte sur fond citron, dans les deux thèmes (jamais de blanc sur Volt) | |
 | `brand-text` | #C6F432 (clair : #4D7C0F) | utilisé automatiquement par `text-brand`, `border-brand`, `ring-brand`, `outline-brand`, `stroke-brand` : le citron ne se lit pas sur fond blanc | ≥ 5:1 |
 | `good` / `warn` / `bad` | vert / ambre / rouge | progrès, vigilance, baisse | ≥ 4,9:1 |
-| `act-run` / `-strength` / `-ride` / `-hike` / `-other` (+ `-soft`) | corail #FF8A5C (clair #D9561F), indigo #8E92FF (#5457E0), lagon #3FCADB (#0E8A9C), vert-bleu #45CBA2 (#1A8A66), `ink-mute` | types d'activité uniquement, via `lib/activity-style.ts` (`fg` / `soft` / `dot`) : tuile `size-12 rounded-tile bg-act-x-soft` + icône `text-act-x`, point `size-2` dans les filtres. `-soft` = 18 % (clair 14 %). Ne jamais réutiliser `z6` ni `good` ; pas de nage | icône / fond doux ≥ 3:1 |
+| `act-run` / `-strength` / `-ride` / `-hike` / `-other` (+ `-soft`) | corail #FF8A5C (clair #D9561F), indigo #8E92FF (#5457E0), lagon #3FCADB (#0E8A9C), vert-bleu #45CBA2 (#1A8A66), `ink-mute` | types d'activité uniquement, via `lib/activity-style.ts` (`fg` / `soft` / `dot`) : tuile `size-12 rounded-tile bg-act-x-soft` + icône `text-act-x`, point `size-2` dans les filtres ; tuile pleine `size-10 rounded-tile bg-act-x` + icône `text-bg` (`dot`) en tête de fiche d'activité. `-soft` = 18 % (clair 14 %). Ne jamais réutiliser `z6` ni `good` ; pas de nage | icône / fond doux ≥ 3:1 |
 | `z1` … `z6` | gris, bleu, vert, jaune, rouge, violet | zones cardio / puissance uniquement | |
 | `tier-bronze` / `-silver` / `-gold` (+ `-soft`, `-ink`) | bronze, argent, or | paliers de badges uniquement (`components/profile/tier-medal.tsx`) | |
 | `bg-holo`, `bg-holo-ring`, `tier-gem`, `tier-diamond-soft/-ink` | dégradé holographique | palier Diamant : anneau animé autour d'une gemme sombre, le badge ultime | |
@@ -73,9 +73,9 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 
 | Composant | Fichier | Quand |
 |---|---|---|
-| `TopBar` | `components/layout/top-bar.tsx` | en-tête de page : retour, grand titre repliable, actions |
+| `TopBar` | `components/layout/top-bar.tsx` | en-tête de page : retour, grand titre repliable, actions ; `collapseAt` (titre affiché ailleurs : il entre dans la barre une fois cet élément passé dessous), `overlay` (barre transparente + léger dégradé sur une carte plein cadre) |
 | `Section` | `components/ui/section.tsx` | bloc de page avec titre en capitales + action |
-| `Metric`, `Delta` | `components/ui/metric.tsx` | toute valeur chiffrée (dans un `<dl>`) |
+| `Metric`, `Delta` | `components/ui/metric.tsx` | toute valeur chiffrée (dans un `<dl>`) ; `<Delta tone>` : `good` / `warn` (à surveiller) / `bad` / `neutral` (dans la moyenne), ou `good` booléen |
 | `Segmented` | `components/ui/segmented.tsx` | onglets (FC / puissance, filtres) |
 | `Switch` | `components/ui/switch.tsx` | réglage on / off : toute la ligne (libellé + phrase) est la cible, 56 px de haut |
 | `BottomSheet`, `ConfirmSheet` | `components/ui/bottom-sheet.tsx` | choix, confirmation, fin de séance |
@@ -86,7 +86,9 @@ Retour au toucher : `active:scale-[0.97]` (boutons), `active:scale-[0.985]` (car
 | `TraceChart` | `components/activity/trace-chart.tsx` | courbe au doigt (FC, altitude, puissance), bandes de zones ; axes optionnels (`yTicks`, `xTicks`), étiquette flottante (`tip`), `onCursor` |
 | `ElevationChart` | `components/activity/elevation-chart.tsx` | profil d'altitude : D+ / D− / min / max, 3 graduations rondes en m (jamais depuis 0), un repère par km |
 | `RoutePreview` | `components/activity/route-preview.tsx` | vignette statique du tracé (fil) : tuiles Stadia Maps en `<img>` + SVG, aucune lib de carte ; trace simplifiée côté serveur (`previewTrack`, `lib/map/track.ts`) ; rien sans GPS |
-| `ActivityTrack` | `components/activity/activity-track.tsx` | fiche d'activité : carte Leaflet (gestes coopératifs, plein écran, Pente / Vitesse) + profil d'altitude au curseur partagé |
+| `ActivityHero` | `components/activity/activity-hero.tsx` | tête de fiche d'activité : carte Leaflet plein cadre (~40vh, gestes coopératifs, plein écran, pastille flottante Pente / Vitesse) sous une `TopBar` transparente (retour, crayon, « … »), carte `rounded-t-sheet` qui chevauche le bas de la carte (méta, titre, distance en `metric-hero`, 3 `Metric`, comparaison), puis profil d'altitude au curseur partagé (`useTrackCursor`, `activity-track.tsx`). Sans GPS : barre normale, même carte |
+| `ActivityMenu` | `components/activity/activity-menu.tsx` | « … » d'une fiche d'activité : `BottomSheet` → « Supprimer » → `ConfirmSheet` |
+| comparaison | `lib/activity/comparables.ts` (+ `lib/data/activity-insight.ts`) | comparables = même sport, même genre de séance (programme, sinon déduit de l'intensité et de la distance), ±30 % de distance, 90 jours précédents, au moins 3 ; écart d'allure en s/km (neutre sous 3 s/km) ; 0 à 2 pastilles `ui.chip` vraies (record déjà calculé, plus longue du mois, rang dans la semaine) |
 | `ZoneBar` | `components/activity/zone-bar.tsx` | temps par zone (`compact` pour une carte) |
 | `Splits` | `components/activity/splits.tsx` | allure par km |
 | `SetLogger` | `components/workout/set-logger.tsx` | séance de muscu en cours (repos entre séries et après exercice, `onSave` asynchrone, option « Enregistrer comme modèle ») |
