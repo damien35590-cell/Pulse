@@ -4,6 +4,8 @@
 
 Toute interface suit docs/design-system.md : tokens Tailwind, composants de components/ui, cn() de lib/utils, démo sur /ui-kit.
 
+Graphiques et visualisations de données : utiliser le skill `pulse-charts` et les composants existants ; ne pas charger le skill intégré `dataviz`.
+
 ## Base de données (Prisma + Neon)
 
 Le schéma évolue uniquement par migrations versionnées dans prisma/migrations/.
