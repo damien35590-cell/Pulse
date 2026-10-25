@@ -35,6 +35,8 @@ import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
 import { getGear } from "@/lib/data/gear";
 import { selectableGear } from "@/lib/gear";
+import { CompareActivity, type Comparable } from "@/components/activity/compare-activity";
+import { isCommute } from "@/lib/routes/estimate";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
@@ -64,6 +66,18 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const gear = a.type === "WORKOUT" ? [] : await getGear(s.user.id);
   const gearOpts = gear.filter((g) => !g.retiredAt && !g.parentId && (selectableGear([g], a.type).length > 0 || a.gear.some((x) => x.id === g.id)))
     .map((g) => ({ id: g.id, name: g.name, kind: g.kind, km: g.km, worn: gear.filter((p) => !p.retiredAt && (p.id === g.id || p.parentId === g.id) && p.level === "critical").map((p) => p.name) }));
+
+  // « Comparer » : même sport, distance à ±20 %, hors activités douces. Rien à comparer sans distance (muscu) ni pour une activité douce.
+  const COMPARE_TOLERANCE = 0.2;
+  const comparable = (x: { id: string; title: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; avgHr: number | null }): Comparable => ({ id: x.id, title: x.title, type: x.type, startedAt: x.startedAt.toISOString(), distanceM: x.distanceM, movingTimeS: x.movingTimeS, elevationGainM: x.elevationGainM, avgHr: x.avgHr });
+  const canCompare = a.type !== "WORKOUT" && !isSoft(a.type) && !isCommute(a) && a.distanceM >= 100;
+  const candidates = canCompare
+    ? (await prisma.activity.findMany({
+        where: { userId: s.user.id, type: a.type, id: { not: a.id }, distanceM: { gte: a.distanceM * (1 - COMPARE_TOLERANCE), lte: a.distanceM * (1 + COMPARE_TOLERANCE) } },
+        orderBy: { startedAt: "desc" }, take: 40,
+        select: { id: true, title: true, type: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgHr: true },
+      })).filter((x) => !isCommute(x)).slice(0, 20).map(comparable)
+    : [];
 
   const route = a.polyline ? decodePolyline(a.polyline) : [];
   const raw = (a.trackPoints as TP[] | null) ?? [];
@@ -232,6 +246,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
 
         {gearOpts.length > 0 && <GearPicker activityId={a.id} options={gearOpts} selected={a.gear.filter((g) => !g.retiredAt).map((g) => g.id)} retired={a.gear.filter((g) => g.retiredAt).map((g) => g.name)} />}
 
+        {candidates.length > 0 && <CompareActivity current={comparable(a)} candidates={candidates} />}
         <ShareActivity title={a.title} summary={shareText} />
       </div>
     </article>

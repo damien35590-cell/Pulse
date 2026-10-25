@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { dayKey } from "@/lib/dates";
 import { bestCurve } from "@/lib/power";
 import { bounds, HR_PCT, POWER_PCT, timeInZones } from "@/lib/zones";
 import { cyclingRadar, hikingRadar, runningRadar, workoutRadar, type Axis } from "@/lib/radar";
 import { GROUPS, volumeByMuscle } from "@/lib/muscles";
 import { mean, type StreamData } from "@/lib/stream";
+import { isCommute } from "@/lib/routes/estimate";
 import { getZones } from "./zones";
 
 type Curve = (number | null)[] | null;
@@ -14,17 +14,21 @@ export async function getAdvanced(userId: string, tz: string) {
   const now = new Date(), ago = (d: number) => new Date(+now - d * 864e5), weeks = 90 / 7;
   const zones = await getZones(userId);
   const [recent, curves, ex, user, acts] = await Promise.all([
-    prisma.activityStream.findMany({ where: { activity: { userId, startedAt: { gte: ago(90) } } }, take: 80, select: { data: true, curve: true, avgCad: true, activity: { select: { type: true, avgPower: true } } } }),
-    prisma.activityStream.findMany({ where: { activity: { userId } }, select: { curve: true, activity: { select: { startedAt: true } } } }),
+    prisma.activityStream.findMany({ where: { activity: { userId, startedAt: { gte: ago(90) } } }, take: 80, select: { data: true, curve: true, avgCad: true, activity: { select: { type: true, avgPower: true, title: true, source: true, dedupeKey: true } } } }),
+    prisma.activityStream.findMany({ where: { activity: { userId } }, select: { curve: true, activity: { select: { startedAt: true, type: true, title: true, source: true, dedupeKey: true } } } }),
     prisma.workoutExercise.findMany({ where: { activity: { userId, type: "WORKOUT", startedAt: { gte: ago(90) } } }, select: { activityId: true, name: true, sets: true, reps: true, loadKg: true, activity: { select: { startedAt: true } } } }),
     prisma.user.findUnique({ where: { id: userId }, select: { weightKg: true } }),
-    prisma.activity.findMany({ where: { userId, type: { in: ["RUN", "HIKE", "WORKOUT"] }, startedAt: { gte: ago(90) } }, select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true } }),
+    prisma.activity.findMany({ where: { userId, type: { in: ["RUN", "HIKE", "WORKOUT"] }, startedAt: { gte: ago(90) } }, select: { type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true } }),
   ]);
-  const runs = acts.filter((a) => a.type === "RUN"), hikes = acts.filter((a) => a.type === "HIKE"), workouts = acts.filter((a) => a.type === "WORKOUT");
-  const days = (xs: { startedAt: Date }[]) => new Set(xs.map((x) => dayKey(x.startedAt, tz))).size / weeks;
+  // Activités douces (vélotaf, Google Fit, marche) : hors du profil comme de la courbe de puissance
+  const soft = (a: { type: string; title: string; source: string; dedupeKey: string | null }) => isCommute({ ...a, startedAt: new Date(0), distanceM: 0, movingTimeS: 0 });
+  const streams = recent.filter((r) => !soft(r.activity)), allCurves = curves.filter((c) => !soft(c.activity));
+  const training = acts.filter((a) => !soft(a)), runs = training.filter((a) => a.type === "RUN"), hikes = training.filter((a) => a.type === "HIKE"), workouts = training.filter((a) => a.type === "WORKOUT");
+  // Sorties par semaine : activités / semaines, comme le coach
+  const days = (xs: unknown[]) => xs.length / weeks;
 
   let cycling: Axis[] | null = null;
-  const rides = recent.filter((r) => r.activity.type === "RIDE");
+  const rides = streams.filter((r) => r.activity.type === "RIDE");
   if (rides.length) {
     const cv = bestCurve(rides.map((r) => r.curve as Curve)), ub = zones.ftp ? bounds(zones.ftp, POWER_PCT) : null;
     const z2 = ub ? rides.reduce((s, r) => s + timeInZones((r.data as unknown as StreamData).power ?? [], ub)[1], 0) : 0;
@@ -38,7 +42,7 @@ export async function getAdvanced(userId: string, tz: string) {
     let share: number | null = null;
     if (zones.hrMax) {
       const ub = bounds(zones.hrMax, HR_PCT); let tot = 0, tgt = 0;
-      for (const r of recent.filter((x) => x.activity.type === "RUN")) { const t = timeInZones((r.data as unknown as StreamData).hr ?? [], ub, true); tot += t.reduce((a, b) => a + b, 0); tgt += t[1] + t[2]; }
+      for (const r of streams.filter((x) => x.activity.type === "RUN")) { const t = timeInZones((r.data as unknown as StreamData).hr ?? [], ub, true); tot += t.reduce((a, b) => a + b, 0); tgt += t[1] + t[2]; }
       share = tot ? tgt / tot : null;
     }
     running = runningRadar({ longestKm: Math.max(...runs.map((r) => r.distanceM)) / 1000, avgPace: km > 0 ? sec / 60 / km : null, dPlusPerWeek: runs.reduce((s, r) => s + r.elevationGainM, 0) / weeks, activeDaysPerWeek: days(runs), hrTargetShare: share });
@@ -68,8 +72,8 @@ export async function getAdvanced(userId: string, tz: string) {
   const d30 = +ago(30), d7 = +ago(7), week = ex.filter((e) => +e.activity.startedAt >= d7);
   return {
     profiles: { RIDE: cycling, RUN: running, HIKE: hiking, WORKOUT: workout }, zones,
-    record: bestCurve(curves.map((c) => c.curve as Curve)),
-    last30: bestCurve(curves.filter((c) => +c.activity.startedAt >= d30).map((c) => c.curve as Curve)),
+    record: bestCurve(allCurves.map((c) => c.curve as Curve)),
+    last30: bestCurve(allCurves.filter((c) => +c.activity.startedAt >= d30).map((c) => c.curve as Curve)),
     muscles: volumeByMuscle(week, bodyKg), hasMuscle: week.length > 0,
   };
 }

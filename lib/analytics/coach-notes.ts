@@ -51,6 +51,17 @@ export function frame(p: CoachPeriod) {
   return { endKey, startKey, prevStart, prevEnd, span, prevSpan: 7 * p.weeks, fullWeeks, lastFullMon: fullWeeks === p.weeks ? endMon : shiftDay(endMon, -7) };
 }
 
+/**
+ * Sorties par semaine : activités / semaines terminées de la période (la semaine en cours n'est comptée que si elle est finie).
+ * Source unique du coach et de la page Analyse. `acts` = les activités de la période, déjà filtrées par sport. null sans semaine terminée.
+ */
+export function sessionsPerWeek(acts: { startedAt: Date }[], p: CoachPeriod): number | null {
+  const f = frame(p);
+  if (f.fullWeeks < 1) return null;
+  const fullEnd = shiftDay(f.lastFullMon, 6);
+  return acts.filter((a) => { const k = dayKey(a.startedAt, p.tz); return k >= f.startKey && k <= fullEnd; }).length / f.fullWeeks;
+}
+
 /** Variation en %, à durée égale (la période en cours peut être plus courte que la précédente). null sans référence. */
 export function rateChange(cur: number, curDays: number, prev: number, prevDays: number): number | null {
   if (prev <= 0 || curDays <= 0) return null;
@@ -119,7 +130,7 @@ export function overviewNotes(input: { acts: CoachAct[]; period: CoachPeriod; pl
 
   // 4. Régularité : séances par semaine terminée, comparée à ta cible
   if (f.fullWeeks >= 2) {
-    const fullEnd = shiftDay(f.lastFullMon, 6), n = cur.filter((a) => dayKey(a.startedAt, p.tz) <= fullEnd).length, perWeek = n / f.fullWeeks;
+    const perWeek = sessionsPerWeek(cur, p)!;
     const empty = Array.from({ length: f.fullWeeks }, (_, i) => shiftDay(f.startKey, 7 * i)).filter((mon) => !cur.some((a) => between(a, mon, shiftDay(mon, 6)))).length;
     const blank = empty ? ` ${plural(empty, "semaine")} sans aucune séance.` : "";
     if (perWeek < TARGET_ALL[0] - 1) notes.push({ id: "freq", tone: "warn", title: `${fr(perWeek, 1)} séance${perWeek >= 2 ? "s" : ""} par semaine`, body: `Ta cible est de ${TARGET_ALL[0]} à ${TARGET_ALL[1]} (2 à 3 courses + 2 à 3 muscu).${blank} La régularité compte plus que l'intensité : vise d'abord 2 séances par discipline.` });
@@ -168,7 +179,7 @@ export function runNotes(input: { acts: CoachAct[]; period: CoachPeriod; goal?: 
 
   // 3. Fréquence : sorties par semaine terminée
   if (f.fullWeeks >= 2) {
-    const fullEnd = shiftDay(f.lastFullMon, 6), perWeek = cur.filter((a) => dayKey(a.startedAt, p.tz) <= fullEnd).length / f.fullWeeks;
+    const perWeek = sessionsPerWeek(cur, p)!;
     if (perWeek < TARGET_RUNS[0] - 0.3) notes.push({ id: "freq", tone: "warn", title: `${fr(perWeek, 1)} sortie${perWeek >= 2 ? "s" : ""} par semaine`, body: `Ta cible est de ${TARGET_RUNS[0]} à ${TARGET_RUNS[1]}. Deux sorties par semaine suffisent pour progresser ; une seule ne fait qu'entretenir.` });
     else if (perWeek <= TARGET_RUNS[1] + 0.5) notes.push({ id: "freq", tone: "good", title: `${fr(perWeek, 1)} sorties par semaine`, body: `Dans ta cible de ${TARGET_RUNS[0]} à ${TARGET_RUNS[1]}.` });
   }
