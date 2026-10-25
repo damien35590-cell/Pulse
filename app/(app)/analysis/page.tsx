@@ -9,7 +9,7 @@ import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
 import { BUILT_IN } from "@/lib/workout/builtin";
-import { catalogFor, ladderInfo } from "@/lib/workout/catalog";
+import { catalogExercise, catalogFor, ladderInfo } from "@/lib/workout/catalog";
 import { fitnessSeries, zone as formZone } from "@/lib/fitness";
 import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
@@ -159,7 +159,10 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const rank = (key: string) => { const r = programOrder.indexOf(/^lafay:([a-z])/.exec(key)?.[1] ?? ""); return r < 0 ? programOrder.length : r; };
   const progression = strength
     ? strength.exercises.filter((e) => inCatalogue(e.key, e.name)).sort((a, b) => rank(a.key) - rank(b.key) || Number(b.sessions >= 2) - Number(a.sessions >= 2) || b.lastDay.localeCompare(a.lastDay)).slice(0, MAX_LADDERS)
-        .map((e) => { const l = ladderInfo(e.key); return { key: e.key, name: l?.label ?? e.name, variant: e.variant ?? l?.code ?? null, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }; })
+        .map((e) => {
+          // Libellé = la variante réellement faite (« A1 · Pompes », « A3 · Pompes serrées »), jamais un code nu ni la seule lettre de la famille
+          const l = ladderInfo(e.key), code = e.variant ?? l?.code ?? null, ce = code ? catalogExercise(code) : undefined;
+          return { key: e.key, name: ce ? `${ce.code ?? code} · ${ce.name}` : l?.label ?? e.name, variant: code, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }; })
     : null;
 
   // Répartition du temps (filtre « Tous » seulement)

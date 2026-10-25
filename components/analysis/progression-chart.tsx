@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils";
 
 /** Un exercice (échelle Lafay : B1 et B2 sont le même exercice) : total de reps par séance, avec la variante de chaque séance. */
 export type Ladder = { key: string; name: string; variant: string | null; level: string; lastDay: string; hint: string | null; points: { day: string; reps: number; variant: string | null }[] };
+/** Graduations rondes (1, 2, 5 × 10^n), 5 au plus, et domaine arrondi au pas supérieur : 0, 10, 20, 30, 40. */
+function niceTicks(max: number): number[] {
+  const raw = Math.max(max, 1) / 4, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = ([1, 2, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag, top = Math.ceil(Math.max(max, 1) / step) * step;
+  return Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
+}
 type DotProps = { cx?: number; cy?: number; index?: number; payload?: Record<string, number | string | undefined> };
 
 /**
@@ -25,7 +31,7 @@ export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
     const pts = [...byDay.values()].sort((x, y) => x.t - y.t);
     return pts.map((p, j) => ({ ...p, mark: j > 0 && p.variant && p.variant !== pts[j - 1].variant ? (pts[j - 1].variant ? `${pts[j - 1].variant}→${p.variant}` : p.variant) : undefined }));
   });
-  const all = series.flat(), DAY = 864e5;
+  const all = series.flat(), DAY = 864e5, ticks = niceTicks(Math.max(...all.map((p) => p.reps)));
   const tick = { fontSize: 11, fill: c.inkMute };
   // La courbe choisie est tracée en dernier : elle passe au-dessus des autres
   const order = ladders.map((_, i) => i).sort((x, y) => Number(ladders[x].key === cur.key) - Number(ladders[y].key === cur.key));
@@ -46,7 +52,7 @@ export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
           <LineChart margin={{ top: 16, right: 16, left: -20, bottom: 0 }}>
             <CartesianGrid stroke={c.inkMute} strokeOpacity={0.2} vertical={false} />
             <XAxis dataKey="t" type="number" scale="time" domain={[Math.min(...all.map((p) => p.t)) - DAY, Math.max(...all.map((p) => p.t)) + DAY]} tickFormatter={(t) => fmtDayKey(new Date(t).toISOString().slice(0, 10))} tick={tick} axisLine={false} tickLine={false} tickCount={4} />
-            <YAxis tick={tick} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, "dataMax + 5"]} />
+            <YAxis tick={tick} axisLine={false} tickLine={false} ticks={ticks} domain={[0, ticks[ticks.length - 1]]} />
             <Tooltip contentStyle={{ background: c.surface, border: `1px solid ${c.line}`, borderRadius: 12, color: c.ink }} labelFormatter={(t) => fmtDayKey(new Date(Number(t)).toISOString().slice(0, 10))} formatter={(v, n) => [`${v} reps`, n]} />
             {order.map((i) => {
               const l = ladders[i], on = l.key === cur.key, color = on ? c.brandText : c.inkMute;
