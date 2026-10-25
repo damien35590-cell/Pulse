@@ -1,0 +1,83 @@
+"use client";
+import { useState } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Metric } from "@/components/ui/metric";
+import { fmtDayKey } from "@/lib/format";
+import { tap } from "@/lib/haptics";
+import { useThemeColors } from "@/lib/use-theme-colors";
+import { cn } from "@/lib/utils";
+
+/** Un exercice (échelle Lafay : B1 et B2 sont le même exercice) : total de reps par séance, avec la variante de chaque séance. */
+export type Ladder = { key: string; name: string; variant: string | null; level: string; lastDay: string; hint: string | null; points: { day: string; reps: number; variant: string | null }[] };
+type DotProps = { cx?: number; cy?: number; index?: number; payload?: Record<string, number | string | undefined> };
+
+/**
+ * Progression : une courbe par échelle (4 au plus, les plus récentes), total de reps par séance. L'échelle choisie est en marque, les autres en gris ;
+ * un changement de variante (B1 → B2) est marqué sur la courbe choisie.
+ */
+export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
+  const c = useThemeColors(), [sel, setSel] = useState(ladders[0]?.key);
+  const cur = ladders.find((l) => l.key === sel) ?? ladders[0];
+  const days = [...new Set(ladders.flatMap((l) => l.points.map((p) => p.day)))].sort();
+  const rows = days.map((day) => {
+    const row: Record<string, number | string> = { day, label: fmtDayKey(day) };
+    ladders.forEach((l, i) => {
+      const j = l.points.findIndex((p) => p.day === day);
+      if (j < 0) return;
+      row[`v${i}`] = l.points[j].reps;
+      const prev = l.points[j - 1]?.variant, v = l.points[j].variant;
+      if (j > 0 && v && v !== prev) row[`m${i}`] = prev ? `${prev}→${v}` : v;
+    });
+    return row;
+  });
+  const tick = { fontSize: 11, fill: c.inkMute };
+  // La courbe choisie est tracée en dernier : elle passe au-dessus des autres
+  const order = ladders.map((_, i) => i).sort((a, b) => Number(ladders[a].key === cur.key) - Number(ladders[b].key === cur.key));
+  return (
+    <div className="space-y-4">
+      {ladders.length > 1 && (
+        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Exercice">
+          {ladders.map((l) => (
+            <button key={l.key} type="button" role="tab" aria-selected={l.key === cur.key} onClick={() => { if (l.key !== cur.key) { tap(6); setSel(l.key); } }}
+              className={cn("inline-flex h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold touch-manipulation", l.key === cur.key ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft")}>
+              {l.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="h-48" role="img" aria-label="Total de répétitions par séance, par exercice">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={rows} margin={{ top: 16, right: 12, left: -20, bottom: 0 }}>
+            <CartesianGrid stroke={c.inkMute} strokeOpacity={0.2} vertical={false} />
+            <XAxis dataKey="label" tick={tick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+            <YAxis tick={tick} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip contentStyle={{ background: c.surface, border: `1px solid ${c.line}`, borderRadius: 12, color: c.ink }} formatter={(v, n) => [`${v} reps`, n]} />
+            {order.map((i) => {
+              const l = ladders[i], on = l.key === cur.key, color = on ? c.brandText : c.inkMute;
+              return (
+                <Line key={l.key} name={l.name} dataKey={`v${i}`} type="linear" connectNulls stroke={color} strokeWidth={on ? 3 : 1.5} strokeOpacity={on ? 1 : 0.6} isAnimationActive={false}
+                  dot={(p: DotProps) => {
+                    const m = p.payload?.[`m${i}`];
+                    if (p.cx == null || p.cy == null || p.payload?.[`v${i}`] == null) return <g key={p.index} />;
+                    return (
+                      <g key={p.index}>
+                        <circle cx={p.cx} cy={p.cy} r={on ? 3.5 : 2} fill={color} stroke={color} />
+                        {on && m && <text x={p.cx} y={p.cy - 9} textAnchor="middle" fontSize={10} fontWeight={600} fill={c.inkSoft}>{m}</text>}
+                      </g>
+                    );
+                  }}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <dl className="grid grid-cols-3 gap-3">
+        <Metric label="Niveau" value={cur.level} size="md" />
+        <Metric label="Variante" value={cur.variant ?? "–"} size="md" tone={cur.variant ? "default" : "soft"} />
+        <Metric label="Dernière" value={fmtDayKey(cur.lastDay)} size="md" />
+      </dl>
+      {cur.hint && <p className="text-sm text-ink-soft">{cur.hint.charAt(0).toUpperCase() + cur.hint.slice(1)}.</p>}
+    </div>
+  );
+}

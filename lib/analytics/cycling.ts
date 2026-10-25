@@ -38,6 +38,8 @@ export type CyclingAnalysis = {
   bests: { label: string; watts: number; prev: number | null }[] | null;
   ftp: { estimated: number | null; used: number | null; manual: boolean };
   zones: { kind: "power" | "hr"; slices: ZoneSlice[]; rides: number; ref: number } | null;
+  /** Temps par zone (secondes, Z1 → Z6) et par semaine, dans la même grille que `weekly` ; même source que `zones` (séries des sorties récentes). */
+  zonesWeekly: { weekStart: string; seconds: number[] }[] | null;
   insights: string[];
   footer: { km: number; commutes: number; commuteKm: number };
 };
@@ -91,17 +93,20 @@ export function buildCyclingAnalysis(input: { rides: RideRow[]; prevRides: RideR
   // 5. Temps par zone : puissance si on a la FTP et des séries de puissance, sinon FC
   const pw = streams.filter((s) => s.power.length), hrS = streams.filter((s) => s.hr.length);
   let zonesOut: CyclingAnalysis["zones"] = null;
+  const weekOf = new Map(sorted.map((r) => [r.id, Math.floor((Date.parse(dayKey(r.startedAt, tz)) - Date.parse(first)) / (7 * 864e5))]));
+  const zonesWeekly = weekly.map((w) => ({ weekStart: w.weekStart, seconds: new Array<number>(6).fill(0) }));
+  const addWeek = (id: string, t: number[]) => { const w = zonesWeekly[weekOf.get(id) ?? -1]; if (w) t.forEach((v, i) => (w.seconds[i] += v)); };
   const build = (kind: "power" | "hr", upper: number[], secs: number[], n: number, ref: number) => {
     const ranges = sliceRanges(upper, kind === "power" ? "W" : "bpm");
     return { kind, rides: n, ref, slices: ZONES.map((z, i) => ({ id: z.id as ZoneSlice["id"], name: z.name, seconds: secs[i], range: ranges[i] })) };
   };
   if (ftpUsed && pw.length) {
     const ub = bounds(ftpUsed, POWER_PCT), secs = new Array<number>(6).fill(0);
-    for (const s of pw) timeInZones(s.power, ub).forEach((v, i) => (secs[i] += v));
+    for (const s of pw) { const t = timeInZones(s.power, ub); t.forEach((v, i) => (secs[i] += v)); addWeek(s.id, t); }
     zonesOut = build("power", ub, secs, pw.length, ftpUsed);
   } else if (zones.hrMax && hrS.length) {
     const ub = bounds(zones.hrMax, HR_PCT), secs = new Array<number>(6).fill(0);
-    for (const s of hrS) timeInZones(s.hr, ub, true).forEach((v, i) => (secs[i] += v));
+    for (const s of hrS) { const t = timeInZones(s.hr, ub, true); t.forEach((v, i) => (secs[i] += v)); addWeek(s.id, t); }
     zonesOut = build("hr", ub, secs, hrS.length, zones.hrMax);
   }
   if (zonesOut && zonesOut.slices.every((s) => s.seconds === 0)) zonesOut = null;
@@ -121,7 +126,7 @@ export function buildCyclingAnalysis(input: { rides: RideRow[]; prevRides: RideR
   return {
     empty: sorted.length === 0, summary, weekly, hasLoad: weekly.some((w) => w.load > 0),
     rides: points, efficiency, bests: bestList.length ? bestList : null, ftp: { estimated: ftpEst, used: ftpUsed, manual: zones.ftpManual },
-    zones: zonesOut, insights: insights.slice(0, 3),
+    zones: zonesOut, zonesWeekly: zonesOut ? zonesWeekly : null, insights: insights.slice(0, 3),
     footer: { km: summary.km, commutes: commutes.length, commuteKm: commutes.reduce((s, r) => s + km(r), 0) },
   };
 }

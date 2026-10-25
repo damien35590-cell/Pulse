@@ -96,7 +96,7 @@ const sa = (o: Partial<StrengthAnalysis> = {}): StrengthAnalysis => ({
   exercises: [], regularity: { perWeek: 2.5, target: [2, 3], upperPct: 50, lowerPct: 50 }, insights: [], prev: { sessions: 10, reps: 800 }, ...o,
 });
 const ex = (name: string, status: "progress" | "stall1" | "stall2" | "evolve", hint: string | null = null) => ({
-  key: name, name, variant: null, level: "6×8", status, sessions: 4, repsPerSession: [], lastDay: "2026-10-20", hint, nextVariant: null, restartTarget: null,
+  key: name, name, variant: null, level: "6×8", status, sessions: 4, repsPerSession: [], points: [], lastDay: "2026-10-20", hint, nextVariant: null, restartTarget: null,
 });
 let s = strengthNotes({ data: sa({ exercises: [ex("Dips B2", "stall2", "passe à B à 6×6"), ex("Pompes", "progress"), ex("Tractions", "progress")] }), period });
 assert.equal(s[0].id, "stuck");

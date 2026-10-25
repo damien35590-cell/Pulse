@@ -18,6 +18,7 @@ export type ExerciseProgress = {
   status: StrengthStatus;          // progrès / blocage 1 (une séance sans progrès) / blocage 2 (deux de suite ou plus) / à faire évoluer (plafond atteint)
   sessions: number;
   repsPerSession: number[];        // du plus ancien au plus récent
+  points: { day: string; reps: number; variant: string | null }[]; // mêmes séances, avec leur jour et leur variante (B1 → B2 : le changement se lit ici)
   lastDay: string;                 // AAAA-MM-JJ
   hint: string | null;             // conseil quand l'exercice est en blocage 2 ou à faire évoluer
   nextVariant: string | null;      // variante suivante (plus difficile) de l'échelle, null si dernière ou inconnue
@@ -128,12 +129,12 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
     const ents = entriesOf(list), cur = ents[0] ?? { variant: null, total: 0, n: list[0].reps, sets: list[0].sets, met: false };
     const stalls = stallsOf(ents), last = list[0], evolve = cur.n >= capOf(last.name);
     const adv = stalls >= 2 || evolve ? advice(cur, last.name) : null;
-    const perSession = new Map<string, number>();
-    for (const r of [...list].reverse()) if (weekOf(r.startedAt) >= 0) perSession.set(r.activityId, (perSession.get(r.activityId) ?? 0) + sumReps(doneSets(r)));
+    const perSession = new Map<string, { day: string; reps: number; variant: string | null }>();
+    for (const r of [...list].reverse()) if (weekOf(r.startedAt) >= 0) { const o = perSession.get(r.activityId); perSession.set(r.activityId, { day: dayKey(r.startedAt, tz), reps: (o?.reps ?? 0) + sumReps(doneSets(r)), variant: variantOf(r.name) }); }
     exercises.push({
       key, name: last.name.trim(), variant: cur.variant, level: `${cur.sets}×${cur.n}`,
       status: evolve ? "evolve" : stalls === 0 ? "progress" : stalls === 1 ? "stall1" : "stall2",
-      sessions: perSession.size, repsPerSession: [...perSession.values()], lastDay: dayKey(last.startedAt, tz),
+      sessions: perSession.size, repsPerSession: [...perSession.values()].map((x) => x.reps), points: [...perSession.values()], lastDay: dayKey(last.startedAt, tz),
       hint: adv?.hint ?? null, nextVariant: adv?.next ?? null, restartTarget: adv?.restart ?? null,
     });
   }

@@ -8,6 +8,7 @@ import { climbCompare } from "@/lib/insights/landmarks";
 import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
+import { fitnessSeries, zone as formZone } from "@/lib/fitness";
 import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
@@ -126,11 +127,28 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   // 3. Évolution : volume par semaine (jours sans activité à 0 : l'axe X reste continu), allure (course), puissance (vélo)
   const daily = fillMissingDates(acts.filter(hit), shiftDay(mon, -7 * (W - 1)), today, TZ);
   const weeks = groupByWeek(daily);
-  const unit = endurance ? "km" : "h";
-  const weekly = weeks.map((w) => ({ label: lab(w.weekStart), value: endurance ? w.distance : w.time / 3600 }));
+  // Unité du volume : km (endurance), séances par semaine (musculation), heures (Tous)
+  const unit = endurance ? "km" : S === "WORKOUT" ? "séances" : "h";
+  const volumeLabel = endurance ? "Distance" : S === "WORKOUT" ? "Séances" : "Durée";
+  const weekly = S === "WORKOUT"
+    ? strength!.weekly.map((w) => ({ label: lab(w.weekStart), value: w.sessions }))
+    : weeks.map((w) => ({ label: lab(w.weekStart), value: endurance ? w.distance : w.time / 3600 }));
   const pace = S === "RUN"
     ? Array.from({ length: W }, (_, i) => { const k = W - 1 - i, r = acts.filter((a) => a.type === "RUN" && a.distanceM >= 2000 && ago(a.startedAt) === k); return r.length ? { label: lab(shiftDay(mon, -7 * k)), value: sum(r, (a) => a.movingTimeS) / 60 / (sum(r, (a) => a.distanceM) / 1000) } : null; }).filter((p): p is { label: string; value: number } => !!p)
     : undefined;
+
+  // Forme (Tous) : fitness 42 j, fatigue 7 j, fraîcheur = fitness − fatigue, sur 84 jours ; seulement si une séance a une charge
+  const fit = S === "all" && acts.some((a) => (a.load ?? 0) > 0) ? fitnessSeries(acts, now, TZ, 330) : null, fitEnd = fit?.[fit.length - 1];
+  const form = fit && fitEnd ? { series: fit.slice(-84), ctl: fitEnd.ctl, atl: fitEnd.atl, form: fitEnd.form, zone: formZone(fitEnd.form) } : null;
+  // Zones par semaine (Vélo) : puissance, sinon FC ; mêmes séries que l'ancien bloc « Temps par zone »
+  const zones = cycling?.zones && cycling.zonesWeekly
+    ? { kind: cycling.zones.kind, ref: cycling.zones.ref, ftpManual: cycling.ftp.manual, rides: cycling.zones.rides, weeks: cycling.zonesWeekly }
+    : null;
+  // Progression (Musculation) : les 4 exercices les plus récents (de préférence au moins 2 séances), une courbe chacun
+  const progression = strength
+    ? [...strength.exercises.filter((e) => e.sessions >= 2), ...strength.exercises.filter((e) => e.sessions < 2)].slice(0, 4)
+        .map((e) => ({ key: e.key, name: e.name, variant: e.variant, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }))
+    : null;
 
   // Répartition du temps (filtre « Tous » seulement)
   const tt = timeS(inPeriod) || 1;
@@ -177,7 +195,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
           </div>
         ) : (
           <>
-            <EvolutionCard weekly={weekly} unit={unit} pace={pace} power={S === "RIDE" ? { record: adv.record, recent: adv.last30 } : null} />
+            <EvolutionCard key={S} weekly={weekly} unit={unit} volumeLabel={volumeLabel} pace={pace} power={S === "RIDE" ? { record: adv.record, recent: adv.last30 } : null} form={form} zones={zones} progression={progression} />
 
             {S === "all" && (
               <Section title="Répartition du temps">
