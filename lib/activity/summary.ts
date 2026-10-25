@@ -1,6 +1,6 @@
 import { fmtKm, fmtDuration, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
 import { previewTrack } from "@/lib/map/track";
-import { isSoft } from "@/lib/sports";
+import { isSoftActivity } from "@/lib/sports";
 import { insightLine } from "@/lib/activity/comparables";
 import { cardArt } from "@/lib/art/card";
 import type { SetExercise } from "@/lib/art/set-bars";
@@ -39,9 +39,9 @@ export function cells(a: SummaryActivity): Cell[] {
  * vignette du tracé simplifiée ici, côté serveur (~200 points). Activités douces : pas de tracé.
  */
 export function summaryData(a: SummaryActivity, insight: ActivityInsight | undefined, tz: string, extra?: Partial<ActivitySummaryData>): ActivitySummaryData {
-  const route = isSoft(a.type) ? undefined : previewTrack(a.polyline);
+  const route = isSoftActivity(a) ? undefined : previewTrack(a.polyline);
   // Art : ruban, profil d'effort ou séries de muscu selon les données (jamais pour une activité douce).
-  const art = isSoft(a.type) ? {} : cardArt({
+  const art = isSoftActivity(a) ? {} : cardArt({
     type: a.type, source: a.source, hasRoute: !!route && route.length > 1, zoneRibbon: a.zoneRibbon, zoneRibbonSource: a.zoneRibbonSource, isInterval: a.isInterval, sessionType: a.sessionType, plannedSession: a.plannedSession,
     exercises: a.exercises?.flatMap((e) => (e.name ? [{ name: e.name, sets: e.sets, reps: e.reps, setsDetail: e.setsDetail }] : [])),
   });

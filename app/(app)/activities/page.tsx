@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { cn, uniqueById } from "@/lib/utils";
 import { fmtDuration, fmtKm } from "@/lib/format";
 import { ui } from "@/lib/ui";
-import { SPORTS, SPORT_ORDER, isSoft } from "@/lib/sports";
+import { SPORTS, SPORT_ORDER, isSoftActivity } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
 import { ActivitySummary } from "@/components/dashboard/activity-summary";
 import { summaryData } from "@/lib/activity/summary";
@@ -84,7 +84,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
     total = count;
   }
   // Phrase de comparaison des cartes affichées (hors activités douces) : une passe pour toute la page, pas une requête par carte.
-  const shown = (byDate ? [...full.values()] : flat).filter((a) => !isSoft(a.type)).map((a) => a.id);
+  const shown = (byDate ? [...full.values()] : flat).filter((a) => !isSoftActivity(a)).map((a) => a.id);
   const insights: Map<string, ActivityInsight> = shown.length
     ? await getActivityInsights(s.user.id, shown, TZ, (await getZones(s.user.id)).hrMax).catch((e) => { console.error("[insight] activités", e); return new Map(); })
     : new Map();
@@ -98,7 +98,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   const toggle = (mk: string) => { const next = openMonths.includes(mk) ? openMonths.filter((k) => k !== mk) : [...openMonths, mk]; return next.join(",") || "-"; };
   const chip = (on: boolean) => cn("inline-flex h-12 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97]", on ? "bg-ink text-bg" : "bg-surface-2 text-ink-soft");
   const counts = (l: Lite[]) => {
-    const nSoft = l.filter((a) => isSoft(a.type)).length;
+    const nSoft = l.filter((a) => isSoftActivity(a)).length;
     if (!soft) return `${plural(l.length, "séance")} · ${fmtDuration(sum(l, (a) => a.movingTimeS))}`;
     return nSoft && nSoft < l.length ? `${l.length - nSoft} sport. · ${nSoft} douce${nSoft > 1 ? "s" : ""}` : plural(l.length, "activité");
   };
@@ -106,7 +106,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
 
   const monthBody = (lite: Lite[]) => {
     const list = lite.map((a) => full.get(a.id)).filter((a): a is Full => !!a);
-    const sport = list.filter((a) => !isSoft(a.type)), softs = list.filter((a) => isSoft(a.type));
+    const sport = list.filter((a) => !isSoftActivity(a)), softs = list.filter((a) => isSoftActivity(a));
     const softRows = <div className="divide-y divide-line">{softs.map((a) => <SoftRow key={a.id} a={a} />)}</div>;
     return (
       <div className="space-y-3 pt-3">
@@ -183,7 +183,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
 
       {!byDate && flat.length > 0 && (
         <div className="space-y-3">
-          {flat.map((a) => isSoft(a.type)
+          {flat.map((a) => isSoftActivity(a)
             ? <div key={a.id} className="overflow-hidden rounded-xl border border-dashed border-line bg-surface/60"><SoftRow a={a} /></div>
             : card(a))}
           {hasMore && (

@@ -7,7 +7,7 @@ import { level, xpOf } from "@/lib/xp";
 import { prepLine, racePrep } from "@/lib/races/prep";
 import { getCountdown, needsResult } from "@/lib/races/time";
 import { uniqueById } from "@/lib/utils";
-import { isSoft } from "@/lib/sports";
+import { isSoftActivity } from "@/lib/sports";
 import { TARGET_LIFTS, TARGET_RUNS } from "@/lib/analytics/coach-notes";
 import type { Act } from "@/lib/insights/types";
 
@@ -44,7 +44,7 @@ export async function getDashboard(userId: string) {
     const min = (list: typeof d) => Math.round(sum(list, (a) => a.movingTimeS) / 60);
     return {
       key, label: "LMMJVSD"[i], km: sum(d, (a) => a.distanceM) / 1000, type: top?.type ?? null, today: key === todayKey,
-      run: min(d.filter((a) => a.type !== "WORKOUT" && !isSoft(a.type))), lift: min(d.filter((a) => a.type === "WORKOUT")), planned: plannedKeys.includes(key),
+      run: min(d.filter((a) => a.type !== "WORKOUT" && !isSoftActivity(a))), lift: min(d.filter((a) => a.type === "WORKOUT")), planned: plannedKeys.includes(key),
     };
   });
   const runKm = sum(week.filter((a) => a.type === "RUN"), (a) => a.distanceM) / 1000;
@@ -55,7 +55,7 @@ export async function getDashboard(userId: string) {
   const targets = { run: target("RUN", TARGET_RUNS[1]), lift: target("WORKOUT", TARGET_LIFTS[1]) };
 
   // Série : semaines d'affilée avec au moins 2 jours actifs. La semaine en cours ne casse jamais la série.
-  const active = new Set(rows.filter((a) => !isSoft(a.type)).map((a) => dayKey(a.startedAt, tz)));
+  const active = new Set(rows.filter((a) => !isSoftActivity(a)).map((a) => dayKey(a.startedAt, tz)));
   let streak = 0;
   for (let k = 0; k < 14; k++) {
     const ok = weekKeys(now, tz, -k).filter((d) => active.has(d)).length >= 2;
@@ -84,7 +84,7 @@ export async function getDashboard(userId: string) {
     form, runKm, runCount: week.filter((a) => a.type === "RUN").length, liftCount: week.filter((a) => a.type === "WORKOUT").length, targets, fit, xp, weekXp, goalCount, events, pendingResult: pendingResult && { id: pendingResult.id, name: pendingResult.name },
     km: sum(week, (a) => a.distanceM) / 1000, days, streak, insights,
     timeS: sum(week, (a) => a.movingTimeS), elevation: sum(week, (a) => a.elevationGainM), kcal: week.some((a) => a.calories != null) ? sum(week, (a) => a.calories ?? 0) : null,
-    goals, recent: uniqueById(rows.filter((a) => !isSoft(a.type))).slice(0, 3).map((a) => ({ ...a, muscles: muscles(a) })), empty: rows.length === 0,
+    goals, recent: uniqueById(rows.filter((a) => !isSoftActivity(a))).slice(0, 3).map((a) => ({ ...a, muscles: muscles(a) })), empty: rows.length === 0,
     range: new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).formatRange(new Date(keys[0]), new Date(keys[6])),
   };
 }

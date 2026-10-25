@@ -4,7 +4,7 @@ import { CloudRain, Flag, MessageSquareText, Thermometer } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decodePolyline } from "@/lib/polyline";
-import { isSoft, SPORTS } from "@/lib/sports";
+import { isSoftActivity, SPORTS } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
 import { fmtClock, fmtKm, fmtNum, fmtPace, fmtWhenShort } from "@/lib/format";
 import { ActivityHero } from "@/components/activity/activity-hero";
@@ -68,15 +68,15 @@ export default async function ActivityPage({ params }: { params: { id: string } 
     .map((g) => ({ id: g.id, name: g.name, kind: g.kind, km: g.km, worn: gear.filter((p) => !p.retiredAt && (p.id === g.id || p.parentId === g.id) && p.level === "critical").map((p) => p.name) }));
 
   // « Comparer » : même sport, distance à ±20 %, hors activités douces. Rien à comparer sans distance (muscu) ni pour une activité douce.
-  const COMPARE_TOLERANCE = 0.2;
+  const COMPARE_TOLERANCE = 0.2, COMPARE_MAX = 10;
   const comparable = (x: { id: string; title: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; avgHr: number | null }): Comparable => ({ id: x.id, title: x.title, type: x.type, startedAt: x.startedAt.toISOString(), distanceM: x.distanceM, movingTimeS: x.movingTimeS, elevationGainM: x.elevationGainM, avgHr: x.avgHr });
-  const canCompare = a.type !== "WORKOUT" && !isSoft(a.type) && !isCommute(a) && a.distanceM >= 100;
+  const canCompare = a.type !== "WORKOUT" && !isCommute(a) && a.distanceM >= 100;
   const candidates = canCompare
     ? (await prisma.activity.findMany({
         where: { userId: s.user.id, type: a.type, id: { not: a.id }, distanceM: { gte: a.distanceM * (1 - COMPARE_TOLERANCE), lte: a.distanceM * (1 + COMPARE_TOLERANCE) } },
         orderBy: { startedAt: "desc" }, take: 40,
         select: { id: true, title: true, type: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgHr: true },
-      })).filter((x) => !isCommute(x)).slice(0, 20).map(comparable)
+      })).filter((x) => !isCommute(x)).slice(0, COMPARE_MAX).map(comparable)
     : [];
 
   const route = a.polyline ? decodePolyline(a.polyline) : [];
@@ -231,7 +231,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
             )}
           </div>
         ) : story && <p className="mt-5 border-t border-line pt-4 text-sm leading-snug text-ink-soft">{story}</p>}
-        {!isSoft(a.type) && <div className="mt-4 empty:hidden"><FeelPrompt filled={a.feeling != null && a.rpe != null} /></div>}
+        {!isSoftActivity(a) && <div className="mt-4 empty:hidden"><FeelPrompt filled={a.feeling != null && a.rpe != null} /></div>}
       </ActivityHero>
 
       <div className="mt-8 space-y-8">

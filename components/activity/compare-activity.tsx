@@ -13,6 +13,8 @@ export type Comparable = { id: string; title: string; type: string; startedAt: s
 
 const TZ = "Europe/Paris";
 const when = (c: Comparable) => fmtWhenShort(new Date(c.startedAt), TZ);
+/** « 5,7 km · 35:15 · 6:11 /km » */
+const stats = (c: Comparable) => { const p = fmtPace(c.distanceM, c.movingTimeS, c.type); return [`${fmtNum(c.distanceM / 1000, 1)} km`, fmtClock(c.movingTimeS), p && `${p.value} ${p.unit}`].filter(Boolean).join(" · "); };
 
 /**
  * « Comparer » (zone d'actions de la fiche) : feuille qui liste les sorties comparables (même sport, distance à ±20 %), puis compare la sélection
@@ -39,7 +41,8 @@ export function CompareActivity({ current, candidates }: { current: Comparable; 
                   <button type="button" onClick={() => { tap(); setPicked(c.id); }} className="flex min-h-14 w-full items-center gap-3 py-2 text-left active:opacity-60">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold text-ink">{c.title}</span>
-                      <span className="block truncate text-sm text-ink-soft">{when(c)} · {fmtNum(c.distanceM / 1000, 1)} km · {fmtClock(c.movingTimeS)}</span>
+                      <span className="block truncate text-sm text-ink-mute">{when(c)}</span>
+                      <span className="block truncate font-num text-sm tabular-nums text-ink-soft">{stats(c)}</span>
                     </span>
                     <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
                   </button>

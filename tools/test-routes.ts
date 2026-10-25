@@ -4,6 +4,7 @@ import {
   ascentOf, bikeSpeed, buildProfile, DEFAULT_BIKE_KMH, DEFAULT_RUN_PACE_S_KM, estimateMinutes, kmForMinutes, median, runPace, withinTolerance,
   type HistoryActivity,
 } from "../lib/routes/estimate";
+import { isSoftActivity } from "../lib/sports";
 import { extraShare } from "../lib/routes/generate";
 import { parseOverpass, tilesFor, mergeTiles } from "../lib/routes/overpass";
 import { classifyPoi } from "../lib/routes/poi";
@@ -166,5 +167,13 @@ assert.match(gpx, /<wpt lat="48\.102500" lon="-1\.595000">\n    <name>Belvédèr
 assert.match(gpx, /<name>La nature &amp; co<\/name>/);
 assert.ok(gpx.indexOf("<wpt") < gpx.indexOf("<trk>"), "waypoints avant la trace (ordre du schéma GPX)");
 assert.equal(gpxFileName("L'équilibrée", 12.44), "pulse-l-equilibree-12-4-km.gpx");
+
+// Activités douces : vélotafs et marches, jamais une course (même détectée par Google Fit)
+assert.equal(isSoftActivity({ type: "RUN", source: "google-fit", dedupeKey: "gfit-seg-8-1", title: "Running" }), false, "une course Google Fit n'est pas douce");
+assert.equal(isSoftActivity({ type: "RUN", title: "Footing vélotaf" }), false);
+assert.equal(isSoftActivity({ type: "WALK" }), true);
+assert.equal(isSoftActivity({ type: "EBIKE" }), true);
+assert.equal(isSoftActivity({ type: "RIDE", source: "google-fit" }), true, "vélo Google Fit non reclassé");
+assert.equal(isSoftActivity({ type: "RIDE", source: "strava", title: "Sortie" }), false);
 
 console.log("✓ itinéraires : estimation, OSM, notation, choix, lieux et GPX");

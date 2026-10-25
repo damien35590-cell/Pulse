@@ -8,6 +8,8 @@ import { climbCompare } from "@/lib/insights/landmarks";
 import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
+import { BUILT_IN } from "@/lib/workout/builtin";
+import { ladderInfo } from "@/lib/workout/catalog";
 import { fitnessSeries, zone as formZone } from "@/lib/fitness";
 import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
@@ -32,6 +34,10 @@ export const metadata = { title: "Analyse" };
 const TZ = "Europe/Paris";
 const MAX_NOTES = 3;
 const CALENDAR_WEEKS = 26;
+/** Courbes de la progression muscu : les 6 exercices du programme Haut / Bas tiennent tous. */
+const MAX_LADDERS = 6;
+// Un token par sport, distincts même en gris (noms de classes complets pour Tailwind) : Musculation marque, Running encre, Vélo encre douce, Rando encre sourde
+const SPLIT = [{ stroke: "stroke-brand", bg: "bg-brand" }, { stroke: "stroke-ink", bg: "bg-ink" }, { stroke: "stroke-ink-soft", bg: "bg-ink-soft" }, { stroke: "stroke-ink-mute", bg: "bg-ink-mute" }] as const;
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const dow = (k: string) => (new Date(k + "T00:00:00Z").getUTCDay() + 6) % 7;
 type Sp = { w?: string; to?: string; s?: string };
@@ -144,15 +150,17 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const zones = cycling?.zones && cycling.zonesWeekly
     ? { kind: cycling.zones.kind, ref: cycling.zones.ref, ftpManual: cycling.ftp.manual, rides: cycling.zones.rides, weeks: cycling.zonesWeekly }
     : null;
-  // Progression (Musculation) : les 4 exercices les plus récents (de préférence au moins 2 séances), une courbe chacun
+  // Progression (Musculation) : d'abord les exercices du programme actif (Haut : B, A, C ; Bas : F, G, H, dans cet ordre), puis les autres du plus récent au plus ancien
+  const programOrder = BUILT_IN.flatMap((t) => t.codes).map((c) => c.toLowerCase());
+  const rank = (key: string) => { const r = programOrder.indexOf(/^lafay:([a-z])/.exec(key)?.[1] ?? ""); return r < 0 ? programOrder.length : r; };
   const progression = strength
-    ? [...strength.exercises.filter((e) => e.sessions >= 2), ...strength.exercises.filter((e) => e.sessions < 2)].slice(0, 4)
-        .map((e) => ({ key: e.key, name: e.name, variant: e.variant, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }))
+    ? [...strength.exercises].sort((a, b) => rank(a.key) - rank(b.key) || Number(b.sessions >= 2) - Number(a.sessions >= 2) || b.lastDay.localeCompare(a.lastDay)).slice(0, MAX_LADDERS)
+        .map((e) => { const l = ladderInfo(e.key); return { key: e.key, name: l?.label ?? e.name, variant: e.variant ?? l?.code ?? null, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }; })
     : null;
 
   // Répartition du temps (filtre « Tous » seulement)
   const tt = timeS(inPeriod) || 1;
-  const shares = MY_SPORTS.map((k, i) => ({ k, pct: (timeS(inPeriod.filter((a) => a.type === k)) / tt) * 100, o: [1, 0.7, 0.45, 0.25][i] }));
+  const shares = MY_SPORTS.map((k, i) => ({ k, pct: (timeS(inPeriod.filter((a) => a.type === k)) / tt) * 100, ...SPLIT[i] }));
   let off = 0;
 
   // 4. Profil : sorties par semaine de chaque discipline sur la période
@@ -202,13 +210,13 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
                 <div className={cn(ui.card, "flex items-center gap-4 p-4")}>
                   <svg viewBox="0 0 42 42" className="size-32 shrink-0 -rotate-90" role="img" aria-label="Répartition du temps par sport">
                     <circle cx="21" cy="21" r="15.915" fill="none" className="stroke-surface-2" strokeWidth="6" />
-                    {shares.map((s) => { const o = off; off += s.pct; return s.pct ? <circle key={s.k} cx="21" cy="21" r="15.915" fill="none" className="stroke-brand" strokeOpacity={s.o} strokeWidth="6" strokeDasharray={`${s.pct.toFixed(2)} ${(100 - s.pct).toFixed(2)}`} strokeDashoffset={-o.toFixed(2)} /> : null; })}
+                    {shares.map((s) => { const o = off; off += s.pct; return s.pct ? <circle key={s.k} cx="21" cy="21" r="15.915" fill="none" className={s.stroke} strokeWidth="6" strokeDasharray={`${Math.max(s.pct - 0.8, 0.1).toFixed(2)} ${(100 - Math.max(s.pct - 0.8, 0.1)).toFixed(2)}`} strokeDashoffset={-o.toFixed(2)} /> : null; })}
                   </svg>
                   <ul className="flex-1">
                     {shares.map((s) => (
                       <li key={s.k}>
                         <Link href={qs({ s: s.k })} className="flex min-h-12 items-center gap-2.5">
-                          <i className="size-3 rounded-sm bg-brand" style={{ opacity: s.o }} aria-hidden /><span className="flex-1">{SPORTS[s.k].label}</span>
+                          <i className={cn("size-3 rounded-sm", s.bg)} aria-hidden /><span className="flex-1">{SPORTS[s.k].label}</span>
                           <b className="font-num text-metric-sm tabular-nums">{Math.round(s.pct)} %</b>
                         </Link>
                       </li>

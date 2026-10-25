@@ -43,6 +43,19 @@ export const ladderKey = (variant: string) => {
   return g.index === 0 ? `lafay:${g.letter}` : `lafay:${g.letter}#${g.index}`;
 };
 
+/**
+ * Libellé d'une échelle d'après sa clé d'historique (« lafay:b », « lafay:a#1 ») : « B · Dips », « A1 · Pompes ».
+ * Le code est la lettre seule quand la famille n'a qu'une échelle, sinon le premier code de l'échelle (A1, A3…). null pour un exercice hors Lafay.
+ */
+export function ladderInfo(key: string): { code: string; label: string } | null {
+  const m = /^lafay:([a-z])(?:#(d+))?$/.exec(key);
+  const fam = m && LAFAY_FAMILIES.find((f) => f.letter?.toLowerCase() === m[1]);
+  if (!m || !fam) return null;
+  const g = fam.groups[Number(m[2] ?? 0)], ladders = fam.groups.filter((x) => x.progression.length > 1).length;
+  const code = ladders <= 1 || !g ? m[1].toUpperCase() : g.progression[0], generic = LAFAY_LABEL[m[1]] ?? fam.name;
+  return { code, label: `${code} · ${generic.charAt(0).toUpperCase()}${generic.slice(1)}` };
+}
+
 /** Variante suivante (plus difficile) de son échelle ; null en fin d'échelle ou pour des variantes sans ordre. */
 export const nextInLadder = (v: string | null) => {
   const g = v ? groupOf(v) : null;

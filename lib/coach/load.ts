@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { dayKey } from "@/lib/dates";
 import { fitnessSeries, zone } from "@/lib/fitness";
-import { isSoft } from "@/lib/sports";
+import { isSoftActivity } from "@/lib/sports";
 import { buildProfile, estimateMinutes, HISTORY_DAYS, isCommute } from "@/lib/routes/estimate";
 import { loadHabitIndex } from "@/lib/habits/build";
 import { classicTitle, dist, proj } from "@/lib/habits/grid";
@@ -37,7 +37,7 @@ export async function loadCoachInput(userId: string, run: RunProgramView | null,
 
   const fit = fitnessSeries(fitActs, now, tz).at(-1);
   const today = dayKey(now, tz);
-  const todayDone = recent.filter((a) => dayKey(a.startedAt, tz) === today && !isSoft(a.type) && !isCommute(a)).map((a) => ({ type: a.type, title: a.title }));
+  const todayDone = recent.filter((a) => dayKey(a.startedAt, tz) === today && !isCommute(a)).map((a) => ({ type: a.type, title: a.title }));
 
   const next = run?.status === "ACTIVE" ? run.next : null;
   const runNext = next ? { title: next.title, summary: next.summary, minutes: Math.max(15, Math.round(next.durationS / 60)), date: next.date, isKey: next.isKeySession, kind: next.kind } : null;

@@ -18,28 +18,24 @@ type DotProps = { cx?: number; cy?: number; index?: number; payload?: Record<str
 export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
   const c = useThemeColors(), [sel, setSel] = useState(ladders[0]?.key);
   const cur = ladders.find((l) => l.key === sel) ?? ladders[0];
-  const days = [...new Set(ladders.flatMap((l) => l.points.map((p) => p.day)))].sort();
-  const rows = days.map((day) => {
-    const row: Record<string, number | string> = { day, label: fmtDayKey(day) };
-    ladders.forEach((l, i) => {
-      const j = l.points.findIndex((p) => p.day === day);
-      if (j < 0) return;
-      row[`v${i}`] = l.points[j].reps;
-      const prev = l.points[j - 1]?.variant, v = l.points[j].variant;
-      if (j > 0 && v && v !== prev) row[`m${i}`] = prev ? `${prev}→${v}` : v;
-    });
-    return row;
+  // Une série par échelle, avec ses propres dates (axe du temps) : la courbe relie toujours ses points, même à deux. Deux séances le même jour sont additionnées.
+  const series = ladders.map((l) => {
+    const byDay = new Map<string, { t: number; reps: number; variant: string | null }>();
+    for (const p of l.points) { const o = byDay.get(p.day); byDay.set(p.day, { t: Date.parse(p.day + "T12:00:00Z"), reps: (o?.reps ?? 0) + p.reps, variant: p.variant ?? o?.variant ?? null }); }
+    const pts = [...byDay.values()].sort((x, y) => x.t - y.t);
+    return pts.map((p, j) => ({ ...p, mark: j > 0 && p.variant && p.variant !== pts[j - 1].variant ? (pts[j - 1].variant ? `${pts[j - 1].variant}→${p.variant}` : p.variant) : undefined }));
   });
+  const all = series.flat(), DAY = 864e5;
   const tick = { fontSize: 11, fill: c.inkMute };
   // La courbe choisie est tracée en dernier : elle passe au-dessus des autres
-  const order = ladders.map((_, i) => i).sort((a, b) => Number(ladders[a].key === cur.key) - Number(ladders[b].key === cur.key));
+  const order = ladders.map((_, i) => i).sort((x, y) => Number(ladders[x].key === cur.key) - Number(ladders[y].key === cur.key));
   return (
     <div className="space-y-4">
       {ladders.length > 1 && (
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Exercice">
           {ladders.map((l) => (
             <button key={l.key} type="button" role="tab" aria-selected={l.key === cur.key} onClick={() => { if (l.key !== cur.key) { tap(6); setSel(l.key); } }}
-              className={cn("inline-flex h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold touch-manipulation", l.key === cur.key ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft")}>
+              className={cn("inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-semibold touch-manipulation", l.key === cur.key ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft")}>
               {l.name}
             </button>
           ))}
@@ -47,25 +43,21 @@ export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
       )}
       <div className="h-48" role="img" aria-label="Total de répétitions par séance, par exercice">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ top: 16, right: 12, left: -20, bottom: 0 }}>
+          <LineChart margin={{ top: 16, right: 16, left: -20, bottom: 0 }}>
             <CartesianGrid stroke={c.inkMute} strokeOpacity={0.2} vertical={false} />
-            <XAxis dataKey="label" tick={tick} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis tick={tick} axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip contentStyle={{ background: c.surface, border: `1px solid ${c.line}`, borderRadius: 12, color: c.ink }} formatter={(v, n) => [`${v} reps`, n]} />
+            <XAxis dataKey="t" type="number" scale="time" domain={[Math.min(...all.map((p) => p.t)) - DAY, Math.max(...all.map((p) => p.t)) + DAY]} tickFormatter={(t) => fmtDayKey(new Date(t).toISOString().slice(0, 10))} tick={tick} axisLine={false} tickLine={false} tickCount={4} />
+            <YAxis tick={tick} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, "dataMax + 5"]} />
+            <Tooltip contentStyle={{ background: c.surface, border: `1px solid ${c.line}`, borderRadius: 12, color: c.ink }} labelFormatter={(t) => fmtDayKey(new Date(Number(t)).toISOString().slice(0, 10))} formatter={(v, n) => [`${v} reps`, n]} />
             {order.map((i) => {
               const l = ladders[i], on = l.key === cur.key, color = on ? c.brandText : c.inkMute;
               return (
-                <Line key={l.key} name={l.name} dataKey={`v${i}`} type="linear" connectNulls stroke={color} strokeWidth={on ? 3 : 1.5} strokeOpacity={on ? 1 : 0.6} isAnimationActive={false}
-                  dot={(p: DotProps) => {
-                    const m = p.payload?.[`m${i}`];
-                    if (p.cx == null || p.cy == null || p.payload?.[`v${i}`] == null) return <g key={p.index} />;
-                    return (
-                      <g key={p.index}>
-                        <circle cx={p.cx} cy={p.cy} r={on ? 3.5 : 2} fill={color} stroke={color} />
-                        {on && m && <text x={p.cx} y={p.cy - 9} textAnchor="middle" fontSize={10} fontWeight={600} fill={c.inkSoft}>{m}</text>}
-                      </g>
-                    );
-                  }}
+                <Line key={l.key} name={l.name} data={series[i]} dataKey="reps" type="linear" stroke={color} strokeWidth={on ? 3 : 1.5} strokeOpacity={on ? 1 : 0.6} isAnimationActive={false}
+                  dot={(p: DotProps) => (
+                    <g key={p.index}>
+                      <circle cx={p.cx} cy={p.cy} r={on ? 3.5 : 2} fill={color} stroke={color} />
+                      {on && p.payload?.mark && <text x={p.cx} y={(p.cy ?? 0) - 9} textAnchor="middle" fontSize={10} fontWeight={600} fill={c.inkSoft}>{String(p.payload.mark)}</text>}
+                    </g>
+                  )}
                 />
               );
             })}

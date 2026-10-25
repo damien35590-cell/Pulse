@@ -2,7 +2,7 @@
  * Estimation du temps d'une boucle selon tes sorties récentes. Fonctions pures (tests : tools/test-routes.ts).
  * Toutes les constantes réglables sont ici.
  */
-import { isSoft } from "@/lib/sports";
+import { isSoftActivity } from "@/lib/sports";
 
 export type RouteSport = "RUN" | "RIDE";
 export type BikeVariant = "road" | "trail";
@@ -47,9 +47,8 @@ export const median = (xs: number[]) => {
 
 const recent = (a: HistoryActivity, now: Date) => +now - +a.startedAt <= HISTORY_DAYS * 864e5 && +a.startedAt <= +now;
 
-/** Vélotaf : E-bike, import Google Fit (vélo à assistance) ou titre explicite. */
-export const isCommute = (a: HistoryActivity) =>
-  isSoft(a.type) || a.source === "google-fit" || !!a.dedupeKey?.startsWith("gfit-") || /v[ée]lotaf/i.test(a.title ?? "");
+/** Activité douce (vélotaf, marche) : la règle unique est `isSoftActivity` (lib/sports.ts). */
+export const isCommute = (a: HistoryActivity) => isSoftActivity(a);
 
 /** Allure médiane (s/km) des sorties course de 90 jours, ≥ 3 km, hors activités douces. */
 export function runPace(acts: HistoryActivity[], now = new Date()) {

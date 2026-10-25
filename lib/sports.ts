@@ -20,3 +20,11 @@ export const SPORT_ORDER = ["WORKOUT", "RUN", "RIDE", "EBIKE", "HIKE", "WALK"] a
 /** Activités « douces » : déplacements du quotidien, pas de l'entraînement. */
 export const SOFT_TYPES = ["EBIKE", "WALK"] as const;
 export const isSoft = (type: string) => (SOFT_TYPES as readonly string[]).includes(type);
+
+/**
+ * LA règle des activités douces (accueil, Analyse, coach, Comparer) : vélotafs (E-bike) et marches du quotidien, jamais une course.
+ * Un vélo « vélotaf » non encore reclassé en E-bike (import Google Fit, titre explicite) compte aussi ; la source seule ne suffit pas :
+ * Google Fit détecte aussi de vraies courses (source « google-fit », type RUN).
+ */
+export const isSoftActivity = (a: { type: string; source?: string | null; dedupeKey?: string | null; title?: string | null }) =>
+  isSoft(a.type) || (a.type === "RIDE" && (a.source === "google-fit" || !!a.dedupeKey?.startsWith("gfit-") || /v[ée]lotaf/i.test(a.title ?? "")));
