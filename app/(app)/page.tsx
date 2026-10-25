@@ -20,7 +20,7 @@ import { getActivityInsights } from "@/lib/data/activity-insight";
 import { getZones } from "@/lib/data/zones";
 import { GearAlert } from "@/components/gear/gear-alert";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
-import { ProgramCard, StartProgramCard, cheer } from "@/components/training/program-card";
+import { ProgramCard, StartProgramCard } from "@/components/training/program-card";
 import { PlanRouteCard } from "@/components/routes/plan-route-card";
 import { PendingBadgesCard } from "@/components/profile/pending-badges-card";
 import { CoachCard } from "@/components/dashboard/coach-card";
@@ -45,7 +45,6 @@ export default async function DashboardPage() {
   // Le coach ne bloque jamais l'accueil : en cas de souci, la carte n'apparaît pas.
   const coach = await getCoach(s.user.id, run).catch((e) => { console.error("[coach]", e); return null; });
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: TZ }).format(new Date());
-  const phrase = run && run.status === "ACTIVE" ? cheer(run.weekDone, run.sessionsPerWeek) : null;
   const goal = d.goals[0];
   const race = d.events[0];
   // Même phrase de comparaison que la fiche, en une passe pour les 3 cartes.
@@ -56,7 +55,6 @@ export default async function DashboardPage() {
     <>
       <TopBar
         title={today}
-        subtitle={phrase ?? undefined}
         actions={<Link href="/import" aria-label="Importer un fichier" className={ui.iconBtn}><Upload className="size-5" aria-hidden /></Link>}
       />
       <div className="space-y-8">

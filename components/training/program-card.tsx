@@ -15,14 +15,6 @@ export const weekLabel = (p: RunProgramView) =>
 const blockLabel = (p: RunProgramView) =>
   `Bloc ${p.current.block} · Semaine ${p.current.weekInBlock}/${p.blockWeeks} · ${p.name}${p.current.isRecovery ? " · allégée" : ""}`;
 
-/** Phrase du coach pour la semaine (sous la date de l'accueil). Toujours encourageante : rien n'est dit d'une semaine incomplète. */
-export function cheer(done: number, target: number) {
-  if (done >= target) return "Semaine bouclée, bravo 🎉";
-  if (target - done === 1 && done > 0) return "Plus qu’une pour boucler la semaine 💪";
-  if (done > 0) return "Bien lancé, continue comme ça";
-  return null;
-}
-
 export function KeyBadge() {
   return <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">Séance clé</span>;
 }

@@ -174,6 +174,7 @@ export function coachToday(i: CoachInput): CoachPlan {
       kind: "lift", tag: "Muscu", title: `Séance ${lift.title.toLowerCase()}`,
       lines: [lift.detail, i.lastLiftAt == null ? "Première séance : choisis tes variantes et tes répétitions de départ." : `Dernière séance il y a ${sinceLift} jours${i.lastLiftHalf ? ` (${HALF_SESSION[i.lastLiftHalf].title.toLowerCase()})` : ""}.`],
       primary: { label: "Démarrer la séance", href: LIFT_HREF },
+      secondary: { label: "Voir le programme", href: "/plan#muscu" },
       next: runTomorrow ? `Demain : ${runLine(i.runNext!)}` : undefined, tone: "go",
     };
   }
