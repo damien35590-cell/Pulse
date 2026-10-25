@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { fitnessSeries, zone } from "@/lib/fitness";
+import { FITNESS_HISTORY_DAYS, formSeries, zone } from "@/lib/fitness";
 import { estimateLoad, LOAD_SOURCE_LABELS, LOAD_SOURCES, type LoadSource } from "@/lib/load";
 import { dayKey, shiftDay } from "@/lib/dates";
 import { SPORT_ORDER, SPORTS } from "@/lib/sports";
@@ -34,8 +34,8 @@ export default async function FitnessPage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const now = new Date();
-  const acts = await prisma.activity.findMany({ where: { userId: s.user.id, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true, loadSource: true } });
-  const all = fitnessSeries(acts, now, TZ), data = all.slice(-90), t = all[all.length - 1], z = zone(t.form), ramp = t.ctl - all[all.length - 8].ctl;
+  const acts = await prisma.activity.findMany({ where: { userId: s.user.id, startedAt: { gte: new Date(+now - FITNESS_HISTORY_DAYS * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true, loadSource: true, source: true, dedupeKey: true, title: true } });
+  const all = formSeries(acts, now, TZ), data = all.slice(-90), t = all[all.length - 1], z = zone(t.form), ramp = t.ctl - all[all.length - 8].ctl;
 
   // D'où vient la charge des 7 derniers jours (aujourd'hui compris) : par sport et par méthode de calcul.
   const from = shiftDay(dayKey(now, TZ), -6), bySport: Record<string, number> = {}, bySource: Record<string, number> = {};

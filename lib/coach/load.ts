@@ -1,7 +1,7 @@
 /** Données du coach du jour (côté serveur) : une requête par source, puis lib/coach/today.ts décide. */
 import { prisma } from "@/lib/prisma";
 import { dayKey } from "@/lib/dates";
-import { fitnessSeries, zone } from "@/lib/fitness";
+import { FITNESS_HISTORY_DAYS, formSeries, zone } from "@/lib/fitness";
 import { isSoftActivity } from "@/lib/sports";
 import { buildProfile, estimateMinutes, HISTORY_DAYS, isCommute } from "@/lib/routes/estimate";
 import { loadHabitIndex } from "@/lib/habits/build";
@@ -23,7 +23,7 @@ export async function loadCoachInput(userId: string, run: RunProgramView | null,
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true, homeLat: true, homeLng: true } });
   const tz = user?.timezone ?? "Europe/Paris";
   const [fitActs, recent, lastRun, lastLift] = await Promise.all([
-    prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true } }),
+    prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - FITNESS_HISTORY_DAYS * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true, source: true, dedupeKey: true, title: true } }),
     prisma.activity.findMany({
       where: { userId, startedAt: { gte: new Date(+now - HISTORY_DAYS * 864e5) } },
       select: { type: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, source: true, dedupeKey: true, startLat: true },
@@ -35,7 +35,7 @@ export async function loadCoachInput(userId: string, run: RunProgramView | null,
     }),
   ]);
 
-  const fit = fitnessSeries(fitActs, now, tz).at(-1);
+  const fit = formSeries(fitActs, now, tz).at(-1);
   const today = dayKey(now, tz);
   const todayDone = recent.filter((a) => dayKey(a.startedAt, tz) === today && !isCommute(a)).map((a) => ({ type: a.type, title: a.title }));
 

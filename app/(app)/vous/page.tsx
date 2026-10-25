@@ -22,6 +22,7 @@ import { getPrefs } from "@/lib/notify/prefs";
 import { prisma } from "@/lib/prisma";
 import { level, rank, xpOf } from "@/lib/xp";
 import { getCountdown } from "@/lib/races/time";
+import { isSoftActivity } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
@@ -45,10 +46,12 @@ export default async function ProfilePage() {
   ]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
-  const { acts, stats } = await loadBadgeStats(userId, TZ);
+  const { acts } = await loadBadgeStats(userId, TZ);
   const records = await getRecordsBySport(userId, TZ, acts.map((a) => a.type));
   const lvl = level(acts.reduce((t, a) => t + xpOf(a), 0));
-  const st = stats.GLOBAL; // mêmes totaux que les badges, tous sports confondus
+  // Totaux tous sports, activités douces (vélotaf, marche) exclues : ce sont les mêmes que la liste des Activités
+  const train = acts.filter((a) => !isSoftActivity(a));
+  const st = { km: train.reduce((t, a) => t + a.distanceM, 0) / 1000, count: train.length, elevation: train.reduce((t, a) => t + a.elevationGainM, 0), hours: train.reduce((t, a) => t + a.movingTimeS, 0) / 3600 };
 
   const seuils = `${thresholdLabel("FTP", zones.ftp, "W", zones.ftpManual)} · ${thresholdLabel("FC max", zones.hrMax, "bpm", zones.hrManual)}`;
 

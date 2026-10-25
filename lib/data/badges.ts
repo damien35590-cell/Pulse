@@ -8,7 +8,7 @@ export async function loadBadgeStats(userId: string, tz: string) {
   const [acts, exercises, records, noted] = await Promise.all([
     prisma.activity.findMany({
       where: { userId },
-      select: { type: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgPower: true, maxPower: true, weather: true, feeling: true },
+      select: { type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, avgPower: true, maxPower: true, weather: true, feeling: true },
     }),
     prisma.workoutExercise.findMany({ where: { activity: { userId } }, select: { activityId: true, name: true, sets: true, reps: true, loadKg: true } }),
     prisma.personalRecord.findMany({ where: { userId, type: "RUN" } }),

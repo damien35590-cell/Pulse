@@ -1,5 +1,6 @@
 import { dayKey, shiftDay } from "./dates";
 import { estimateLoad } from "./load";
+import { isSoftActivity } from "./sports";
 
 /** Facteurs d'intensité par sport (estimation), désormais définis dans lib/load.ts. */
 export { INTENSITY } from "./load";
@@ -19,6 +20,17 @@ export function fitnessSeries(acts: { startedAt: Date; movingTimeS: number; type
     out.push({ key: k, load: l, ctl: c, atl: f, form: c - f });
   }
   return out;
+}
+
+/** Historique lu pour la forme : la fitness est une moyenne mobile sur 42 j, elle a besoin de mois de recul pour être juste. */
+export const FITNESS_HISTORY_DAYS = 330;
+
+/**
+ * LA série de forme de l'app (accueil, Forme physique, Analyse, coach) : activités douces (vélotaf, marche) exclues avec `isSoftActivity`.
+ * `acts` doit porter `source`, `dedupeKey` et `title` pour que la règle soit complète.
+ */
+export function formSeries(acts: (Parameters<typeof fitnessSeries>[0][number] & { source?: string | null; dedupeKey?: string | null; title?: string | null })[], now: Date, tz: string, days = 300): Fit[] {
+  return fitnessSeries(acts.filter((a) => !isSoftActivity(a)), now, tz, days);
 }
 
 export function zone(form: number) {

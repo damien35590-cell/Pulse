@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { dayKey, weekKeys } from "@/lib/dates";
 import { weeklyInsights } from "@/lib/insights/engine";
-import { fitnessSeries, zone } from "@/lib/fitness";
+import { FITNESS_HISTORY_DAYS, formSeries, zone } from "@/lib/fitness";
 import { MUSCLE_LABELS } from "@/lib/training/catalog/exercises";
 import { level, xpOf } from "@/lib/xp";
 import { prepLine, racePrep } from "@/lib/races/prep";
@@ -25,7 +25,7 @@ export async function getDashboard(userId: string) {
     prisma.goal.findMany({ where: { userId, active: true, metric: "DISTANCE", period: "WEEK" }, orderBy: { createdAt: "asc" } }),
     prisma.goal.count({ where: { userId, active: true } }),
     prisma.activity.findMany({ where: { userId }, select: { distanceM: true, elevationGainM: true, movingTimeS: true, type: true } }),
-    prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - 330 * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true } }),
+    prisma.activity.findMany({ where: { userId, startedAt: { gte: new Date(+now - FITNESS_HISTORY_DAYS * 864e5) } }, select: { startedAt: true, movingTimeS: true, type: true, load: true, source: true, dedupeKey: true, title: true } }),
     prisma.raceEvent.findMany({ where: { userId, status: { not: "DNS" }, date: { gte: new Date(+now - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 6 }),
     prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { lt: new Date(+now + 864e5) } }, orderBy: { date: "desc" }, take: 3, select: { id: true, name: true, date: true, startTime: true, status: true } }),
     // Séances prévues au programme cette semaine (hors passées / déplacées) : pastilles en pointillé dans la semaine.
@@ -65,7 +65,7 @@ export async function getDashboard(userId: string) {
   }
 
   const insights = weeklyInsights(rows.map((r) => ({ ...r, weather: r.weather as Act["weather"] })), { now, tz });
-  const series = fitnessSeries(fitActs, now, tz), fit = series.at(-1)!, xp = level(allXp.reduce((t, a) => t + xpOf(a), 0));
+  const series = formSeries(fitActs, now, tz), fit = series.at(-1)!, xp = level(allXp.reduce((t, a) => t + xpOf(a), 0));
   const weekXp = week.reduce((t, a) => t + xpOf(a), 0);
   // Un objectif par sport (ou « tous sports ») : la distance de la semaine ne compte que le sport concerné. Sans objectif : 30 km, tous sports.
   const goals = (goalRows.length ? goalRows.map((g) => ({ id: g.id, sport: g.type as string | null, goalKm: g.target / 1000 })) : [{ id: "default", sport: null as string | null, goalKm: 30 }])

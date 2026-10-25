@@ -10,7 +10,7 @@ import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
 import { BUILT_IN } from "@/lib/workout/builtin";
 import { catalogExercise, catalogFor, ladderInfo } from "@/lib/workout/catalog";
-import { fitnessSeries, zone as formZone } from "@/lib/fitness";
+import { FITNESS_HISTORY_DAYS, formSeries, zone as formZone } from "@/lib/fitness";
 import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
@@ -57,7 +57,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const period = parsePeriod(searchParams, TZ), now = period.now, W = period.weeks, todayKey = dayKey(new Date(), TZ);
   const coachPeriod = { weeks: W, tz: TZ, now, current: period.current };
   const acts = (await prisma.activity.findMany({
-    where: { userId: uid, startedAt: { gte: new Date(+now - (Math.max(2 * W, CALENDAR_WEEKS) * 7 + 14) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
+    where: { userId: uid, startedAt: { gte: new Date(+now - Math.max((Math.max(2 * W, CALENDAR_WEEKS) * 7 + 14), FITNESS_HISTORY_DAYS) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
     select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
   })).filter((a) => !isCommute(a)); // activités douces : hors de toutes les statistiques
 
@@ -148,7 +148,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     : undefined;
 
   // Forme (Tous) : fitness 42 j, fatigue 7 j, fraîcheur = fitness − fatigue, sur 84 jours ; seulement si une séance a une charge
-  const fit = S === "all" && acts.some((a) => (a.load ?? 0) > 0) ? fitnessSeries(acts, now, TZ, 330) : null, fitEnd = fit?.[fit.length - 1];
+  const fit = S === "all" && acts.some((a) => (a.load ?? 0) > 0) ? formSeries(acts, now, TZ, FITNESS_HISTORY_DAYS) : null, fitEnd = fit?.[fit.length - 1];
   const form = fit && fitEnd ? { series: fit.slice(-84), ctl: fitEnd.ctl, atl: fitEnd.atl, form: fitEnd.form, zone: formZone(fitEnd.form) } : null;
   // Zones par semaine (Vélo) : puissance, sinon FC ; mêmes séries que l'ancien bloc « Temps par zone »
   const zones = cycling?.zones && cycling.zonesWeekly

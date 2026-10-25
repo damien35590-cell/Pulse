@@ -16,7 +16,7 @@ const blockLabel = (p: RunProgramView) =>
   `Bloc ${p.current.block} · Semaine ${p.current.weekInBlock}/${p.blockWeeks} · ${p.name}${p.current.isRecovery ? " · allégée" : ""}`;
 
 export function KeyBadge() {
-  return <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">Séance clé</span>;
+  return <span className="shrink-0 whitespace-nowrap rounded-full bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">Séance clé</span>;
 }
 
 /** Points de la semaine du programme : faite (plein), passée (gris), prochaine (anneau), à venir (contour). */
@@ -91,7 +91,10 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
     <section aria-label="Programme course" className={cn(ui.card, "relative overflow-hidden p-4 pb-0")}>
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/[0.07] blur-3xl" />
       <div className="relative flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 truncate text-label uppercase text-brand">{paused ? "Programme en pause" : "Prochaine séance"}</p>
+          {!paused && n?.isKeySession && <KeyBadge />}
+        </div>
         <Link href="/plan" className="-my-3 inline-flex h-12 shrink-0 items-center text-sm font-semibold text-brand active:opacity-60">Programme</Link>
       </div>
       {paused ? (
@@ -109,10 +112,7 @@ export function ProgramCard({ p }: { p: RunProgramView }) {
           count={`${p.weekDone}/${p.sessionsPerWeek}`}
         >
           <div>
-            <div className="flex items-start justify-between gap-2">
-              <h2 className="text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
-              {n.isKeySession && <span className="mt-2"><KeyBadge /></span>}
-            </div>
+            <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{n.title}</h2>
             {n.summary && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{n.summary}</p>}
             <div className="mt-5"><SessionActions id={n.id} variant="card" /></div>
           </div>
