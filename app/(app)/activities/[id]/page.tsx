@@ -29,9 +29,8 @@ import { buildStream, type StreamData } from "@/lib/stream";
 import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote, FeelPrompt } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
-import { RaceToggle } from "@/components/activity/race-toggle";
 import { SessionTypeControl } from "@/components/activity/session-type";
-import { detectedSessionType } from "@/lib/art/session-type";
+import { detectedSessionType, type SessionType } from "@/lib/art/session-type";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
 import { getGear } from "@/lib/data/gear";
@@ -124,8 +123,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         }
         sections={
           <>
-            {(a.type === "RUN" || a.type === "RIDE" || a.type === "HIKE") && a.zoneRibbon != null && <SessionTypeControl id={a.id} detected={detectedSessionType(a.isInterval)} current={(a.sessionType as "interval" | "easy" | "race" | null)} />}
-            {a.type === "RUN" && <RaceToggle id={a.id} isRace={a.isRace} />}
+            {(a.type === "RUN" || a.type === "RIDE" || a.type === "HIKE") && a.zoneRibbon != null && <SessionTypeControl id={a.id} detected={detectedSessionType(a.isInterval)} current={(a.sessionType as SessionType | null)} />}
             {note && (
               <section aria-label="Note du coach" className={cn(ui.card, "flex gap-3 p-4")}>
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><MessageSquareText className="size-4" aria-hidden /></span>
@@ -185,7 +183,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
           </>
         }
       >
-        {a.isRace && <span className={cn(ui.chip, "mt-1")}><Flag className="size-3.5" aria-hidden />Compétition</span>}
+        {a.sessionType === "race" && <span className={cn(ui.chip, "mt-1")}><Flag className="size-3.5" aria-hidden />Compétition</span>}
         {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand"><Flag className="size-4" aria-hidden />Course · {a.raceEvent.name}</Link>}
         {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
         <dl className="mt-5">

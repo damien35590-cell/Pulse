@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-strava-import.ts
 import assert from "node:assert/strict";
-import { findDuplicate, isExcludedType, mapStravaType, parseCsv, parseNumber, parseStravaDate, readStravaCsv, stravaKey, toParsed, type KnownActivity } from "../lib/import/strava";
+import { findDuplicate, isExcludedType, mapStravaType, parseCsv, parseNumber, parseStravaDate, readStravaCsv, stravaKey, stravaSessionType, toParsed, type KnownActivity } from "../lib/import/strava";
 import { parseXmlTrack } from "../lib/import/xml-track";
 
 // ── CSV : guillemets, retours à la ligne dans une description, en-têtes répétés (le dernier « Distance » est en mètres) ──
@@ -20,9 +20,12 @@ assert.equal(rows[1].name, "St Malo, Erquy");
 assert.equal(rows[1].description, 'ligne 1\n"ligne 2"');
 assert.equal(rows[1].file, null);
 assert.equal(rows[1].commute, true);
-assert.equal(rows[0].isRace, false); // pas de colonne Compétition : false
-const raceCsv = [`ID de l'activité,Date de l'activité,Nom de l'activité,Type d'activité,Compétition`, `9,"1 mai 2026, 09:00:00",10 km,Course à pied,true`, `10,"2 mai 2026, 09:00:00",Footing,Course à pied,`].join("\n");
-assert.deepEqual(readStravaCsv(raceCsv).rows.map((r) => r.isRace), [true, false]);
+assert.equal(rows[0].sessionType, undefined); // pas de colonne Compétition / Sortie longue
+const raceCsv = [`ID de l'activité,Date de l'activité,Nom de l'activité,Type d'activité,Compétition,Sortie longue,Type d'entraînement`, `9,"1 mai 2026, 09:00:00",10 km,Course à pied,true,,`, `10,"2 mai 2026, 09:00:00",Footing,Course à pied,,,`, `11,"3 mai 2026, 09:00:00",Longue,Course à pied,,true,`, `12,"4 mai 2026, 09:00:00",Via type,Course à pied,,,2`, `13,"5 mai 2026, 09:00:00",Les deux,Course à pied,true,true,`].join("\n");
+assert.deepEqual(readStravaCsv(raceCsv).rows.map((r) => r.sessionType), ["race", undefined, "long", "long", "race"]);
+assert.equal(stravaSessionType("", "", "1"), "race");
+assert.equal(stravaSessionType("", "", "3"), undefined);
+assert.equal(toParsed({ ...readStravaCsv(raceCsv).rows[0], movingS: 600 }, null).sessionType, "race");
 assert.deepEqual(readStravaCsv("a,b\n1,2").missing, ["id", "date", "type"]);
 
 // ── Dates (UTC) et nombres ──

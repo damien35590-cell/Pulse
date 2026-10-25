@@ -87,8 +87,8 @@ export type StravaRow = {
   avgPower?: number;
   maxPower?: number;
   calories?: number;
-  /** Course (compétition) selon Strava : colonne « Compétition » ou type d'entraînement « Course » (workout_type 1). */
-  isRace: boolean;
+  /** Type de séance d'après Strava (Activity.sessionType) : « Compétition » / workout_type 1 → race, « Sortie longue » / workout_type 2 → long ; undefined sinon. */
+  sessionType?: "race" | "long";
 };
 
 // En-têtes (français ou anglais, sans accents ni casse). L'export répète certains titres (Distance, Temps écoulé, FC max) :
@@ -110,14 +110,22 @@ const COLS = {
   maxPower: ["puissance max.", "max watts"],
   avgPower: ["puissance moyenne", "average watts"],
   calories: ["calories"],
-  // Absentes des anciens exports : sans elles, isRace reste false.
+  // Absentes des anciens exports : sans elles, sessionType reste indéfini.
   competition: ["competition", "race"],
+  longRun: ["sortie longue", "long run"],
   workoutType: ["type d'entrainement", "workout type"],
 } as const;
 const REQUIRED: (keyof typeof COLS)[] = ["id", "date", "type"];
 
-/** « true » / « vrai » / « 1 » (case Compétition) ; pour le type d'entraînement : 1 ou « Course » (workout_type Strava : 0 défaut, 1 course, 2 sortie longue, 3 séance). */
-const isRaceFlag = (v: string) => /^(true|vrai|oui|1|race|course|competition)$/i.test(norm(v));
+const isTrue = (v: string) => /^(true|vrai|oui|1)$/i.test(norm(v));
+
+/** Cases Compétition / Sortie longue, sinon type d'entraînement Strava (workout_type : 0 défaut, 1 course, 2 sortie longue, 3 séance). La course prime. */
+export function stravaSessionType(competition: string, longRun: string, workoutType: string): "race" | "long" | undefined {
+  const w = norm(workoutType);
+  if (isTrue(competition) || w === "1" || w === "race" || w === "course") return "race";
+  if (isTrue(longRun) || w === "2" || w === "long run" || w === "sortie longue") return "long";
+  return undefined;
+}
 
 export function readStravaCsv(text: string): { rows: StravaRow[]; missing: string[] } {
   const table = parseCsv(text);
@@ -139,7 +147,7 @@ export function readStravaCsv(text: string): { rows: StravaRow[]; missing: strin
       commute: /^(true|vrai|oui|1)$/i.test(str(r, "commute")),
       file: str(r, "file") || null,
       elapsedS: numOf(r, "elapsed"), movingS: numOf(r, "moving"), distanceM: numOf(r, "distance"), elevationM: numOf(r, "elevation"),
-      isRace: isRaceFlag(str(r, "competition")) || isRaceFlag(str(r, "workoutType")),
+      sessionType: stravaSessionType(str(r, "competition"), str(r, "longRun"), str(r, "workoutType")),
       avgHr: numOf(r, "avgHr"), maxHr: numOf(r, "maxHr"), avgPower: numOf(r, "avgPower"), maxPower: numOf(r, "maxPower"), calories: numOf(r, "calories"),
     };
   });
@@ -199,7 +207,7 @@ export function toParsed(row: StravaRow, file: ParsedActivity | null): ParsedAct
     avgHr: file?.avgHr ?? pos(row.avgHr), maxHr: file?.maxHr ?? pos(row.maxHr),
     avgPower: file?.avgPower ?? pos(row.avgPower), maxPower: file?.maxPower ?? pos(row.maxPower),
     calories: file?.calories ?? pos(row.calories),
-    isRace: row.isRace || undefined,
+    sessionType: row.sessionType,
     startLat: file?.startLat, startLng: file?.startLng, points: file?.points ?? [],
   };
 }

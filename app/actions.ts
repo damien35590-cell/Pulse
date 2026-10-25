@@ -389,15 +389,6 @@ export async function setSessionType(id: string, value: string | null): Promise<
   return { ok: true };
 }
 
-/** Case « Compétition » de la fiche (course à pied). */
-export async function setRace(id: string, value: boolean): Promise<Res> {
-  const userId = await uid();
-  const r = await prisma.activity.updateMany({ where: { id, userId }, data: { isRace: !!value } });
-  if (r.count === 0) return { ok: false, error: "Activité introuvable." };
-  revalidatePath("/activities"); revalidatePath(`/activities/${id}`); revalidatePath("/");
-  return { ok: true };
-}
-
 /** Champ vide = retour à l'estimation automatique. Un seuil qui change de façon sensible fait recalculer les rubans de zones en arrière-plan. */
 export async function saveZones(fd: FormData) {
   const userId = await uid(), ftp = num(fd.get("ftp")), hrMax = num(fd.get("hrMax"));

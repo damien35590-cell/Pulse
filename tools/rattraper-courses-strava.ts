@@ -1,13 +1,13 @@
 /**
- * Rattrape Activity.isRace pour les activités Strava déjà en base, depuis l'activities.csv de l'archive officielle
- * (colonne « Compétition », ou type d'entraînement « Course » : workout_type 1).
+ * Rattrape Activity.sessionType pour les activités Strava déjà en base, depuis l'activities.csv de l'archive officielle :
+ * « Compétition » / workout_type 1 → "race", « Sortie longue » / workout_type 2 → "long".
  *
  *   npx tsx tools/rattraper-courses-strava.ts "C:\strava-export"            → simulation (défaut)
  *   npx tsx tools/rattraper-courses-strava.ts "C:\strava-export" --apply    → écrit
  *
  * Options : --user <email> (défaut : ALLOWED_EMAIL du .env, sinon l'unique utilisateur).
  * Correspondance : d'abord l'identifiant Strava (externalId), sinon départ à ±5 min et distance à ±3 % (activité venue d'une autre source).
- * Ne fait que passer isRace à true : un choix manuel (case décochée) n'est jamais écrasé dans l'autre sens.
+ * Ne remplit que les sessionType vides : un choix déjà fait (manuel ou d'un import précédent) n'est jamais écrasé.
  * Base : dev par défaut ; pour la prod, voir CLAUDE.md (vercel env pull + --env-file, avec --dry-run d'abord).
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -35,29 +35,35 @@ async function main() {
 
   const { rows, missing } = readStravaCsv(readFileSync(csvPath, "utf8"));
   if (missing.length) { console.error(`Colonnes introuvables : ${missing.join(", ")}`); process.exitCode = 1; return; }
-  const races = rows.filter((r) => r.isRace);
+  const races = rows.filter((r) => r.sessionType);
   console.log(`\nRattrapage des compétitions Strava — ${apply ? "ÉCRITURE" : "SIMULATION"} — ${users[0].email ?? uid}`);
-  console.log(`${rows.length} ligne(s) dans activities.csv, dont ${races.length} marquée(s) compétition.`);
-  if (!races.length) { console.log("Rien à faire (colonne « Compétition » absente ou jamais cochée)."); await prisma.$disconnect(); return; }
+  console.log(`${rows.length} ligne(s) dans activities.csv, dont ${races.length} compétition(s) ou sortie(s) longue(s).`);
+  if (!races.length) { console.log("Rien à faire (colonnes « Compétition » / « Sortie longue » absentes ou jamais cochées)."); await prisma.$disconnect(); return; }
 
-  const byExternal = new Map((await prisma.activity.findMany({ where: { userId: uid, source: "strava", externalId: { in: races.map((r) => r.id) } }, select: { id: true, isRace: true, externalId: true, title: true, startedAt: true } })).map((a) => [a.externalId!, a]));
-  const ids: string[] = [];
+  const byExternal = new Map((await prisma.activity.findMany({ where: { userId: uid, source: "strava", externalId: { in: races.map((r) => r.id) } }, select: { id: true, sessionType: true, externalId: true, title: true, startedAt: true } })).map((a) => [a.externalId!, a]));
+  const todo: { id: string; value: "race" | "long" }[] = [];
   let already = 0, unmatched = 0;
   for (const r of races) {
     let a = byExternal.get(r.id);
     if (!a && r.startedAt) {
-      const near = await prisma.activity.findMany({ where: { userId: uid, type: "RUN", startedAt: { gte: new Date(+r.startedAt - 5 * 60e3), lte: new Date(+r.startedAt + 5 * 60e3) } }, select: { id: true, isRace: true, externalId: true, title: true, startedAt: true, distanceM: true } });
+      const near = await prisma.activity.findMany({ where: { userId: uid, type: "RUN", startedAt: { gte: new Date(+r.startedAt - 5 * 60e3), lte: new Date(+r.startedAt + 5 * 60e3) } }, select: { id: true, sessionType: true, externalId: true, title: true, startedAt: true, distanceM: true } });
       const d = r.distanceM ?? 0;
       a = near.filter((x) => d > 0 && Math.abs(x.distanceM - d) / d <= 0.03).sort((x, y) => Math.abs(+x.startedAt - +r.startedAt!) - Math.abs(+y.startedAt - +r.startedAt!))[0];
     }
     if (!a) { unmatched++; console.log(`  ? introuvable en base : ${r.rawDate} « ${r.name} » (${r.id})`); continue; }
-    if (a.isRace) { already++; continue; }
-    ids.push(a.id);
-    console.log(`  ✓ ${a.startedAt.toISOString().slice(0, 16).replace("T", " ")} « ${a.title} »`);
+    if (a.sessionType) { already++; continue; }
+    todo.push({ id: a.id, value: r.sessionType! });
+    console.log(`  ✓ ${r.sessionType} ${a.startedAt.toISOString().slice(0, 16).replace("T", " ")} « ${a.title} »`);
   }
-  console.log(`\n${ids.length} à marquer, ${already} déjà marquée(s), ${unmatched} sans correspondance.`);
-  if (apply && ids.length) { const r = await prisma.activity.updateMany({ where: { userId: uid, id: { in: ids } }, data: { isRace: true } }); console.log(`${r.count} activité(s) mise(s) à jour.`); }
-  else if (!apply) console.log("Simulation : rien n'a été modifié. Relancer avec --apply pour écrire.");
+  console.log(`\n${todo.length} à renseigner, ${already} déjà renseignée(s), ${unmatched} sans correspondance.`);
+  if (apply && todo.length) {
+    let n = 0;
+    for (const value of ["race", "long"] as const) {
+      const ids = todo.filter((t) => t.value === value).map((t) => t.id);
+      if (ids.length) n += (await prisma.activity.updateMany({ where: { userId: uid, id: { in: ids }, sessionType: null }, data: { sessionType: value } })).count;
+    }
+    console.log(`${n} activité(s) mise(s) à jour.`);
+  } else if (!apply) console.log("Simulation : rien n'a été modifié. Relancer avec --apply pour écrire.");
   await prisma.$disconnect();
 }
 main().catch((e) => { console.error(e); process.exitCode = 1; });

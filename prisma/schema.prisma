@@ -197,8 +197,7 @@ model Activity {
   zoneRibbonSource String?               // "hr" | "power" | "pace" : série d'où vient le ruban ; null = pas de ruban (ou ruban d'avant ce champ)
   zoneRibbonRef  Float?                  // seuil utilisé : FC max (bpm), FTP (W) ou VMA (km/h) ; sert à repérer les rubans périmés quand il change
   isInterval     Boolean?                // séance d'intervalles (lib/art/interval.ts, 10 s de résolution, rubans FC et allure) ; null = non évalué
-  isRace         Boolean      @default(false) // compétition : case « Compétition » de Strava (import), ou choix manuel sur la fiche
-  sessionType    String?                 // choix manuel : "interval" | "easy" | "race" ; null = automatique. Jamais écrit par un recalcul (lib/art/session-type.ts)
+  sessionType    String?                 // choix manuel : "interval" | "easy" | "long" | "race" (l'import Strava remplit "race" et "long") ; null = automatique. Jamais écrit par un recalcul (lib/art/session-type.ts)
   intervalReps   Int?                    // nombre de répétitions détectées
   zoneRibbonAt   DateTime?               // dernier calcul du ruban, même sans résultat ; null = jamais calculé ou à recalculer (lib/data/zone-ribbon.ts)
   createdAt      DateTime     @default(now())

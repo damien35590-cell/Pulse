@@ -28,7 +28,7 @@ export type ParsedActivity = {
   calories?: number;
   startLat?: number;
   startLng?: number;
-  /** Compétition (Strava : case « Compétition »). */
-  isRace?: boolean;
+  /** Type de séance d'après Strava : "race" (Compétition) ou "long" (Sortie longue) ; absent = détection automatique. */
+  sessionType?: "race" | "long";
   points: TrackPoint[];
 };
