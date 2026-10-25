@@ -20,7 +20,7 @@ export async function getDashboard(userId: string) {
   const [rows, goalRows, goalCount, allXp, fitActs, eventsRaw, pendingRaw, plannedRaw, countGoals, programs] = await Promise.all([
     prisma.activity.findMany({
       where: { userId, startedAt: { gte: new Date(+now - 100 * 864e5) } }, orderBy: { startedAt: "desc" },
-      select: { id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, calories: true, avgHr: true, avgPower: true, polyline: true, startLat: true, startLng: true, weather: true, exercises: { select: { sets: true, reps: true, loadKg: true, exercise: { select: { primaryMuscles: true } } } } },
+      select: { id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, calories: true, avgHr: true, avgPower: true, polyline: true, startLat: true, startLng: true, weather: true, isRace: true, exercises: { select: { sets: true, reps: true, loadKg: true, exercise: { select: { primaryMuscles: true } } } } },
     }),
     prisma.goal.findMany({ where: { userId, active: true, metric: "DISTANCE", period: "WEEK" }, orderBy: { createdAt: "asc" } }),
     prisma.goal.count({ where: { userId, active: true } }),

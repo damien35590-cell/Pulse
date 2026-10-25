@@ -20,6 +20,9 @@ assert.equal(rows[1].name, "St Malo, Erquy");
 assert.equal(rows[1].description, 'ligne 1\n"ligne 2"');
 assert.equal(rows[1].file, null);
 assert.equal(rows[1].commute, true);
+assert.equal(rows[0].isRace, false); // pas de colonne Compétition : false
+const raceCsv = [`ID de l'activité,Date de l'activité,Nom de l'activité,Type d'activité,Compétition`, `9,"1 mai 2026, 09:00:00",10 km,Course à pied,true`, `10,"2 mai 2026, 09:00:00",Footing,Course à pied,`].join("\n");
+assert.deepEqual(readStravaCsv(raceCsv).rows.map((r) => r.isRace), [true, false]);
 assert.deepEqual(readStravaCsv("a,b\n1,2").missing, ["id", "date", "type"]);
 
 // ── Dates (UTC) et nombres ──

@@ -28,5 +28,7 @@ export type ParsedActivity = {
   calories?: number;
   startLat?: number;
   startLng?: number;
+  /** Compétition (Strava : case « Compétition »). */
+  isRace?: boolean;
   points: TrackPoint[];
 };

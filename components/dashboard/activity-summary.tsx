@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Flag } from "lucide-react";
 import { activityStyle } from "@/lib/activity-style";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
@@ -26,6 +27,8 @@ export type ActivitySummaryData = {
   /** La phrase unique : même comparaison que la fiche (lib/activity/comparables.ts : insightLine). */
   insight?: Line;
   badge?: string;
+  /** Compétition : pastille « Compétition » sous la date. */
+  isRace?: boolean;
   /** Trace GPS simplifiée (~200 points, previewTrack) : absente en intérieur ou en muscu, et alors pas de carte. */
   route?: LatLng[];
   /** Art dérivé des données (lib/art/card.ts), au plus un des trois : ruban sous la carte, profil d'effort à sa place, ou séries de muscu en tête. */
@@ -51,6 +54,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold leading-tight text-ink">{a.title}</p>
           <p className="mt-0.5 truncate text-xs text-ink-mute">{a.when}</p>
+          {a.isRace && <span className={cn(ui.chip, "mt-1")}><Flag className="size-3" aria-hidden />Compétition</span>}
         </div>
         {a.badge && <span className="shrink-0 rounded-full bg-brand/15 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-brand">{a.badge}</span>}
       </div>

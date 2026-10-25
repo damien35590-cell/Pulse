@@ -11,7 +11,7 @@ export type SummaryActivity = {
   id: string; type: string; title: string; story: string | null; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; polyline: string | null;
   avgHr?: number | null; avgPower?: number | null; exercises?: ({ sets: number; reps: number; loadKg: number | null } & Partial<SetExercise>)[];
   /** Art (lib/art/card.ts) : tous facultatifs, sans eux la carte reste celle d'avant. */
-  source?: string | null; zoneRibbon?: unknown; zoneRibbonSource?: string | null; isInterval?: boolean | null; sessionType?: string | null; plannedSession?: { kind: string; title: string } | null;
+  source?: string | null; zoneRibbon?: unknown; zoneRibbonSource?: string | null; isInterval?: boolean | null; sessionType?: string | null; isRace?: boolean; plannedSession?: { kind: string; title: string } | null;
 };
 export type Cell = { l: string; v: string; u?: string };
 
@@ -46,7 +46,7 @@ export function summaryData(a: SummaryActivity, insight: ActivityInsight | undef
     exercises: a.exercises?.flatMap((e) => (e.name ? [{ name: e.name, sets: e.sets, reps: e.reps, setsDetail: e.setsDetail }] : [])),
   });
   return {
-    id: a.id, type: a.type, title: a.title, when: fmtWhen(a.startedAt, tz),
+    id: a.id, type: a.type, title: a.title, isRace: a.isRace || undefined, when: fmtWhen(a.startedAt, tz),
     metrics: cells(a).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
     insight: insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
     route, ...art,
