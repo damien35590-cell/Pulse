@@ -210,7 +210,8 @@ export function runNotes(input: { acts: CoachAct[]; period: CoachPeriod; goal?: 
 
 // ───────── Onglet « Musculation » ─────────
 
-export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeriod; plans?: PlanAdherence[] }): CoachNote[] {
+/** `perWeek` : séances par semaine de la page (`sessionsPerWeek`, comme la tuile) ; à défaut, celle de l'analyse de muscu. */
+export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeriod; plans?: PlanAdherence[]; perWeek?: number | null }): CoachNote[] {
   const { data, period: p, plans = [] } = input;
   if (data.empty) return rankNotes(planNotes(plans.filter((x) => x.sport === "WORKOUT")));
   const f = frame(p), notes: CoachNote[] = [];
@@ -227,7 +228,7 @@ export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeri
 
   // 2. Fréquence par rapport aux 2 à 3 séances par semaine
   if (f.fullWeeks >= 2) {
-    const per = data.regularity.perWeek;
+    const per = input.perWeek ?? data.regularity.perWeek;
     if (per < TARGET_LIFTS[0] - 0.3) notes.push({ id: "freq", tone: "warn", title: `${fr(per, 1)} séance${per >= 2 ? "s" : ""} par semaine`, body: `Ta cible est de ${TARGET_LIFTS[0]} à ${TARGET_LIFTS[1]}. En dessous de 2 séances par semaine, le « +1 rep par séance » a du mal à tenir.` });
     else if (per > TARGET_LIFTS[1] + 0.5) notes.push({ id: "freq", tone: "info", title: `${fr(per, 1)} séances par semaine`, body: "Au-delà de 3, garde au moins un jour de repos entre deux séances qui travaillent les mêmes muscles." });
     else notes.push({ id: "freq", tone: "good", title: "Rythme respecté", body: `${fr(per, 1)} séances par semaine, dans ta cible de ${TARGET_LIFTS[0]} à ${TARGET_LIFTS[1]}.` });

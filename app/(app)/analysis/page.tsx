@@ -9,7 +9,7 @@ import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
 import { BUILT_IN } from "@/lib/workout/builtin";
-import { ladderInfo } from "@/lib/workout/catalog";
+import { catalogFor, ladderInfo } from "@/lib/workout/catalog";
 import { fitnessSeries, zone as formZone } from "@/lib/fitness";
 import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
@@ -38,6 +38,8 @@ const CALENDAR_WEEKS = 26;
 const MAX_LADDERS = 6;
 // Un token par sport, distincts même en gris (noms de classes complets pour Tailwind) : Musculation marque, Running encre, Vélo encre douce, Rando encre sourde
 const SPLIT = [{ stroke: "stroke-brand", bg: "bg-brand" }, { stroke: "stroke-ink", bg: "bg-ink" }, { stroke: "stroke-ink-soft", bg: "bg-ink-soft" }, { stroke: "stroke-ink-mute", bg: "bg-ink-mute" }] as const;
+// Exercice du catalogue (code Lafay ou fiche SuperPhysique) ; un exercice saisi librement n'a pas de courbe de progression (il reste dans l'historique et les comptes)
+const inCatalogue = (key: string, name: string) => key.startsWith("lafay:") || !!catalogFor(name, null);
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const dow = (k: string) => (new Date(k + "T00:00:00Z").getUTCDay() + 6) % 7;
 type Sp = { w?: string; to?: string; s?: string };
@@ -54,7 +56,17 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   // Période choisie : `now` = fin de la période (aujourd'hui, ou le dimanche de la semaine choisie)
   const period = parsePeriod(searchParams, TZ), now = period.now, W = period.weeks, todayKey = dayKey(new Date(), TZ);
   const coachPeriod = { weeks: W, tz: TZ, now, current: period.current };
-  const S = (MY_SPORTS as readonly string[]).includes(searchParams.s ?? "") ? searchParams.s! : "all";
+  const acts = (await prisma.activity.findMany({
+    where: { userId: uid, startedAt: { gte: new Date(+now - (Math.max(2 * W, CALENDAR_WEEKS) * 7 + 14) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
+    select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
+  })).filter((a) => !isCommute(a)); // activités douces : hors de toutes les statistiques
+
+  const mon = weekKeys(now, TZ)[0], today = dayKey(now, TZ);
+  const ago = (d: Date) => { const diff = (Date.parse(mon) - Date.parse(dayKey(d, TZ))) / 864e5; return diff <= 0 ? 0 : Math.ceil(diff / 7); };
+  // Filtres de sport : seulement ceux qui ont au moins une activité (non douce) sur la période ; « Tous » toujours. Un filtre disparu retombe sur « Tous ».
+  const inPeriod = acts.filter((a) => ago(a.startedAt) < W);
+  const sports = MY_SPORTS.filter((k) => inPeriod.some((a) => a.type === k));
+  const S = (sports as readonly string[]).includes(searchParams.s ?? "") ? searchParams.s! : "all";
   const endurance = S === "RUN" || S === "RIDE" || S === "HIKE";
   const noun = S === "WORKOUT" || S === "all" ? "séance" : "sortie";
 
@@ -69,15 +81,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   });
   const planSport = S === "RUN" || S === "WORKOUT" ? S : undefined;
 
-  const acts = (await prisma.activity.findMany({
-    where: { userId: uid, startedAt: { gte: new Date(+now - (Math.max(2 * W, CALENDAR_WEEKS) * 7 + 14) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
-    select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
-  })).filter((a) => !isCommute(a)); // activités douces : hors de toutes les statistiques
-
-  const mon = weekKeys(now, TZ)[0], today = dayKey(now, TZ);
-  const ago = (d: Date) => { const diff = (Date.parse(mon) - Date.parse(dayKey(d, TZ))) / 864e5; return diff <= 0 ? 0 : Math.ceil(diff / 7); };
   const hit = (a: { type: string }) => S === "all" || a.type === S;
-  const inPeriod = acts.filter((a) => ago(a.startedAt) < W);
   const cur = inPeriod.filter(hit), prev = acts.filter((a) => { const k = ago(a.startedAt); return k >= W && k < 2 * W && hit(a); });
   // Sorties par semaine : toujours le calcul du coach (activités / semaines de la période)
   const perWeekOf = (l: { startedAt: Date }[]) => sessionsPerWeek(l, coachPeriod) ?? l.length / W;
@@ -96,7 +100,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const insight = (id: string, text: string): CoachNote => ({ id, tone: "info", title: text, body: "" });
   const notes = rankNotes(
     S === "RUN" ? runNotes({ acts, period: coachPeriod, goal: runGoal, plans })
-    : S === "WORKOUT" ? strengthNotes({ data: strength!, period: coachPeriod, plans })
+    : S === "WORKOUT" ? strengthNotes({ data: strength!, period: coachPeriod, plans, perWeek: sessionsPerWeek(cur, coachPeriod) })
     : S === "RIDE" ? cycling!.insights.map((t, i) => insight(`ride-${i}`, t))
     : S === "HIKE" ? hiking!.insights.map((t, i) => insight(`hike-${i}`, t))
     : overviewNotes({ acts, period: coachPeriod, plans }),
@@ -154,7 +158,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const programOrder = BUILT_IN.flatMap((t) => t.codes).map((c) => c.toLowerCase());
   const rank = (key: string) => { const r = programOrder.indexOf(/^lafay:([a-z])/.exec(key)?.[1] ?? ""); return r < 0 ? programOrder.length : r; };
   const progression = strength
-    ? [...strength.exercises].sort((a, b) => rank(a.key) - rank(b.key) || Number(b.sessions >= 2) - Number(a.sessions >= 2) || b.lastDay.localeCompare(a.lastDay)).slice(0, MAX_LADDERS)
+    ? strength.exercises.filter((e) => inCatalogue(e.key, e.name)).sort((a, b) => rank(a.key) - rank(b.key) || Number(b.sessions >= 2) - Number(a.sessions >= 2) || b.lastDay.localeCompare(a.lastDay)).slice(0, MAX_LADDERS)
         .map((e) => { const l = ladderInfo(e.key); return { key: e.key, name: l?.label ?? e.name, variant: e.variant ?? l?.code ?? null, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }; })
     : null;
 
@@ -187,7 +191,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
       <h1 className="font-display text-3xl font-bold leading-none">Analyse</h1>
       <PeriodPicker weeks={W} current={period.current} endKey={period.endKey} startKey={period.startKey} preset={period.preset} today={todayKey} />
       <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">
-        {[["all", "Tous"], ...MY_SPORTS.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}
+        {[["all", "Tous"], ...sports.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">{kpis}</div>
