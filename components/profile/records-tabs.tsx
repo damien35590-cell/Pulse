@@ -9,7 +9,7 @@ import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import type { RecordSport, RecordsBySport } from "@/lib/analytics/records";
 
-const TAB_LABEL: Record<RecordSport, string> = { RUN: "Course", RIDE: "Vélo", WORKOUT: "Muscu", HIKE: "Rando" };
+const TAB_LABEL: Record<RecordSport, string> = { RUN: "Running", RIDE: "Vélo", WORKOUT: "Muscu", HIKE: "Rando" };
 const STORAGE_KEY = "pulse:records-sport";
 
 /** Records personnels : un onglet par sport (seulement ceux qui ont des records), le dernier choisi est retenu. */
@@ -40,7 +40,7 @@ export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; l
           onChange={choose}
           options={data.sports.map(({ sport: s }) => {
             const Icon = SPORTS[s].icon;
-            return { value: s, label: <span className="inline-flex items-center justify-center gap-1.5"><Icon className="size-4 shrink-0" aria-hidden />{TAB_LABEL[s]}</span> };
+            return { value: s, label: <span className="inline-flex items-center justify-center gap-1"><Icon className="size-3.5 shrink-0" aria-hidden />{TAB_LABEL[s]}</span> };
           })}
         />
       )}
