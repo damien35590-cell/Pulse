@@ -62,13 +62,13 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         {a.metrics.slice(0, 3).map((m) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} />)}
       </dl>
 
-      {a.zones && <ZoneBar zones={a.zones} compact className="mt-4" />}
       {a.tags && (
         <ul className="mt-4 flex flex-wrap gap-1.5">
           {a.tags.map((t) => <li key={t} className={ui.chip}>{t}</li>)}
         </ul>
       )}
       {a.insight && <InsightLine line={a.insight} className="mt-3" />}
+      {a.zones && <ZoneBar zones={a.zones} compact className="mt-4" />}
       {a.sets
         ? <SetBars groups={a.sets} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />
         : a.effort

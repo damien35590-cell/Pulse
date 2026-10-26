@@ -1,7 +1,10 @@
 import { fmtKm, fmtDuration, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
 import { previewTrack } from "@/lib/map/track";
 import { isSoftActivity } from "@/lib/sports";
-import { insightLine } from "@/lib/activity/comparables";
+import { insightLine, type InsightLine } from "@/lib/activity/comparables";
+import { parseRibbon } from "@/lib/art/zone-ribbon";
+import { ZONES } from "@/lib/zones";
+import type { ZoneSlice } from "@/components/activity/zone-bar";
 import { cardArt } from "@/lib/art/card";
 import type { SetExercise } from "@/lib/art/set-bars";
 import type { ActivityInsight } from "@/lib/data/activity-insight";
@@ -34,6 +37,21 @@ export function cells(a: SummaryActivity): Cell[] {
   return list.filter((c): c is Cell => c !== null).slice(0, 3);
 }
 
+/** Une carte d'endurance a toujours sa phrase : à défaut de comparaison, la place de la sortie dans la semaine (vraie même pour la 1re). */
+function fallbackLine(type: string, rank?: number): InsightLine | undefined {
+  return (type === "RUN" || type === "RIDE" || type === "HIKE") && rank ? { text: rank === 1 ? "1ʳᵉ sortie de la semaine" : `${rank}ᵉ sortie de la semaine`, tone: "neutral" } : undefined;
+}
+
+/** Sans trace GPS, une sortie avec FC garde un visuel : temps par zone tiré du ruban (fractions du temps) quand il vient de la FC. */
+function ribbonZones(a: SummaryActivity): ZoneSlice[] | undefined {
+  if (!["RUN", "RIDE", "HIKE"].includes(a.type) || a.zoneRibbonSource !== "hr") return undefined;
+  const ribbon = parseRibbon(a.zoneRibbon);
+  if (!ribbon) return undefined;
+  const seconds = new Map<number, number>();
+  for (const s of ribbon) seconds.set(s.z, (seconds.get(s.z) ?? 0) + s.f * a.movingTimeS);
+  return ZONES.map((z) => ({ id: z.id, name: z.name, seconds: seconds.get(z.id) ?? 0 }));
+}
+
 /**
  * Données d'une carte du fil (accueil, liste) : 3 chiffres, la phrase de comparaison de la fiche (lib/activity/comparables.ts),
  * vignette du tracé simplifiée ici, côté serveur (~200 points). Activités douces : pas de tracé.
@@ -48,7 +66,8 @@ export function summaryData(a: SummaryActivity, insight: ActivityInsight | undef
   return {
     id: a.id, type: a.type, title: a.title, competition: a.sessionType === "race" || undefined, when: fmtWhen(a.startedAt, tz),
     metrics: cells(a).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
-    insight: a.type === "WORKOUT" ? insight?.strength : insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
+    insight: a.type === "WORKOUT" ? insight?.strength : insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? fallbackLine(a.type, insight?.weekRank),
+    zones: !route && !art.ribbon && !art.effort ? ribbonZones(a) : undefined,
     route, ...art,
     ...extra,
   };

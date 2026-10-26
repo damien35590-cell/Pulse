@@ -32,12 +32,13 @@ const SORTS: Record<string, { label: string; orderBy: Prisma.ActivityOrderByWith
 };
 const PERIODS: Record<string, string> = { all: "Tout", "30": "30 derniers jours", "90": "3 derniers mois", year: "Cette année" };
 const FULL = {
-  id: true, type: true, title: true, story: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, polyline: true, avgHr: true, avgPower: true,
+  id: true, type: true, title: true, story: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, polyline: true, avgHr: true, avgPower: true,
   source: true, zoneRibbon: true, zoneRibbonSource: true, isInterval: true, sessionType: true, plannedSession: { select: { kind: true, title: true } }, // art de la carte (lib/art/card.ts) : jamais le flux brut
   exercises: { orderBy: { position: "asc" }, select: { name: true, sets: true, reps: true, loadKg: true, setsDetail: true } },
 } satisfies Prisma.ActivitySelect;
 type Full = Prisma.ActivityGetPayload<{ select: typeof FULL }>;
-type Lite = { id: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number };
+type Lite = { id: string; type: string; title: string; source: string; dedupeKey?: string | null; startedAt: Date; distanceM: number; movingTimeS: number };
+const LITE = { id: true, type: true, title: true, source: true, dedupeKey: true, startedAt: true, distanceM: true, movingTimeS: true } satisfies Prisma.ActivitySelect;
 
 const ymFmt = new Intl.DateTimeFormat("fr-FR", { year: "numeric", month: "2-digit", timeZone: TZ });
 const monthKey = (d: Date) => { const p = ymFmt.formatToParts(d); return `${p.find((x) => x.type === "year")!.value}-${p.find((x) => x.type === "month")!.value}`; };
@@ -62,11 +63,12 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
 
   // Chronologique : années > mois repliables ; seules les cartes des mois ouverts sont chargées.
   // Autres tris : liste à plat, paginée par 20.
-  let total = 0, flat: Full[] = [], hasMore = false, n = PAGE, openMonths: string[] = [];
+  let total = 0, trainTotal = 0, flat: Full[] = [], hasMore = false, n = PAGE, openMonths: string[] = [];
   const years = new Map<string, Map<string, Lite[]>>(), full = new Map<string, Full>();
   if (byDate) {
-    const all = await prisma.activity.findMany({ where, orderBy, select: { id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true } });
+    const all = await prisma.activity.findMany({ where, orderBy, select: LITE });
     total = all.length;
+    trainTotal = all.filter((a) => !isSoftActivity(a)).length;
     for (const a of all) {
       const mk = monthKey(a.startedAt), y = mk.slice(0, 4);
       if (!years.has(y)) years.set(y, new Map());
@@ -82,6 +84,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
     hasMore = rows.length > n;
     flat = uniqueById(rows.slice(0, n)); // filet de sécurité : jamais deux cartes pour le même id
     total = count;
+    trainTotal = (await prisma.activity.findMany({ where, select: LITE })).filter((a) => !isSoftActivity(a)).length;
   }
   // Phrase de comparaison des cartes affichées (hors activités douces) : une passe pour toute la page, pas une requête par carte.
   const shown = (byDate ? [...full.values()] : flat).filter((a) => !isSoftActivity(a)).map((a) => a.id);
@@ -98,9 +101,10 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   const toggle = (mk: string) => { const next = openMonths.includes(mk) ? openMonths.filter((k) => k !== mk) : [...openMonths, mk]; return next.join(",") || "-"; };
   const chip = (on: boolean) => cn("inline-flex h-12 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97]", on ? "bg-ink text-bg" : "bg-surface-2 text-ink-soft");
   const counts = (l: Lite[]) => {
-    const nSoft = l.filter((a) => isSoftActivity(a)).length;
-    if (!soft) return `${plural(l.length, "séance")} · ${fmtDuration(sum(l, (a) => a.movingTimeS))}`;
-    return nSoft && nSoft < l.length ? `${l.length - nSoft} sport. · ${nSoft} douce${nSoft > 1 ? "s" : ""}` : plural(l.length, "activité");
+    // Séances = entraînement seulement : les activités douces (vélotaf, marche) ne comptent ni en nombre, ni en temps, ni en km.
+    const train = l.filter((a) => !isSoftActivity(a)), nSoft = l.length - train.length;
+    const base = `${plural(train.length, "séance")} · ${fmtDuration(sum(train, (a) => a.movingTimeS))}`;
+    return soft && nSoft ? `${base} · ${nSoft} douce${nSoft > 1 ? "s" : ""}` : base;
   };
   const filtered = T !== null || period !== "all";
 
@@ -139,7 +143,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
           <FilterSheet sort={sortKey} soft={soft} period={period}
             sorts={Object.entries(SORTS).map(([k, v]) => [k, v.label])} periods={Object.entries(PERIODS)} />
         </div>
-        <p className={ui.label}>{plural(total, "activité")}</p>
+        <p className={ui.label}>{plural(trainTotal, "séance")}</p>
       </div>
 
       {total === 0 && (filtered
@@ -148,14 +152,14 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
       )}
 
       {byDate && [...years].map(([y, months], yi) => {
-        const yAll = [...months.values()].flat();
+        const yAll = [...months.values()].flat(), yTrain = yAll.filter((a) => !isSoftActivity(a));
         const hasOpen = [...months.keys()].some((k) => openMonths.includes(k));
         return (
           <details key={y} open={yi === 0 || hasOpen} className="group/year">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
               <h2 className="font-display text-2xl font-bold tabular-nums">{y}</h2>
               <span className="flex items-center gap-2 text-sm text-ink-soft">
-                {plural(yAll.length, "activité")}{sum(yAll, (a) => a.distanceM) > 0 && ` · ${fmtKm(sum(yAll, (a) => a.distanceM))} km`}
+                {plural(yTrain.length, "séance")}{sum(yTrain, (a) => a.distanceM) > 0 && ` · ${fmtKm(sum(yTrain, (a) => a.distanceM))} km`} · {fmtDuration(sum(yTrain, (a) => a.movingTimeS))}
                 <ChevronDown className="h-5 w-5 transition-transform group-open/year:rotate-180" aria-hidden />
               </span>
             </summary>
