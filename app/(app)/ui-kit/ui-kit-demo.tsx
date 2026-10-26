@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { Dumbbell, Ellipsis, Flag, HeartPulse, RefreshCw, Sparkles, Target, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
@@ -127,7 +128,7 @@ function List({ go }: { go: Go }) {
       <TopBar title="Activités" subtitle="Données fictives · octobre · 9 séances" actions={<button type="button" aria-label="Importer un fichier" className={ui.iconBtn}><Upload className="size-5" aria-hidden /></button>} />
       <Segmented
         className="mb-5"
-        options={[{ value: "all", label: "Toutes" }, { value: "RUN", label: "Course" }, { value: "WORKOUT", label: "Muscu" }]}
+        options={[{ value: "all", label: "Toutes" }, { value: "RUN", label: SPORT_SHORT("RUN") }, { value: "WORKOUT", label: "Muscu" }]}
         value={f}
         onChange={setF}
       />

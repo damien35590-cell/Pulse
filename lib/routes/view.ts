@@ -1,3 +1,5 @@
+import { SPORT_LABEL } from "@/lib/sports";
+
 /** Formats d'affichage des boucles, utilisables côté serveur comme côté client. */
 
 /** Durée pour un <Metric> : « 45 min » ou « 1:05 h ». */
@@ -7,4 +9,4 @@ export const durationMetric = (minutes: number) => {
 };
 
 export const sportLine = (r: { sport: "RUN" | "RIDE"; variant: "road" | "trail" | null }) =>
-  r.sport === "RUN" ? "Course" : r.variant === "trail" ? "Vélo · chemins" : "Vélo · route";
+  r.sport === "RUN" ? SPORT_LABEL("RUN") : r.variant === "trail" ? "Vélo · chemins" : "Vélo · route";

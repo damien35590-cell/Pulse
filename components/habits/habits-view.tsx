@@ -10,6 +10,7 @@ import { decodePolyline, routePath } from "@/lib/polyline";
 import { durationMetric } from "@/lib/routes/view";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { prepareClassic } from "@/app/actions";
@@ -87,7 +88,7 @@ export function HabitsView({ habits, coverage }: Props) {
   const busy = !!progress;
   return (
     <div className="space-y-8">
-      <Segmented options={[{ value: "RUN", label: "Course" }, { value: "RIDE", label: "Vélo" }]} value={sport} onChange={(s) => { setSport(s); setSelected(null); }} />
+      <Segmented options={[{ value: "RUN", label: SPORT_SHORT("RUN") }, { value: "RIDE", label: "Vélo" }]} value={sport} onChange={(s) => { setSport(s); setSelected(null); }} />
 
       <Section title="Tes traces GPS">
         <div className={cn(ui.card, "space-y-3 p-4")}>

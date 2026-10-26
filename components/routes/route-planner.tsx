@@ -8,6 +8,7 @@ import { fmtPaceMin } from "@/lib/routes/estimate";
 import { RUN_SESSIONS, SESSION_LABEL, type RunSession } from "@/lib/routes/session-fit";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { setHome } from "@/app/actions";
@@ -216,7 +217,7 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, preset, chi
     <div className="space-y-8">
       <Section title="Sport">
         <div className="space-y-2">
-          <Segmented options={[{ value: "RUN", label: "Course" }, { value: "RIDE", label: "Vélo" }]} value={sport} onChange={setSport} />
+          <Segmented options={[{ value: "RUN", label: SPORT_SHORT("RUN") }, { value: "RIDE", label: "Vélo" }]} value={sport} onChange={setSport} />
           {sport === "RIDE" && <Segmented size="sm" options={[{ value: "road", label: "Route" }, { value: "trail", label: "Chemins" }]} value={variant} onChange={setVariant} />}
           <p className="px-1 text-xs text-ink-mute">{hint}</p>
         </div>

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { fmtNum } from "@/lib/format";
 import { Metric } from "@/components/ui/metric";
@@ -27,7 +28,7 @@ export function WeekCard({ run, lift, km, goalKm, days }: Props) {
   return (
     <div className={cn(ui.card, "p-4")}>
       <dl className="grid grid-cols-3 gap-3">
-        <Metric size="lg" label="Course" value={run.done} unit={`/ ${run.target}`} />
+        <Metric size="lg" label={SPORT_SHORT("RUN")} value={run.done} unit={`/ ${run.target}`} />
         <Metric size="lg" label="Muscu" value={lift.done} unit={`/ ${lift.target}`} />
         <Metric
           size="lg" label="Distance" value={fmtNum(km, 1)} unit={`/ ${fmtNum(goalKm, 0)} km`}
@@ -64,7 +65,7 @@ export function WeekCard({ run, lift, km, goalKm, days }: Props) {
 
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-ink-mute">
         <span className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-brand" />Course</span>
+          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-brand" />{SPORT_SHORT("RUN")}</span>
           <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-ink/80" />Muscu</span>
         </span>
         <span className="whitespace-nowrap font-num text-sm tabular-nums text-ink-soft">{hm(total)} au total</span>

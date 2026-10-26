@@ -5,10 +5,13 @@ import { Runner } from "@/components/ui/icons/runner";
 export type SportIcon = ComponentType<LucideProps>;
 
 /** Comme sur Strava : une seule couleur de marque, les sports se distinguent par leur pictogramme. */
-export const SPORTS: Record<string, { label: string; icon: SportIcon }> = {
-  RUN: { label: "Running", icon: Runner }, RIDE: { label: "Vélo", icon: Bike }, EBIKE: { label: "E-bike", icon: Zap }, SWIM: { label: "Natation", icon: Waves },
-  HIKE: { label: "Randonnée", icon: Mountain }, WALK: { label: "Marche", icon: Footprints }, WORKOUT: { label: "Musculation", icon: Dumbbell }, OTHER: { label: "Activité", icon: Activity },
+export const SPORTS: Record<string, { label: string; short: string; icon: SportIcon }> = {
+  RUN: { label: "Running", short: "Running", icon: Runner }, RIDE: { label: "Vélo", short: "Vélo", icon: Bike }, EBIKE: { label: "E-bike", short: "E-bike", icon: Zap }, SWIM: { label: "Natation", short: "Natation", icon: Waves },
+  HIKE: { label: "Randonnée", short: "Rando", icon: Mountain }, WALK: { label: "Marche", short: "Marche", icon: Footprints }, WORKOUT: { label: "Musculation", short: "Muscu", icon: Dumbbell }, OTHER: { label: "Activité", short: "Activité", icon: Activity },
 };
+/** Libellés des sports : complet (SPORT_LABEL) et court pour onglets et puces (SPORT_SHORT). Source unique, RUN = « Running ». */
+export const SPORT_LABEL = (type: string) => SPORTS[type]?.label ?? SPORTS.OTHER.label;
+export const SPORT_SHORT = (type: string) => SPORTS[type]?.short ?? SPORTS.OTHER.short;
 export const sportColor = (_type?: string) => "rgb(var(--brand))";
 
 /** Les quatre sports de l'app. */

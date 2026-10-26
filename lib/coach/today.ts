@@ -2,6 +2,7 @@
  * Coach du jour : une seule recommandation pour aujourd'hui, à partir de la forme, du programme course,
  * de l'alternance Lafay (haut / bas du corps), de la météo et de tes classiques. Fonctions pures (tests : tools/test-coach.ts).
  */
+import { SPORT_LABEL } from "@/lib/sports";
 import type { RideWeather } from "@/lib/weather/open-meteo";
 import { sessionFromProgram, type RunSession } from "../routes/session-fit";
 
@@ -161,7 +162,7 @@ export function coachToday(i: CoachInput): CoachPlan {
     if (tired && r.isKey) lines.push("Fatigue marquée : vise le bas des allures, ou décale à demain.");
     if (late > 0) lines.push(`Prévue ${late === 1 ? "hier" : `il y a ${late} jours`} : fais-la aujourd'hui, le programme suit.`);
     return {
-      kind: "run", tag: r.isKey ? "Séance clé" : "Course", title: r.title, lines,
+      kind: "run", tag: r.isKey ? "Séance clé" : SPORT_LABEL("RUN"), title: r.title, lines,
       primary: { label: `Trouver une boucle de ${r.minutes} min`, href: routeHref(r.minutes, sessionFromProgram(r)) },
       secondary: { label: "Voir le programme", href: "/plan" },
       next: liftDue ? `Demain : muscu ${lift.title.toLowerCase()}` : undefined, tone: tired ? "easy" : "go",
