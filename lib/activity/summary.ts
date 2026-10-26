@@ -48,7 +48,7 @@ export function summaryData(a: SummaryActivity, insight: ActivityInsight | undef
   return {
     id: a.id, type: a.type, title: a.title, competition: a.sessionType === "race" || undefined, when: fmtWhen(a.startedAt, tz),
     metrics: cells(a).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
-    insight: insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
+    insight: a.type === "WORKOUT" ? insight?.strength : insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
     route, ...art,
     ...extra,
   };

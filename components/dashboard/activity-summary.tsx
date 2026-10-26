@@ -31,7 +31,7 @@ export type ActivitySummaryData = {
   competition?: boolean;
   /** Trace GPS simplifiée (~200 points, previewTrack) : absente en intérieur ou en muscu, et alors pas de carte. */
   route?: LatLng[];
-  /** Art dérivé des données (lib/art/card.ts), au plus un des trois : ruban sous la carte, profil d'effort à sa place, ou séries de muscu en tête. */
+  /** Art dérivé des données (lib/art/card.ts), au plus un des trois : ruban, profil d'effort ou séries de muscu : toujours en pied de carte. */
   ribbon?: RibbonSegment[];
   effort?: { segments: RibbonSegment[]; label?: string };
   sets?: SetGroup[];
@@ -39,14 +39,13 @@ export type ActivitySummaryData = {
 
 /**
  * Carte de résumé (fil d'activités, accueil) : on y lit « comment ça s'est passé » en 2 secondes.
- * Hiérarchie : titre → 3 chiffres → bande de zones → une seule phrase d'analyse → vignette du tracé. Tout le reste est dans le détail.
+ * Hiérarchie (identique pour tous les sports) : titre → 3 chiffres → bande de zones → une seule phrase d'analyse → visuel pleine largeur en pied de carte (tracé, ruban, effort ou séries). Tout le reste est dans le détail.
  */
 export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData; href?: string; onSelect?: () => void }) {
   const { icon: Icon, fg, soft } = activityStyle(a.type);
   const hasMap = !!a.route && a.route.length > 1;
   const body = (
     <>
-      {a.sets && <SetBars groups={a.sets} className="-mx-4 -mt-4 mb-4 w-[calc(100%_+_2rem)] rounded-t-card" />}
       <div className="flex items-center gap-3">
         <span className={cn("grid size-12 shrink-0 place-items-center rounded-tile", soft, fg)}>
           <Icon className="size-6" aria-hidden />
@@ -70,7 +69,9 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         </ul>
       )}
       {a.insight && <InsightLine line={a.insight} className="mt-3" />}
-      {a.effort
+      {a.sets
+        ? <SetBars groups={a.sets} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />
+        : a.effort
         ? <EffortStrip segments={a.effort.segments} label={a.effort.label} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />
         : (hasMap || a.ribbon) && (
           <div className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] overflow-hidden rounded-b-card">
@@ -80,7 +81,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         )}
     </>
   );
-  const cls = cn(ui.card, ui.pressCard, "block w-full p-4 text-left");
+  const cls = cn(ui.card, ui.pressCard, "block w-full overflow-hidden p-4 text-left");
   // Démo : pas de navigation. Un <div role="button"> car <button> n'accepte pas de blocs (dl, ul, p) à l'intérieur.
   if (onSelect)
     return (

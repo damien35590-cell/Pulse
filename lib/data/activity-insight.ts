@@ -1,19 +1,53 @@
 import type { ActivityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { dayKey, weekKeys } from "@/lib/dates";
-import { classContext, contextChips, paceInsight, sessionClass, WINDOW_DAYS, type Candidate, type PaceInsight, type SessionClass } from "@/lib/activity/comparables";
+import { classContext, contextChips, paceInsight, sessionClass, WINDOW_DAYS, type Candidate, type InsightLine, type PaceInsight, type SessionClass } from "@/lib/activity/comparables";
+import { doneSets, entriesOf, groupKey, stallsOf, sumReps, type StrengthRow } from "@/lib/analytics/strength";
+import type { SetDetail } from "@/lib/exercises";
+import { applyLafayProgress } from "@/lib/workout/lafay";
+import { catalogFor, resolveName } from "@/lib/workout/catalog";
+import { exerciseCode } from "@/lib/art/set-bars";
 
 const DAY = 86_400_000;
 const select = {
-  id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true, rpe: true,
+  id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true, rpe: true, kind: true, templateId: true,
   plannedSession: { select: { kind: true, isKeySession: true } }, raceEvent: { select: { id: true } },
 } as const;
 
-type Row = { id: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number; avgHr: number | null; rpe: number | null; plannedSession: { kind: string; isKeySession: boolean } | null; raceEvent: { id: string } | null };
-const toCandidate = (r: Row): Candidate => ({ ...r, planned: r.plannedSession, race: !!r.raceEvent });
+type Row = { id: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number; avgHr: number | null; rpe: number | null; kind: string | null; templateId: string | null; plannedSession: { kind: string; isKeySession: boolean } | null; raceEvent: { id: string } | null };
+const toCandidate = (r: Row): Candidate & Pick<Row, "kind" | "templateId"> => ({ ...r, planned: r.plannedSession, race: !!r.raceEvent });
 
-export type ActivityInsight = { pace: PaceInsight | null; chips: string[]; /** Genre de séance (même classement que la comparaison). */ cls?: SessionClass };
+export type ActivityInsight = { pace: PaceInsight | null; chips: string[]; /** Genre de séance (même classement que la comparaison). */ cls?: SessionClass; /** Muscu : phrase de contexte de la carte (strengthLine). */ strength?: InsightLine };
 const EMPTY: ActivityInsight = { pace: null, chips: [] };
+
+const isTimed = (name: string) => { const { code, variant } = resolveName(name); return catalogFor(code, variant)?.mode === "time"; };
+
+type StrengthTarget = { id: string; startedAt: Date; kind: string | null; templateId: string | null };
+type StrengthHistory = StrengthRow & { kind: string | null; templateId: string | null };
+
+/**
+ * Phrase de contexte d'une séance de muscu : écart de répétitions avec la séance précédente du même modèle, sinon blocage Lafay
+ * (mêmes règles que le verdict de séance), sinon rien. `history` : lignes d'exercices de l'utilisateur, séance incluse.
+ */
+export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): InsightLine | null {
+  const total = (rows: StrengthRow[]) => rows.filter((r) => !isTimed(r.name)).reduce((s, r) => s + sumReps(doneSets(r)), 0);
+  const upTo = history.filter((r) => +r.startedAt <= +t.startedAt);
+  const mine = upTo.filter((r) => r.activityId === t.id);
+  if (!mine.length) return null;
+  const sameTemplate = (r: StrengthHistory) => (t.templateId ? r.templateId === t.templateId : t.kind ? r.kind === t.kind : false);
+  const prevId = upTo.filter((r) => r.activityId !== t.id && sameTemplate(r)).sort((a, b) => +b.startedAt - +a.startedAt)[0]?.activityId;
+  const cur = total(mine), prev = prevId ? total(upTo.filter((r) => r.activityId === prevId)) : 0;
+  if (prev > 0 && cur !== prev) {
+    const d = cur - prev;
+    return { text: `${d > 0 ? "+" : "−"}${Math.abs(d)} reps vs séance précédente`, tone: d > 0 ? "good" : "warn" };
+  }
+  for (const key of new Set(mine.map((r) => groupKey(r.name)))) {
+    const rows = upTo.filter((r) => groupKey(r.name) === key).sort((a, b) => +b.startedAt - +a.startedAt);
+    const change = applyLafayProgress(rows)?.change;
+    if ((change === "evolve" || change === "restart") && stallsOf(entriesOf(rows)) >= 2) return { text: `Blocage sur ${exerciseCode(rows[0].name)} : 2ᵉ séance`, tone: "warn" };
+  }
+  return null;
+}
 
 /** Fenêtre utile d'une activité : 90 jours avant, jusqu'à la fin de son mois et de sa semaine (une journée de marge pour le fuseau). */
 function span(a: { startedAt: Date }, tz: string) {
@@ -42,12 +76,22 @@ export async function getActivityInsights(userId: string, ids: string[], tz: str
     prisma.personalRecord.findMany({ where: { userId, activityId: { in: targets.map((t) => t.id) } }, select: { kind: true, activityId: true } }),
   ]);
   const all = rows.map(toCandidate);
+  const lifts = targets.filter((t) => t.type === "WORKOUT");
+  const history: StrengthHistory[] = lifts.length
+    ? (await prisma.workoutExercise.findMany({
+      where: { activity: { userId, type: "WORKOUT", startedAt: { gte: new Date(Math.min(...lifts.map((t) => +t.startedAt)) - 120 * DAY), lte: new Date(Math.max(...lifts.map((t) => +t.startedAt))) } } },
+      select: { activityId: true, name: true, sets: true, reps: true, loadKg: true, setsDetail: true, activity: { select: { startedAt: true, kind: true, templateId: true } } },
+    })).map((e) => ({
+      activityId: e.activityId, startedAt: e.activity.startedAt, name: e.name, sets: e.sets, reps: e.reps, loadKg: e.loadKg,
+      setsDetail: Array.isArray(e.setsDetail) ? (e.setsDetail as unknown as SetDetail[]) : null, kind: e.activity.kind, templateId: e.activity.templateId,
+    }))
+    : [];
   targets.forEach((target, i) => {
     const { start, end } = spans[i];
     const pool = all.filter((c) => c.id !== target.id && c.type === target.type && +c.startedAt >= start && +c.startedAt < end);
     const ctx = classContext(target, pool, hrMax);
     const recs = records.filter((r) => r.activityId === target.id).map((r) => r.kind);
-    out.set(target.id, { pace: paceInsight(target, pool, ctx), chips: contextChips(target, pool, { tz, records: recs, ctx }), cls: sessionClass(target, ctx) });
+    out.set(target.id, { pace: paceInsight(target, pool, ctx), chips: contextChips(target, pool, { tz, records: recs, ctx }), cls: sessionClass(target, ctx), strength: (target.type === "WORKOUT" ? strengthLine(target, history) : null) ?? undefined });
   });
   return out;
 }
