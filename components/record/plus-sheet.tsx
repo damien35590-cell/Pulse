@@ -68,8 +68,11 @@ export function PlusSheet({ open, onClose }: { open: boolean; onClose: () => voi
             <span className="flex items-center gap-2"><Dumbbell className="size-5" aria-hidden />Séance de musculation</span>
             <span className="max-w-full truncate text-xs font-medium opacity-70">{subtitle}</span>
           </button>
+          <button type="button" onClick={() => { tap(); onClose(); setPick(true); }} className="flex min-h-12 w-full items-center justify-center rounded-full text-label text-ink-soft select-none touch-manipulation transition active:bg-surface-3 active:text-ink">
+            Autre séance
+          </button>
 
-          <Link href="/import" onClick={() => { tap(); onClose(); }} className={cn(row, "mt-2")}>
+          <Link href="/import" onClick={() => { tap(); onClose(); }} className={row}>
             <span className={tile}><FileUp className="size-5" aria-hidden /></span>
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">Importer un fichier</span>
