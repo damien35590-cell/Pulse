@@ -1,4 +1,5 @@
 "use client";
+import { FeelPicker, FEELING_KEYS } from "@/components/activity/feel-picker";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,7 +16,6 @@ import { suggestCatalog } from "@/lib/training/match-exercise";
 import { EQUIPMENT_LABELS } from "@/lib/training/catalog/exercises";
 import { NewSessionButton } from "@/components/workout/new-session-sheet";
 
-const FEELINGS = [["GREAT", "Super"], ["GOOD", "Bien"], ["OK", "Correct"], ["TIRED", "Fatigué"], ["HARD", "Difficile"]] as const;
 const SPORT_KEYS = ["WORKOUT", "RUN", "RIDE", "HIKE"] as const;
 type SetRow = { reps: string; load: string; done: boolean };
 type Ex = { id: number; name: string; sets: string; reps: string; loadKg: string; restS: string; comment: string; pk: string; detail: SetRow[] | null };
@@ -173,9 +173,7 @@ export default function RecordPage() {
       )}
       <label className="block text-sm text-ink-soft">Date et heure<input type="datetime-local" value={f.when} onChange={set("when")} className={cn(field, "text-lg font-semibold")} /></label>
       <label className="block text-sm text-ink-soft">Titre (facultatif)<input value={f.title} onChange={set("title")} className={cn(field, "text-lg font-semibold")} /></label>
-      <div role="radiogroup" aria-label="Ressenti" className="flex flex-wrap gap-2">
-        {FEELINGS.map(([k, l]) => <button type="button" key={k} role="radio" aria-checked={feeling === k} onClick={() => { tap(); setFeeling(feeling === k ? null : k); }} className={cn("min-h-12 rounded-full px-4 font-medium", feeling === k ? "bg-brand text-brand-ink" : "bg-surface-2")}>{l}</button>)}
-      </div>
+      <FeelPicker value={feeling ? FEELING_KEYS.indexOf(feeling as (typeof FEELING_KEYS)[number]) + 1 : null} onChange={(v) => { tap(); const k = FEELING_KEYS[v - 1]; setFeeling(feeling === k ? null : k); }} />
       <RpePicker value={rpe} onChange={setRpe} />
       <label className="block text-sm text-ink-soft">Notes<textarea value={f.notes} onChange={set("notes")} rows={3} className="mt-1 w-full rounded-xl border border-line bg-surface p-4 text-base" /></label>
       {err && <p role="alert" className="text-sm font-medium text-brand">{err}</p>}

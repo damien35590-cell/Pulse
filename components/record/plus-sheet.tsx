@@ -34,7 +34,7 @@ export function PlusSheet({ open, onClose }: { open: boolean; onClose: () => voi
   function workout() {
     tap(12);
     onClose();
-    // Programme actif : droit à la préparation de la séance du jour ; sinon, choix du modèle.
+    // Suggestion du jour (même source que le sous-titre) : droit à la préparation ; sans elle, choix du modèle.
     if (menu?.nextSession) router.push("/record/session?suggest=1");
     else setPick(true);
   }

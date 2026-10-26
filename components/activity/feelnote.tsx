@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Check, Frown, Laugh, Meh, MessageCircleQuestion, Smile, Zap, type LucideIcon } from "lucide-react";
+import { Check, MessageCircleQuestion } from "lucide-react";
 import { tap } from "@/lib/haptics";
 import { sessionRpe } from "@/lib/load";
 import { ui } from "@/lib/ui";
@@ -8,15 +8,7 @@ import { cn } from "@/lib/utils";
 import { Section } from "@/components/ui/section";
 import { Metric } from "@/components/ui/metric";
 import { RpePicker } from "./rpe-picker";
-
-// Mêmes libellés que l'écran d'enregistrement ; tonalités en tokens (vert → ambre → rouge).
-const FEELS: { v: number; Icon: LucideIcon; label: string; tone: string }[] = [
-  { v: 1, Icon: Laugh, label: "Super", tone: "text-good" },
-  { v: 2, Icon: Smile, label: "Bien", tone: "text-good" },
-  { v: 3, Icon: Meh, label: "Correct", tone: "text-ink" },
-  { v: 4, Icon: Frown, label: "Fatigué", tone: "text-warn" },
-  { v: 5, Icon: Zap, label: "Difficile", tone: "text-bad" },
-];
+import { FeelPicker } from "./feel-picker";
 
 /** Ancre de la section, et événement émis quand ressenti + effort sont remplis (la pastille du haut disparaît). */
 export const FEEL_ANCHOR = "ressenti";
@@ -84,28 +76,7 @@ export function FeelNote({ activityId, movingTimeS, initialFeel, initialComment,
       }
     >
       <div className={cn(ui.card, "space-y-5 p-4")}>
-        <div role="radiogroup" aria-label="Ressenti" className="grid grid-cols-5">
-          {FEELS.map(({ v, Icon, label, tone }) => {
-            const active = feel === v, muted = feel != null && !active;
-            return (
-              <button
-                key={v}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => pickFeel(v)}
-                className={cn(
-                  "flex min-h-16 flex-col items-center justify-center gap-1 rounded-tile select-none touch-manipulation transition duration-150 ease-snappy active:scale-95",
-                  active && "scale-105 bg-surface-2",
-                  muted && "opacity-45",
-                )}
-              >
-                <Icon className={cn("size-6", active ? tone : "text-ink-soft")} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
-                <span className={cn("text-xs", active ? "font-semibold text-ink" : "text-ink-soft")}>{label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <FeelPicker value={feel} onChange={pickFeel} />
 
         <RpePicker value={rpe} onChange={pickRpe} />
 
