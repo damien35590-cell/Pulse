@@ -15,7 +15,7 @@ const unit = (g: SetGroup) => (g.timed ? " s" : "");
 export function SetBars({ groups, className }: { groups: SetGroup[]; className?: string }) {
   const label = groups.map((g) => `${g.code} : ${g.sets.length} séries, ${total(g)}${g.timed ? " secondes" : " répétitions"}`).join(" ; ");
   return (
-    <div role="img" aria-label={label} className={cn("flex h-[116px] w-full items-start justify-between gap-3 overflow-hidden bg-viz-strength-bg px-[18px] pb-2.5 pt-4", className)}>
+    <div role="img" aria-label={label} className={cn("flex h-[116px] w-full items-start justify-start gap-6 overflow-hidden bg-viz-strength-bg px-[18px] pb-2.5 pt-4", className)}>
       {groups.map((g, i) => {
         const scale = Math.max(g.max, g.target, 1), px = (v: number) => (v / scale) * TOP;
         return (

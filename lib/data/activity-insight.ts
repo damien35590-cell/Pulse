@@ -2,11 +2,9 @@ import type { ActivityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { dayKey, weekKeys } from "@/lib/dates";
 import { classContext, contextChips, paceInsight, sessionClass, WINDOW_DAYS, type Candidate, type InsightLine, type PaceInsight, type SessionClass } from "@/lib/activity/comparables";
-import { doneSets, entriesOf, groupKey, stallsOf, sumReps, type StrengthRow } from "@/lib/analytics/strength";
+import { doneSets, sumReps, type StrengthRow } from "@/lib/analytics/strength";
 import type { SetDetail } from "@/lib/exercises";
-import { applyLafayProgress } from "@/lib/workout/lafay";
 import { catalogFor, resolveName } from "@/lib/workout/catalog";
-import { exerciseCode } from "@/lib/art/set-bars";
 
 const DAY = 86_400_000;
 const select = {
@@ -26,8 +24,8 @@ type StrengthTarget = { id: string; startedAt: Date; kind: string | null; templa
 type StrengthHistory = StrengthRow & { kind: string | null; templateId: string | null };
 
 /**
- * Phrase de contexte d'une séance de muscu : écart de répétitions avec la séance précédente du même modèle, sinon blocage Lafay
- * (mêmes règles que le verdict de séance), sinon rien. `history` : lignes d'exercices de l'utilisateur, séance incluse.
+ * Phrase de contexte d'une séance de muscu : total de répétitions (tous exercices) comparé à la séance précédente du même modèle
+ * (sinon de la même moitié du corps). `history` : lignes d'exercices de l'utilisateur, séance incluse.
  */
 export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): InsightLine | null {
   const total = (rows: StrengthRow[]) => rows.filter((r) => !isTimed(r.name)).reduce((s, r) => s + sumReps(doneSets(r)), 0);
@@ -36,17 +34,11 @@ export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): Ins
   if (!mine.length) return null;
   const sameTemplate = (r: StrengthHistory) => (t.templateId ? r.templateId === t.templateId : t.kind ? r.kind === t.kind : false);
   const prevId = upTo.filter((r) => r.activityId !== t.id && sameTemplate(r)).sort((a, b) => +b.startedAt - +a.startedAt)[0]?.activityId;
-  const cur = total(mine), prev = prevId ? total(upTo.filter((r) => r.activityId === prevId)) : 0;
-  if (prev > 0 && cur !== prev) {
-    const d = cur - prev;
-    return { text: `${d > 0 ? "+" : "−"}${Math.abs(d)} reps vs séance précédente`, tone: d > 0 ? "good" : "warn" };
-  }
-  for (const key of new Set(mine.map((r) => groupKey(r.name)))) {
-    const rows = upTo.filter((r) => groupKey(r.name) === key).sort((a, b) => +b.startedAt - +a.startedAt);
-    const change = applyLafayProgress(rows)?.change;
-    if ((change === "evolve" || change === "restart") && stallsOf(entriesOf(rows)) >= 2) return { text: `Blocage sur ${exerciseCode(rows[0].name)} : 2ᵉ séance`, tone: "warn" };
-  }
-  return null;
+  if (!prevId) return { text: "Première séance de ce type", tone: "neutral" };
+  const cur = total(mine), d = cur - total(upTo.filter((r) => r.activityId === prevId));
+  if (d > 0) return { text: `Total en hausse : ${cur} reps (+${d})`, tone: "good" };
+  if (d < 0) return { text: `Total en baisse : ${cur} reps (−${-d})`, tone: "warn" };
+  return { text: `Égal à la dernière séance (${cur} reps)`, tone: "neutral" };
 }
 
 /** Fenêtre utile d'une activité : 90 jours avant, jusqu'à la fin de son mois et de sa semaine (une journée de marge pour le fuseau). */
