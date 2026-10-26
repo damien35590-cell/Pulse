@@ -1,4 +1,5 @@
 import FitParser from "fit-file-parser";
+import { SPORT_LABEL } from "@/lib/sports";
 import { dedupeKeyOf } from "./stats";
 import type { ActivityKind, ParsedActivity, TrackPoint } from "./types";
 
@@ -7,8 +8,8 @@ const SPORTS: Record<string, ActivityKind> = {
   walking: "WALK", training: "WORKOUT", e_biking: "EBIKE", virtual_activity: "RIDE",
 };
 const TITLES: Record<ActivityKind, string> = {
-  RUN: "Running", RIDE: "Sortie vélo", EBIKE: "E-bike", SWIM: "Natation", HIKE: "Randonnée",
-  WALK: "Marche", WORKOUT: "Séance", OTHER: "Activité importée",
+  RUN: SPORT_LABEL("RUN"), RIDE: "Sortie vélo", EBIKE: "E-bike", SWIM: "Natation", HIKE: SPORT_LABEL("HIKE"),
+  WALK: SPORT_LABEL("WALK"), WORKOUT: "Séance", OTHER: "Activité importée",
 };
 
 export function parseFit(buf: ArrayBuffer, fileName: string): Promise<ParsedActivity> {

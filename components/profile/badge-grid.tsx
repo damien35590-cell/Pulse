@@ -5,14 +5,15 @@ import { Check, Gem, Lock, X } from "lucide-react";
 import type { BadgeItem, Discipline, EvaluatedBadge } from "@/lib/badges";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
+import { SPORT_SHORT } from "@/lib/sports";
 import { useBadgeReview } from "./badge-celebration";
 import { DISC_LABEL, ICONS } from "./badge-meta";
 import { TIER_BG, TIER_CHIP, TIER_NAMES, TIER_TEXT, TierMedal, unitFor } from "./tier-medal";
 
 type Tab = "ALL" | Discipline;
 const TABS: { key: Tab; label: string }[] = [
-  { key: "ALL", label: "Tous" }, { key: "GLOBAL", label: "Général" }, { key: "RIDE", label: "Vélo" },
-  { key: "RUN", label: "Running" }, { key: "HIKE", label: "Rando" }, { key: "WORKOUT", label: "Muscu" },
+  { key: "ALL", label: "Tous" }, { key: "GLOBAL", label: "Général" }, { key: "RIDE", label: SPORT_SHORT("RIDE") },
+  { key: "RUN", label: SPORT_SHORT("RUN") }, { key: "HIKE", label: SPORT_SHORT("HIKE") }, { key: "WORKOUT", label: SPORT_SHORT("WORKOUT") },
 ];
 
 const fmt = (n: number, dec = 0) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: dec }).format(n);

@@ -1,4 +1,5 @@
 import type { ActivityType } from "@prisma/client";
+import { SPORT_LABEL } from "@/lib/sports";
 import { prisma } from "@/lib/prisma";
 import { findOverlapping, processActivity } from "@/lib/pipeline/post-import";
 
@@ -27,8 +28,8 @@ function mapFitType(typeId: number): ActivityType {
 const AUTO_TYPES = new Set([1, 7, 8]);
 const AUTO_TITLES: Record<string, string> = {
   EBIKE: "Vélotaf",
-  WALK: "Marche",
-  RUN: "Running",
+  WALK: SPORT_LABEL("WALK"),
+  RUN: SPORT_LABEL("RUN"),
 };
 
 // Fonction pour rafraîchir le jeton Google s'il est expiré

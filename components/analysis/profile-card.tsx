@@ -10,13 +10,14 @@ import { fmtNum } from "@/lib/format";
 import type { Axis } from "@/lib/radar";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { ui } from "@/lib/ui";
+import { SPORT_SHORT } from "@/lib/sports";
 import { cn } from "@/lib/utils";
 
 const DISCIPLINES = [
-  { k: "RIDE", tab: "Vélo", name: "cyclisme", empty: "Aucune séance de vélo avec données détaillées sur 90 jours.", unit: "sortie" },
-  { k: "RUN", tab: "Running", name: "running", empty: "Aucune sortie running sur 90 jours.", unit: "sortie" },
-  { k: "HIKE", tab: "Rando", name: "randonnée", empty: "Aucune randonnée sur 90 jours.", unit: "sortie" },
-  { k: "WORKOUT", tab: "Muscu", name: "musculation", empty: "Aucune séance de musculation sur 90 jours.", unit: "séance" },
+  { k: "RIDE", tab: SPORT_SHORT("RIDE"), name: "cyclisme", empty: "Aucune séance de vélo avec données détaillées sur 90 jours.", unit: "sortie" },
+  { k: "RUN", tab: SPORT_SHORT("RUN"), name: "running", empty: "Aucune sortie running sur 90 jours.", unit: "sortie" },
+  { k: "HIKE", tab: SPORT_SHORT("HIKE"), name: "randonnée", empty: "Aucune randonnée sur 90 jours.", unit: "sortie" },
+  { k: "WORKOUT", tab: SPORT_SHORT("WORKOUT"), name: "musculation", empty: "Aucune séance de musculation sur 90 jours.", unit: "séance" },
 ] as const;
 type Key = (typeof DISCIPLINES)[number]["k"];
 const MIN_AXES = 3; // sous 3 axes, un radar n'est plus un polygone

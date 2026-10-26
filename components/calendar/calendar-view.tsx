@@ -118,7 +118,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
       )}
 
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-soft" aria-label="Légende">
-        <Leg c="bg-orange-500" t="Séance clé" /><Leg c="bg-ink-soft/60" t="Séance prévue" /><Leg c="bg-emerald-500" t="Course faite" /><Leg c="bg-violet-500" t="Muscu" />
+        <Leg c="bg-orange-500" t="Séance clé" /><Leg c="bg-ink-soft/60" t="Séance prévue" /><Leg c="bg-emerald-500" t="Running fait" /><Leg c="bg-violet-500" t="Muscu" />
         <li className="flex items-center gap-1"><StarIcon className="h-3 w-3" />Course objectif</li>
       </ul>
 
@@ -128,7 +128,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
           {isEmpty(sel) && <p className="text-sm text-ink-soft">Rien de prévu ni de fait ce jour-là.</p>}
           {sel.races.map((r) => <Row key={r.id} icon={<StarIcon className="h-3.5 w-3.5" />} text={r.name} meta={raceLabel[r.status]} />)}
           {sel.sessions.map((s) => <Row key={s.id} icon={<span className={cn(dot, sessionDot(s))} />} text={s.title} meta={[statusLabel[s.status], s.isKey ? "clé" : null, s.durationS ? fmtDuration(s.durationS) : null].filter(Boolean).join(" · ")} />)}
-          {sel.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-emerald-500")} />} text={a.title} meta={`Course · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
+          {sel.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-emerald-500")} />} text={a.title} meta={`Running · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
           {sel.workouts.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-violet-500")} />} text={a.title} meta={`Muscu · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
         </div>
       )}

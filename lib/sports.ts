@@ -1,3 +1,4 @@
+// Convention de nommage : « Running » = le sport (type RUN) ; « Course » = une course / compétition (événement).
 import { Bike, Dumbbell, Footprints, Mountain, Waves, Activity, Zap, type LucideProps } from "lucide-react";
 import type { ComponentType } from "react";
 import { Runner } from "@/components/ui/icons/runner";

@@ -23,7 +23,7 @@ export async function generateDebrief(input: { w?: string; to?: string; s?: stri
   const userId = (await auth())?.user?.id;
   if (!userId) return { ok: false, error: "Session expirée : reconnecte-toi." };
   const scope = scopeOf(input.s);
-  if (!scope) return { ok: false, error: "Le coach IA analyse les onglets Tous, Course et Muscu." };
+  if (!scope) return { ok: false, error: "Le coach IA analyse les onglets Tous, Running et Muscu." };
 
   const period = parsePeriod(input, TZ), periodKey = debriefKey(period.weeks, period.endKey);
   try {
