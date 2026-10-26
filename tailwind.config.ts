@@ -30,6 +30,8 @@ const config: Config = {
         stack: { workout: c("stack-workout"), run: c("stack-run"), ride: c("stack-ride"), hike: c("stack-hike"), other: c("stack-other") },
         act: Object.fromEntries(["run", "strength", "ride", "hike", "other"].map((k) => [k, { DEFAULT: c(`act-${k}`), soft: `var(--act-${k}-soft)` }])),
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
+        // Bandes de visuel du fil : suivent le thème (bg-viz-strength-bg, text-viz-strength-ink, bg-viz-ride-bg…).
+        viz: Object.fromEntries(["strength-bg", "strength-bar", "strength-bar-dim", "strength-ink", "strength-code", "target", "ride-bg", "ride-ink"].map((k) => [k, c(`viz-${k}`)])),
         // Art : toujours sombre, identique dans les deux thèmes (bg-art-run-bg, text-art-gym-fg, text-art-ink…).
         art: {
           "run-bg": c("art-run-bg"), "run-fg": c("art-run-fg"), "gym-bg": c("art-gym-bg"), "gym-fg": c("art-gym-fg"),

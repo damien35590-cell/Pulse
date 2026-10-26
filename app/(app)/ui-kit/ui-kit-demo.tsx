@@ -395,12 +395,12 @@ function Tokens() {
               <div className={cn(ui.card, "overflow-hidden")}><SetBars groups={artDemo.sets} /></div>
               <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">SetBars · une barre par série, pointillé = cible du jour, E4 au chrono (secondes)</figcaption>
             </figure>
-            <div className="grid grid-cols-7 gap-1.5">
-              {[["art-run-bg", "bg-art-run-bg"], ["art-run-fg", "bg-art-run-fg"], ["art-gym-bg", "bg-art-gym-bg"], ["art-gym-fg", "bg-art-gym-fg"], ["art-ink", "bg-art-ink"], ["soft-run", "bg-art-ink-soft-run"], ["soft-gym", "bg-art-ink-soft-gym"]].map(([n, c]) => (
-                <div key={n} className="min-w-0"><div className={cn("h-10 rounded-lg ring-1 ring-inset ring-white/10", c)} /><p className="mt-1 truncate text-micro text-ink-mute">{n}</p></div>
+            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
+              {[["strength-bg", "bg-viz-strength-bg"], ["strength-bar", "bg-viz-strength-bar"], ["strength-bar-dim", "bg-viz-strength-bar-dim"], ["strength-ink", "bg-viz-strength-ink"], ["strength-code", "bg-viz-strength-code"], ["target", "bg-viz-target"], ["ride-bg", "bg-viz-ride-bg"], ["ride-ink", "bg-viz-ride-ink"]].map(([n, c]) => (
+                <div key={n} className="min-w-0"><div className={cn("h-10 rounded-lg ring-1 ring-inset ring-line", c)} /><p className="mt-1 truncate text-micro text-ink-mute">viz-{n}</p></div>
               ))}
             </div>
-            <p className="px-1 text-xs text-ink-soft">Toujours sombre, mêmes valeurs en clair et en sombre (bascule le thème en haut). Jamais derrière un chiffre, jamais dans une séance en direct.</p>
+            <p className="px-1 text-xs text-ink-soft">Les bandes suivent le thème (bascule le thème en haut) : teinte douce en clair, valeurs d'origine en sombre. Jamais derrière un chiffre, jamais dans une séance en direct.</p>
           </div>
         </Section>
 

@@ -21,6 +21,9 @@
        Jamais derrière un chiffre, jamais dans une séance en direct, jamais de Volt. Les zones y reprennent z1–z6. */
     --art-run-bg: 18 35 63; --art-run-fg: 90 169 255; --art-gym-bg: 42 24 16; --art-gym-fg: 255 138 61;
     --art-ink: 245 245 247; --art-ink-soft-run: 201 216 240; --art-ink-soft-gym: 243 217 200;
+    /* Bandes de visuel du fil (SetBars, EffortStrip) : suivent le thème. Sombre : valeurs d'origine des bandes (art-gym / art-run). */
+    --viz-strength-bg: 42 24 16; --viz-strength-bar: 255 138 61; --viz-strength-bar-dim: 149 81 39; --viz-strength-ink: 243 217 200; --viz-strength-code: 255 138 61; --viz-target: 245 245 247;
+    --viz-ride-bg: 18 35 63; --viz-ride-ink: 245 245 247;
     --sport-ride: var(--brand); --sport-swim: var(--brand);
     --sport-hike: var(--brand); --sport-workout: var(--brand); --sport-other: var(--brand);
     /* Couleurs par type d'activité (lib/activity-style.ts) : une famille, même luminosité et chroma OKLCH, sans concurrencer Volt. */
@@ -48,6 +51,9 @@
     --act-run-soft: color-mix(in oklch, rgb(var(--act-run)) 14%, transparent); --act-strength-soft: color-mix(in oklch, rgb(var(--act-strength)) 14%, transparent);
     --act-ride-soft: color-mix(in oklch, rgb(var(--act-ride)) 14%, transparent); --act-hike-soft: color-mix(in oklch, rgb(var(--act-hike)) 14%, transparent);
     --act-other-soft: color-mix(in oklch, rgb(var(--act-other)) 14%, transparent);
+    /* Bandes de visuel du fil (SetBars, EffortStrip) : teinte douce proche de surface-2, pour ne pas couper une carte blanche en deux. */
+    --viz-strength-bg: 253 238 226; --viz-strength-bar: 201 76 18; --viz-strength-bar-dim: 222 128 82; --viz-strength-ink: 124 45 12; --viz-strength-code: 154 52 8; --viz-target: 124 45 12;
+    --viz-ride-bg: 232 241 253; --viz-ride-ink: 20 50 100;
     --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
     color-scheme: light;
   }
@@ -65,6 +71,9 @@
       --act-run-soft: color-mix(in oklch, rgb(var(--act-run)) 14%, transparent); --act-strength-soft: color-mix(in oklch, rgb(var(--act-strength)) 14%, transparent);
       --act-ride-soft: color-mix(in oklch, rgb(var(--act-ride)) 14%, transparent); --act-hike-soft: color-mix(in oklch, rgb(var(--act-hike)) 14%, transparent);
       --act-other-soft: color-mix(in oklch, rgb(var(--act-other)) 14%, transparent);
+      /* Bandes de visuel du fil (SetBars, EffortStrip) : teinte douce proche de surface-2, pour ne pas couper une carte blanche en deux. */
+      --viz-strength-bg: 253 238 226; --viz-strength-bar: 201 76 18; --viz-strength-bar-dim: 222 128 82; --viz-strength-ink: 124 45 12; --viz-strength-code: 154 52 8; --viz-target: 124 45 12;
+      --viz-ride-bg: 232 241 253; --viz-ride-ink: 20 50 100;
       --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
       color-scheme: light;
     }
