@@ -44,7 +44,7 @@ export function halfOf(kind: string | null, names: string[]): Half | null {
 
 /**
  * Phrase de contexte d'une séance de muscu, par priorité : blocage Lafay (règles du verdict de séance), total de répétitions comparé à la
- * séance précédente du même type (même modèle, sinon même moitié du corps, enregistrée ou déduite), sinon le total seul.
+ * séance précédente du même type (même modèle, sinon même moitié du corps), sur les seuls exercices communs ; sinon le total seul.
  * `history` : lignes d'exercices de l'utilisateur, séance incluse.
  */
 export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): InsightLine | null {
@@ -59,14 +59,17 @@ export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): Ins
     if ((change === "evolve" || change === "restart") && stallsOf(entriesOf(rows)) >= 2) return { text: `Blocage sur ${exerciseCode(rows[0].name)} : 2ᵉ séance`, tone: "warn" };
   }
 
-  const cur = total(mine), half = halfOf(t.kind, mine.map((r) => r.name));
+  const half = halfOf(t.kind, mine.map((r) => r.name));
   const others = new Map<string, StrengthHistory[]>();
   for (const r of upTo) if (r.activityId !== t.id) others.set(r.activityId, [...(others.get(r.activityId) ?? []), r]);
   const prev = [...others.values()]
     .filter((rows) => (t.templateId && rows[0].templateId === t.templateId) || (half !== null && halfOf(rows[0].kind, rows.map((r) => r.name)) === half))
     .sort((a, b) => +b[0].startedAt - +a[0].startedAt)[0];
-  if (!prev) return { text: `${cur} reps au total`, tone: "neutral" };
-  const d = cur - total(prev);
+  // Seuls les exercices des deux séances sont comparés (échelle Lafay ou nom normalisé) : sinon une séance plus longue « gagne » d'office.
+  const shared = prev ? new Set(mine.map((r) => groupKey(r.name)).filter((k) => prev.some((r) => groupKey(r.name) === k))) : new Set<string>();
+  if (!prev || !shared.size) return { text: `${total(mine)} reps au total`, tone: "neutral" };
+  const onShared = (rows: StrengthRow[]) => total(rows.filter((r) => shared.has(groupKey(r.name))));
+  const cur = onShared(mine), d = cur - onShared(prev);
   if (d > 0) return { text: `Total en hausse : ${cur} reps (+${d})`, tone: "good" };
   if (d < 0) return { text: `Total en baisse : ${cur} reps (−${-d})`, tone: "warn" };
   return { text: `Égal à la dernière séance (${cur} reps)`, tone: "neutral" };
