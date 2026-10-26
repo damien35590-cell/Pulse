@@ -91,7 +91,7 @@ export default function ImportPage() {
 
       <label className="grid min-h-14 cursor-pointer place-items-center rounded-xl bg-brand px-4 font-display text-xl font-semibold text-brand-ink active:scale-[.98]">
         {busy && !progress ? "Lecture en cours…" : "Choisir des fichiers"}
-        <input type="file" multiple accept=".fit,.gpx,.zip,.gz" onChange={onPick} className="sr-only" disabled={busy} />
+        <input type="file" multiple accept=".fit,.gpx,.tcx,.zip,.gz" onChange={onPick} className="sr-only" disabled={busy} />
       </label>
 
       {errors.length > 0 && <ul className="space-y-1 rounded-xl border border-line bg-surface p-3 text-sm text-ink-soft">{errors.slice(0, 5).map((m) => <li key={m}>{m}</li>)}{errors.length > 5 && <li>… et {errors.length - 5} autres</li>}</ul>}

@@ -351,6 +351,7 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   return {
     success: true,
     count: sessions.length + segments.length,
+    saved: saved + auto, // activités créées (séances + automatiques)
     message: `${saved} séance(s), ${auto} activité(s) automatique(s), ${updated} distance(s) mise(s) à jour, ${duplicates} déjà présente(s).`,
   };
 }

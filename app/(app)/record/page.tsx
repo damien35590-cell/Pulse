@@ -79,7 +79,7 @@ export default function RecordPage() {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <h1 className="font-display text-3xl font-bold leading-none">Nouvelle sortie</h1>
+      <h1 className="font-display text-3xl font-bold leading-none">Saisie manuelle</h1>
       <div role="radiogroup" aria-label="Sport" className="grid grid-cols-2 gap-2">
         {SPORT_KEYS.map((k) => { const I = SPORTS[k].icon, on = type === k; return (
           <button type="button" key={k} role="radio" aria-checked={on} onClick={() => { tap(); setType(k); setErr(""); }}

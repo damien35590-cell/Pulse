@@ -1,9 +1,9 @@
 import { gunzipSync, unzipSync } from "fflate";
 import { parseFit } from "./fit";
-import { parseGpx } from "./gpx";
+import { parseGpx, parseTcx } from "./gpx";
 import type { ParsedActivity } from "./types";
 
-const ACTIVITY_FILE = /\.(fit|gpx)(\.gz)?$/i;
+const ACTIVITY_FILE = /\.(fit|gpx|tcx)(\.gz)?$/i;
 
 export async function parseOne(name: string, bytes: Uint8Array): Promise<ParsedActivity> {
   let data = bytes;
@@ -11,10 +11,11 @@ export async function parseOne(name: string, bytes: Uint8Array): Promise<ParsedA
   if (n.endsWith(".gz")) { data = gunzipSync(bytes); n = n.slice(0, -3); } // archive Strava : *.fit.gz
   if (n.endsWith(".fit")) return parseFit(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer, name);
   if (n.endsWith(".gpx")) return parseGpx(new TextDecoder().decode(data), name);
+  if (n.endsWith(".tcx")) return parseTcx(new TextDecoder().decode(data), name);
   throw new Error("Format non pris en charge");
 }
 
-/** Accepte .fit, .gpx, .fit.gz et l'archive ZIP Strava ; dédoublonne par minute de départ. */
+/** Accepte .fit, .gpx, .tcx, .fit.gz et l'archive ZIP Strava ; dédoublonne par minute de départ. */
 export async function importFiles(files: File[]) {
   const found = new Map<string, ParsedActivity>();
   const errors: string[] = [];

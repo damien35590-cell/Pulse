@@ -32,6 +32,9 @@ export async function GET(req: Request) {
       syncProgramToIntervals(user.id, 14),
     ]);
 
+    // Heure affichée sous « Synchroniser maintenant » (feuille « + ») : la nuit compte aussi.
+    if (intervals.status === "fulfilled" || googleFit.status === "fulfilled") await prisma.user.update({ where: { id: user.id }, data: { lastSyncAt: new Date() } }).catch(() => {});
+
     const report = (r: PromiseSettledResult<unknown>) =>
       r.status === "fulfilled"
         ? { ok: true, result: r.value }

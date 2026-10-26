@@ -43,5 +43,14 @@ export function fmtWhenShort(d: Date, tz: string, now = new Date()) {
   return `${day} · ${time}`;
 }
 
+/** Temps écoulé : « à l’instant », « il y a 12 min », « il y a 2 h », « il y a 3 j ». */
+export function fmtAgo(iso: string, now = new Date()) {
+  const min = Math.max(0, Math.floor((+now - +new Date(iso)) / 60_000));
+  if (min < 1) return "à l’instant";
+  if (min < 60) return `il y a ${min} min`;
+  if (min < 24 * 60) return `il y a ${Math.floor(min / 60)} h`;
+  return `il y a ${Math.floor(min / (24 * 60))} j`;
+}
+
 /** Ordinal français : 1re / 1er, puis 2e, 14e… (jamais « ème »). `gender` : « f » par défaut (une sortie, une séance), « m » pour 1er. */
 export const ordinalFr = (n: number, gender: "m" | "f" = "f") => (n === 1 ? (gender === "m" ? "1er" : "1re") : `${n}e`);

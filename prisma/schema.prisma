@@ -89,6 +89,7 @@ model User {
   homeLat       Float?    // domicile : départ par défaut des itinéraires
   homeLng       Float?
   homeEquipment String[]  @default([]) // « Mon matériel » (valeurs de Equipment dans lib/workout/catalog-data.ts) ; vide = matériel par défaut
+  lastSyncAt    DateTime? // dernière synchro Intervals.icu + Google Fit (bouton « Synchroniser maintenant » ou tâche de nuit) ; limite les synchros manuelles à une toutes les 5 min
   createdAt     DateTime  @default(now())
 
   accounts   Account[]

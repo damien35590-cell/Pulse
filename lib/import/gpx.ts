@@ -38,6 +38,27 @@ export function parseGpx(text: string, fileName: string): ParsedActivity {
   return trackActivity(points, { name, type, fileName });
 }
 
+/** TCX (Garmin Training Center) dans le navigateur ; la version Node est dans lib/import/xml-track.ts. */
+export function parseTcx(text: string, fileName: string): ParsedActivity {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  if (doc.querySelector("parsererror") || !doc.getElementsByTagName("TrainingCenterDatabase").length) throw new Error("TCX illisible");
+  const num = (el: Element | undefined) => { const v = el?.textContent?.trim() ? Number(el.textContent) : NaN; return Number.isFinite(v) ? v : undefined; };
+  const byLocal = (el: Element, name: string) => Array.from(el.getElementsByTagName("*")).find((n) => n.localName.toLowerCase() === name);
+  const points: TrackPoint[] = [];
+  for (const el of Array.from(doc.getElementsByTagName("Trackpoint"))) {
+    const time = el.getElementsByTagName("Time")[0]?.textContent;
+    if (!time) continue;
+    points.push({
+      lat: num(el.getElementsByTagName("LatitudeDegrees")[0]), lng: num(el.getElementsByTagName("LongitudeDegrees")[0]),
+      ele: num(el.getElementsByTagName("AltitudeMeters")[0]), t: Date.parse(time),
+      hr: num(el.getElementsByTagName("HeartRateBpm")[0]?.getElementsByTagName("Value")[0]),
+      cad: num(el.getElementsByTagName("Cadence")[0] ?? byLocal(el, "runcadence")), power: num(byLocal(el, "watts")),
+    });
+  }
+  const act = doc.getElementsByTagName("Activity")[0];
+  return trackActivity(points, { name: act?.getElementsByTagName("Notes")[0]?.textContent?.trim() || undefined, type: act?.getAttribute("Sport") ?? "", fileName });
+}
+
 /** Activité à partir de points déjà lus (GPX ou TCX) : commun au navigateur (DOMParser) et à Node (lib/import/xml-track.ts). */
 export function trackActivity(points: TrackPoint[], o: { name?: string; type: string; fileName: string }): ParsedActivity {
   if (points.length < 2) throw new Error("Aucun point GPS exploitable");
