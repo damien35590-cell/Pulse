@@ -59,7 +59,7 @@ export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; l
               <RecordTile row={r} sport={current.sport} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base text-ink">{r.label}</span>
-                <span className="block text-label uppercase text-ink-mute">{r.day}{r.sub ? ` · ${r.sub}` : ""}</span>
+                <span className="block truncate text-sm text-ink-mute">{r.day}{r.sub ? ` · ${r.sub}` : ""}</span>
               </span>
               <span className="shrink-0 text-right">
                 <b className="font-num text-metric-lg tabular-nums text-ink">{r.value}</b>

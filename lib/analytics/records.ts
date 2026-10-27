@@ -123,7 +123,7 @@ export function strengthRecords(rows: StrengthRow[], tz: string): RecordRow[] {
     } else {
       // Répétitions : titre = la meilleure série ; précision = total de la séance où elle a été faite (à égalité, la plus fournie).
       const [id, top] = [...perSession].reduce((b, x) => (x[1].best > b[1].best || (x[1].best === b[1].best && x[1].total > b[1].total) ? x : b));
-      if (top.best > 0) row = { key: k, label, value: String(top.best), unit: "reps", day: fmtDay(top.at, tz), sub: `${top.total} reps sur la séance`, activityId: id };
+      if (top.best > 0) row = { key: k, label, value: String(top.best), unit: "reps", day: fmtDay(top.at, tz), sub: `${top.total} sur la séance`, activityId: id };
     }
     if (row) { const { code, variant } = resolveName(name); if (variant || isLafayCode(code)) row.code = variant ?? code; }
     if (row) out.push({ row, last: +list[0].startedAt });

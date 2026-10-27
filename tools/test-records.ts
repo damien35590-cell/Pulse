@@ -19,8 +19,8 @@ const rows = [
 ];
 const s = strengthRecords(rows, tz);
 const b2 = s.find((r) => r.label.includes("B2"))!, b1 = s.find((r) => r.label.includes("B1"))!;
-assert.equal(b2.value, "9"); assert.equal(b2.unit, "reps"); assert.equal(b2.activityId, "a3"); assert.equal(b2.sub, "49 reps sur la séance");
-assert.equal(b1.value, "8", "B1 ne se mélange pas avec B2"); assert.equal(b1.sub, "48 reps sur la séance");
+assert.equal(b2.value, "9"); assert.equal(b2.unit, "reps"); assert.equal(b2.activityId, "a3"); assert.equal(b2.sub, "49 sur la séance");
+assert.equal(b1.value, "8", "B1 ne se mélange pas avec B2"); assert.equal(b1.sub, "48 sur la séance");
 const row1 = s.find((r) => r.label === "Rowing haltère")!;
 assert.equal(row1.value, "22"); assert.equal(row1.unit, "kg × 10"); assert.equal(row1.activityId, "a3");
 assert.equal(s.length, 3);
