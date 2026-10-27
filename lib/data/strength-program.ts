@@ -58,17 +58,21 @@ export type StrengthProgramView = {
 
 const label = (e: DraftExercise) => (isLafayCode(e.code) ? e.name.replace(/\s-\s/, " ") : e.name);
 /** Phrase : « squat sauté » → « Squat sauté » (jamais de casse de titre en CSS). */
+/** « B1 - dips » → « dips » : le code est déjà dans la tuile (affichage seulement, rien n'est modifié en base). */
+export const nameOnly = (s: string) => s.replace(/^\s*[A-Za-z]\d{0,2}\s*[-–—:.]\s+/, "").trim();
 const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const initials = (name: string) => name.split(/[\s-]+/).filter((w) => w.length > 2).slice(0, 3).map((w) => w[0].toUpperCase()).join("") || name.slice(0, 3).toUpperCase();
 
 function rowOf(e: DraftExercise, p: ExerciseProgress | undefined, rows: StrengthRow[]): ProgressRow {
   // État et cible de boucle : lafayView, comme la séance proposée par « Démarrer » (même historique, même résultat).
   const { state, loop } = isLafayCode(e.code) ? lafayView(rows) : { state: p ? loopState(p.points) : ("new" as const), loop: null };
-  const spark = p ? p.repsPerSession.slice(-SPARK) : [];
+  const totals = p ? p.repsPerSession.slice(-SPARK) : [];
+  // Tendance : au moins 2 séances ; avec une seule, on ne montre que le dernier total.
+  const spark = totals.length >= 2 ? totals : [];
   return {
-    code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: upperFirst(isLafayCode(e.code) ? e.name.replace(/^.*?s-s/, "") : e.name),
+    code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: upperFirst(nameOnly(e.name)),
     target: `${e.sets} × ${e.reps}`, state, stall: state === "stall1" ? "1/2" : state === "stall2" ? "2/2" : null, loop,
-    spark, last: spark.length ? spark[spark.length - 1] : null,
+    spark, last: totals.length ? totals[totals.length - 1] : null,
   };
 }
 

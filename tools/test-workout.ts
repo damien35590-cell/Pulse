@@ -4,6 +4,7 @@ import type { StrengthRow } from "../lib/analytics/strength";
 import { applyLafayProgress, lafayView } from "../lib/workout/lafay";
 import { kindOfNames, nextKind } from "../lib/workout/kind";
 import { defaultVariant, displayName, resolveName, restAfterFor, variantsOf } from "../lib/workout/catalog";
+import { nameOnly } from "../lib/data/strength-program";
 import { planExercise, type Structure } from "../lib/workout/draft";
 
 const d = (iso: string) => new Date(iso + "T08:00:00Z");
@@ -131,3 +132,8 @@ p = planExercise(base, [row("z", "2026-10-12", "B2 - dips", 3, 8, [8, 8, 8]), ro
 assert.equal(p.last?.reps.length, 6);
 
 console.log("workout : OK");
+
+assert.equal(nameOnly("B1 - dips"), "dips");
+assert.equal(nameOnly("A3 – pompes"), "pompes");
+assert.equal(nameOnly("Développé couché"), "Développé couché", "pas de code : inchangé");
+console.log("noms : ok");
