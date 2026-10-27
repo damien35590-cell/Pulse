@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Camera, Pencil } from "lucide-react";
+import Link from "next/link";
+import { Camera, ChevronRight, Pencil } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Avatar } from "@/components/profile/avatar";
 import { updateProfile } from "@/app/(app)/vous/actions";
@@ -9,9 +10,9 @@ import { tap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 
-type Props = { name: string; image: string | null; email: string | null };
+type Props = { name: string; image: string | null; /** « Niveau 7 · Athlète » : lien vers Badges et niveau, sous le nom. */ level: string };
 
-export function EditProfile({ name, image, email }: Props) {
+export function EditProfile({ name, image, level }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(name);
   const [photo, setPhoto] = useState<Blob | null>(null);
@@ -62,10 +63,14 @@ export function EditProfile({ name, image, email }: Props) {
           <Avatar name={name} image={image} className="size-16 text-3xl" />
           <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-brand text-brand-ink"><Pencil className="size-3" aria-hidden /></span>
         </button>
-        <button type="button" onClick={openSheet} tabIndex={-1} className="min-w-0 flex-1 select-none touch-manipulation text-left active:opacity-60">
-          <h1 className="truncate font-display text-3xl font-bold leading-none">{name}</h1>
-          <p className="truncate text-sm text-ink-soft">{email}</p>
-        </button>
+        <div className="min-w-0 flex-1">
+          <button type="button" onClick={openSheet} tabIndex={-1} className="block w-full select-none touch-manipulation text-left active:opacity-60">
+            <h1 className="truncate font-display text-3xl font-bold leading-none">{name}</h1>
+          </button>
+          <Link href="/vous/badges" onClick={() => tap()} className="-mb-2 mt-1 inline-flex min-h-11 select-none touch-manipulation items-center gap-1 text-sm font-semibold text-brand active:opacity-60">
+            {level}<ChevronRight className="size-4 shrink-0" aria-hidden />
+          </Link>
+        </div>
       </header>
 
       <BottomSheet open={open} onClose={() => !pending && setOpen(false)} title="Modifier le profil">

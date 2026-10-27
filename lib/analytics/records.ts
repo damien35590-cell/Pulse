@@ -12,8 +12,8 @@ import { doneSets, groupKey, sumReps, variantOf, type StrengthRow } from "./stre
 import { catalogFor, resolveName } from "../workout/catalog";
 
 export type RecordSport = "WORKOUT" | "RUN" | "RIDE" | "HIKE";
-/** Ordre des onglets : celui des quatre sports de l'app (lib/sports.ts → MY_SPORTS). */
-export const RECORD_SPORTS: readonly RecordSport[] = ["WORKOUT", "RUN", "RIDE", "HIKE"];
+/** Ordre des onglets : Running, Muscu, Vélo, Rando. */
+export const RECORD_SPORTS: readonly RecordSport[] = ["RUN", "WORKOUT", "RIDE", "HIKE"];
 
 export type RecordRow = {
   key: string;
@@ -22,6 +22,7 @@ export type RecordRow = {
   unit: string;            // « km », « W », « reps »… (vide pour un chrono)
   day: string;             // « 12 oct. 2026 »
   sub: string | null;      // précision affichée après la date
+  code?: string;           // pastille d'une ligne running : « 5K », « 10K », « 21,1 »
   activityId: string | null;
 };
 export type SportRecords = { sport: RecordSport; rows: RecordRow[] };
@@ -33,8 +34,6 @@ export type RecordInput = {
   /** Courbes de puissance des sorties VÉLO : [5 s, 30 s, 1 min, 5 min, 20 min, 1 h] (lib/power.ts). */
   curves: { activityId: string; startedAt: Date; curve: (number | null)[] | null }[];
   strength: StrengthRow[];
-  /** Nombre de sorties par type d'activité : sert à choisir l'onglet par défaut. */
-  counts: Record<string, number>;
 };
 
 const fmtDay = (d: Date, tz: string) =>
@@ -47,6 +46,8 @@ const dplus: Fmt = (v) => ({ value: fmtNum(v, 0), unit: "m" });
 
 const LONGEST = { kind: "LONGEST_DISTANCE", label: "Plus longue sortie", fmt: km } as const;
 const CLIMB = { kind: "BEST_ELEVATION", label: "Plus gros D+", fmt: dplus } as const;
+/** Pastille des records de course : la distance de l'effort. */
+const RUN_CODE: Record<string, string> = { BEST_5K: "5K", BEST_10K: "10K", BEST_HALF: "21,1" };
 const ENDURANCE: Record<Exclude<RecordSport, "WORKOUT">, readonly { kind: string; label: string; fmt: Fmt }[]> = {
   RUN: [{ kind: "BEST_5K", label: "Meilleur 5 km", fmt: time }, { kind: "BEST_10K", label: "Meilleur 10 km", fmt: time }, { kind: "BEST_HALF", label: "Meilleur semi-marathon", fmt: time }, LONGEST, CLIMB],
   RIDE: [LONGEST, CLIMB],
@@ -59,7 +60,7 @@ function enduranceRows(sport: Exclude<RecordSport, "WORKOUT">, input: RecordInpu
     const pr = input.prs.find((p) => p.type === sport && p.kind === def.kind);
     if (!pr || !(pr.value > 0)) continue;
     const f = def.fmt(pr.value);
-    rows.push({ key: `${sport}:${def.kind}`, label: def.label, value: f.value, unit: f.unit, day: fmtDay(pr.achievedAt, input.tz), sub: null, activityId: pr.activityId });
+    rows.push({ key: `${sport}:${def.kind}`, label: def.label, value: f.value, unit: f.unit, day: fmtDay(pr.achievedAt, input.tz), sub: null, activityId: pr.activityId, ...(sport === "RUN" && RUN_CODE[def.kind] ? { code: RUN_CODE[def.kind] } : {}) });
   }
   if (sport === "RIDE") {
     let best: { w: number; id: string; at: Date } | null = null;
@@ -133,7 +134,6 @@ export function buildSportRecords(input: RecordInput): RecordsBySport {
   const sports = RECORD_SPORTS
     .map((sport): SportRecords => ({ sport, rows: sport === "WORKOUT" ? strengthRecords(input.strength, input.tz) : enduranceRows(sport, input) }))
     .filter((s) => s.rows.length > 0);
-  // Onglet par défaut : le sport où l'on a le plus de sorties, parmi ceux qui ont des records (égalité : ordre des onglets)
-  const defaultSport = sports.reduce<SportRecords | null>((b, s) => (!b || (input.counts[s.sport] ?? 0) > (input.counts[b.sport] ?? 0) ? s : b), null)?.sport ?? null;
-  return { sports, defaultSport };
+  // Onglet par défaut : Running s'il a des records, sinon le premier onglet disponible
+  return { sports, defaultSport: sports[0]?.sport ?? null };
 }

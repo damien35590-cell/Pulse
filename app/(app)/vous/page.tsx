@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { Dumbbell, Flag, Gauge, Trophy, Wrench } from "lucide-react";
+import { Dumbbell, Flag, Gauge, Trophy, UserRound, Wrench } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadBadgeStats } from "@/lib/data/badges";
-import { fmtNum } from "@/lib/format";
-import { Metric } from "@/components/ui/metric";
+import { getTracesArt } from "@/lib/data/traces";
+import { TracesCover } from "@/components/profile/traces-cover";
 import { Section } from "@/components/ui/section";
 import { SettingsRow } from "@/components/ui/settings-row";
 import { EditProfile } from "@/components/profile/edit-profile";
@@ -31,23 +31,21 @@ export const metadata = { title: "Vous" };
 const TZ = "Europe/Paris";
 const RECORDS_SHOWN = 3;
 const card = cn(ui.card, "divide-y divide-surface-2 overflow-hidden");
-// Chiffre au-dessus, libellé dessous (Metric met le libellé en tête : on inverse l'ordre).
-const stat = "flex flex-col-reverse items-center text-center [&>dt]:mt-1";
 
 export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const [me, gear, raceRows, zones, equipment, notifyPrefs] = await Promise.all([
+  const [me, gear, raceRows, zones, equipment, notifyPrefs, traces] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, image: true, email: true } }),
     getGear(userId),
     prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 }),
-    getZones(userId), getEquipment(userId), getPrefs(userId),
+    getZones(userId), getEquipment(userId), getPrefs(userId), getTracesArt(userId),
   ]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
   const { acts } = await loadBadgeStats(userId, TZ);
-  const records = await getRecordsBySport(userId, TZ, acts.map((a) => a.type));
+  const records = await getRecordsBySport(userId, TZ);
   const lvl = level(acts.reduce((t, a) => t + xpOf(a), 0));
   // Totaux tous sports, activités douces (vélotaf, marche) exclues : ce sont les mêmes que la liste des Activités
   const train = acts.filter((a) => !isSoftActivity(a));
@@ -57,14 +55,9 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <EditProfile name={me?.name ?? s.user.email?.split("@")[0] ?? "Vous"} image={me?.image ?? null} email={me?.email ?? null} />
+      <EditProfile name={me?.name ?? s.user.email?.split("@")[0] ?? "Vous"} image={me?.image ?? null} level={`Niveau ${lvl.n} · ${rank(lvl.n)}`} />
 
-      <dl className={cn(ui.card, "grid grid-cols-4 gap-2 p-4")}>
-        <Metric className={stat} align="center" label="km" value={fmtNum(st.km, 0)} />
-        <Metric className={stat} align="center" label="sorties" value={st.count} />
-        <Metric className={stat} align="center" label="m D+" value={fmtNum(st.elevation, 0)} />
-        <Metric className={stat} align="center" label="h" value={fmtNum(st.hours, 0)} />
-      </dl>
+      <TracesCover art={traces} totals={st} />
 
       <Section title="Records personnels">
         <RecordsTabs data={records} limit={RECORDS_SHOWN} moreHref="/vous/records" />
@@ -84,6 +77,7 @@ export default async function ProfilePage() {
           <SettingsRow icon={<Dumbbell aria-hidden />} title="Matériel de muscu" href="/vous/materiel-muscu" value={`${equipment.filter((e) => e !== "aucun").length} sur ${Object.keys(EQUIPMENT_LABELS).length}`} />
           <NotificationsRow prefs={notifyPrefs} />
           <ThemePicker />
+          <SettingsRow icon={<UserRound aria-hidden />} title="Compte" value={me?.email ?? s.user.email ?? "Non renseigné"} trailing={<span aria-hidden />} />
           <InstallRow />
         </div>
       </Section>

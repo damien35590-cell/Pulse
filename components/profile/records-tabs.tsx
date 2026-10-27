@@ -1,17 +1,28 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Mountain, Route } from "lucide-react";
 import { Segmented } from "@/components/ui/segmented";
 import { tap } from "@/lib/haptics";
-import { SPORTS, SPORT_SHORT } from "@/lib/sports";
+import { activityStyle } from "@/lib/activity-style";
+import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import type { RecordSport, RecordsBySport } from "@/lib/analytics/records";
+import type { RecordRow, RecordSport, RecordsBySport } from "@/lib/analytics/records";
 
 const STORAGE_KEY = "pulse:records-sport";
 
-/** Records personnels : un onglet par sport (seulement ceux qui ont des records), le dernier choisi est retenu. */
+/** Pastille d'une ligne running : le code de la distance (5K, 10K, 21,1), sinon un pictogramme (plus longue sortie, plus gros D+). */
+function RunTile({ row }: { row: RecordRow }) {
+  const run = activityStyle("RUN");
+  return (
+    <span aria-hidden className={cn("grid size-12 shrink-0 place-items-center rounded-tile [&>svg]:size-5", run.soft, run.fg)}>
+      {row.code ? <b className="font-num text-metric-sm tabular-nums">{row.code}</b> : row.key.endsWith("BEST_ELEVATION") ? <Mountain /> : <Route />}
+    </span>
+  );
+}
+
+/** Records personnels : un onglet par sport (Running d'abord, seulement ceux qui ont des records), le dernier choisi est retenu. */
 export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; limit?: number; moreHref?: string }) {
   const [sport, setSport] = useState<RecordSport | null>(data.defaultSport);
 
@@ -37,16 +48,15 @@ export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; l
         <Segmented
           value={current.sport}
           onChange={choose}
-          options={data.sports.map(({ sport: s }) => {
-            const Icon = SPORTS[s].icon;
-            return { value: s, label: <span className="inline-flex items-center justify-center gap-1"><Icon className="size-3.5 shrink-0" aria-hidden />{SPORT_SHORT(s)}</span> };
-          })}
+          size="lg"
+          options={data.sports.map(({ sport: s }) => ({ value: s, label: <span>{SPORT_SHORT(s)}</span> }))}
         />
       )}
       <ul className={cn(ui.card, "divide-y divide-line overflow-hidden")}>
         {(limit ? current.rows.slice(0, limit) : current.rows).map((r) => {
           const body = (
             <>
+              {current.sport === "RUN" && <RunTile row={r} />}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base text-ink">{r.label}</span>
                 <span className="block text-label uppercase text-ink-mute">{r.day}{r.sub ? ` · ${r.sub}` : ""}</span>

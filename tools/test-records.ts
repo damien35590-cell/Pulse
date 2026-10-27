@@ -49,11 +49,13 @@ const curves = [
   { activityId: "v2", startedAt: d("2026-05-09"), curve: [800, 600, 450, 310, 262.4, null] as (number | null)[] },
   { activityId: "v3", startedAt: d("2026-05-10"), curve: null },
 ];
-const res = buildSportRecords({ tz, prs, curves, strength: rows, counts: { RUN: 40, RIDE: 120, WORKOUT: 30, EBIKE: 300 } });
-assert.deepEqual(res.sports.map((x) => x.sport), ["WORKOUT", "RUN", "RIDE"], "pas d'onglet pour un sport sans record, ni pour l'E-bike");
-assert.equal(res.defaultSport, "RIDE", "onglet par défaut : le sport le plus pratiqué");
+const res = buildSportRecords({ tz, prs, curves, strength: rows });
+assert.deepEqual(res.sports.map((x) => x.sport), ["RUN", "WORKOUT", "RIDE"], "Running d'abord ; pas d'onglet pour un sport sans record, ni pour l'E-bike");
+assert.equal(res.defaultSport, "RUN", "onglet par défaut : Running, même si le vélo est plus pratiqué");
+assert.equal(buildSportRecords({ tz, prs: prs.filter((p) => p.type !== "RUN"), curves, strength: [] }).defaultSport, "RIDE", "sans record de course : le premier onglet disponible");
 const run = res.sports.find((x) => x.sport === "RUN")!.rows;
 assert.deepEqual(run.map((r) => [r.label, r.value, r.unit]), [["Meilleur 5 km", "20:29", ""], ["Meilleur 10 km", "45:58", ""], ["Plus longue sortie", "14,2", "km"]]);
+assert.deepEqual(run.map((r) => r.code), ["5K", "10K", undefined], "pastille de code pour les distances d'effort seulement");
 const ride = res.sports.find((x) => x.sport === "RIDE")!.rows;
 const sp = (v: string) => v.replace(/\s/g, " "); // fr-FR sépare les milliers par une espace insécable
 assert.deepEqual(ride.map((r) => [r.label, sp(r.value), r.unit]), [["Plus longue sortie", "110,8", "km"], ["Plus gros D+", "1 234", "m"], ["Meilleure puissance 20 min", "262", "W"]]);
@@ -61,6 +63,6 @@ assert.equal(ride[2].activityId, "v2");
 assert.equal(sp(ride[0].day), "1 mai 2026");
 
 // Rien du tout : aucun onglet, pas d'onglet par défaut
-assert.deepEqual(buildSportRecords({ tz, prs: [], curves: [], strength: [], counts: {} }), { sports: [], defaultSport: null });
+assert.deepEqual(buildSportRecords({ tz, prs: [], curves: [], strength: [] }), { sports: [], defaultSport: null });
 
 console.log("records : tout est vert");
