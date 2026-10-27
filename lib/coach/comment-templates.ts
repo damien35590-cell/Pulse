@@ -8,7 +8,17 @@ const mmss = (s: number) => { const r = Math.round(s); return `${Math.floor(r / 
 const hms = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(Math.round(s % 60)).padStart(2, "0")}` : mmss(s));
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : "±"}${Math.abs(n)}`;
 
-export function commentTemplate({ kind, facts: f }: Verdict): string {
+/** Muscu avec ceinture cardio : une phrase de chiffres, rien d'interprété. Vide sans mesure. */
+const hrLine = (f: Verdict["facts"]) =>
+  f.hrAvg != null && f.hrMax != null
+    ? ` FC moyenne ${f.hrAvg} bpm, maximale ${f.hrMax} bpm${f.hrRestDrop != null ? `, baisse moyenne de ${f.hrRestDrop} bpm pendant les repos` : ""}.`
+    : "";
+
+export function commentTemplate(v: Verdict): string {
+  return commentBody(v) + (v.facts.sport === "WORKOUT" ? hrLine(v.facts) : "");
+}
+
+function commentBody({ kind, facts: f }: Verdict): string {
   const strength = f.sport === "WORKOUT";
   switch (kind) {
     case "record":

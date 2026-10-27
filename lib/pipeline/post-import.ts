@@ -38,7 +38,7 @@ export function compareRichness(a: Richness, b: Richness) {
 const FULL = {
   id: true, userId: true, type: true, title: true, notes: true, feeling: true, startedAt: true, distanceM: true, movingTimeS: true, elapsedTimeS: true,
   elevationGainM: true, calories: true, avgHr: true, maxHr: true, avgPower: true, maxPower: true, polyline: true, trackPoints: true,
-  startLat: true, startLng: true, source: true, weather: true, story: true, rpe: true, createdAt: true,
+  startLat: true, startLng: true, source: true, weather: true, story: true, rpe: true, createdAt: true, hrSeries: true,
   stream: { select: { activityId: true } }, gear: { select: { id: true } }, _count: { select: { exercises: true } },
 } satisfies Prisma.ActivitySelect;
 const loadFull = (id: string) => prisma.activity.findUnique({ where: { id }, select: FULL });
@@ -66,12 +66,12 @@ export async function findOverlapping(userId: string, span: Span, excludeId?: st
 async function mergeInto(keep: Full, drop: Full) {
   const fill = <K extends "notes" | "feeling" | "rpe" | "elapsedTimeS" | "calories" | "avgHr" | "maxHr" | "avgPower" | "maxPower" | "polyline" | "startLat" | "startLng" | "story">(k: K) =>
     keep[k] == null && drop[k] != null ? drop[k] : undefined;
-  const json = (k: "trackPoints" | "weather") => (keep[k] == null && drop[k] != null ? (drop[k] as Prisma.InputJsonValue) : undefined);
+  const json = (k: "trackPoints" | "weather" | "hrSeries") => (keep[k] == null && drop[k] != null ? (drop[k] as Prisma.InputJsonValue) : undefined);
   const data: Prisma.ActivityUpdateInput = {
     notes: fill("notes"), feeling: fill("feeling"), rpe: fill("rpe"), elapsedTimeS: fill("elapsedTimeS"), calories: fill("calories"),
     avgHr: fill("avgHr"), maxHr: fill("maxHr"), avgPower: fill("avgPower"), maxPower: fill("maxPower"),
     polyline: fill("polyline"), startLat: fill("startLat"), startLng: fill("startLng"), story: fill("story"),
-    trackPoints: json("trackPoints"), weather: json("weather"),
+    trackPoints: json("trackPoints"), weather: json("weather"), hrSeries: json("hrSeries"),
     distanceM: keep.distanceM <= 0 && drop.distanceM > 0 ? drop.distanceM : undefined,
     elevationGainM: keep.elevationGainM <= 0 && drop.elevationGainM > 0 ? drop.elevationGainM : undefined,
     gear: drop.gear.length ? { connect: drop.gear.map((g) => ({ id: g.id })) } : undefined,

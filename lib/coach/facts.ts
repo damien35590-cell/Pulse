@@ -9,11 +9,27 @@ import { getOverview } from "../analytics/overview";
 import { getStrengthAnalysis } from "../analytics/strength";
 import { frame, runNotes, strengthNotes, type CoachNote } from "../analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "../data/coach";
+import { restDrop, setsOf } from "../workout/hr";
 import type { Period } from "../analysis/period";
 
 export type CoachScope = "all" | "RUN" | "WORKOUT";
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const pace = (timeS: number, m: number) => (m > 0 ? `${Math.floor(timeS / (m / 1000) / 60)}:${String(Math.round((timeS / (m / 1000)) % 60)).padStart(2, "0")}` : null);
+/** Séances de muscu de la période avec FC (ceinture cardio) : moyenne des FC moyennes, FC max atteinte, baisse moyenne pendant les repos. Null sans mesure. */
+async function strengthHeart(userId: string, period: Period, tz: string) {
+  const acts = (await prisma.activity.findMany({
+    where: { userId, type: "WORKOUT", avgHr: { gt: 0 }, startedAt: { gte: new Date(Date.parse(period.startKey + "T00:00:00Z") - 864e5), lte: period.now } },
+    select: { startedAt: true, avgHr: true, maxHr: true, exercises: { select: { setsDetail: true } } },
+  })).filter((a) => dayKey(a.startedAt, tz) >= period.startKey);
+  if (!acts.length) return null;
+  const drop = restDrop(acts.flatMap((a) => setsOf(a.exercises.map((e) => e.setsDetail))));
+  return {
+    seancesAvecFc: acts.length,
+    fcMoyenneDesSeances: Math.round(acts.reduce((s, a) => s + a.avgHr!, 0) / acts.length),
+    fcMaxAtteinte: Math.max(...acts.map((a) => a.maxHr ?? 0)),
+    baisseMoyenneFcPendantRepos: drop ? { bpm: drop.bpm, series: drop.sets } : null,
+  };
+}
 const notesOf = (l: CoachNote[]) => l.map((n) => `[${n.tone}] ${n.title} — ${n.body}`);
 
 export async function getCoachFacts(userId: string, scope: CoachScope, period: Period, tz: string) {
@@ -25,7 +41,7 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
   };
 
   if (scope === "WORKOUT") {
-    const [s, plans] = await Promise.all([getStrengthAnalysis(userId, tz, weeks, now), getPlanAdherence(userId, period.startKey, period.endKey, todayKey, "WORKOUT")]);
+    const [s, plans, fc] = await Promise.all([getStrengthAnalysis(userId, tz, weeks, now), getPlanAdherence(userId, period.startKey, period.endKey, todayKey, "WORKOUT"), strengthHeart(userId, period, tz)]);
     return {
       ...base, onglet: "musculation",
       resume: { seances: s.summary.sessions, series: s.summary.sets, repetitions: s.summary.reps, tonnageKg: s.summary.tonnage },
@@ -36,6 +52,7 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
         seances: e.sessions, totalRepsDernieresSeances: e.repsPerSession.slice(-6), derniereSeance: e.lastDay, conseilPulse: e.hint,
       })),
       programmes: plans,
+      ...(fc ? { frequenceCardiaque: fc } : {}),
       constatsPulse: notesOf(strengthNotes({ data: s, period: coachPeriod, plans })),
     };
   }

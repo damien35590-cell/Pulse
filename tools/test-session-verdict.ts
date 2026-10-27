@@ -112,8 +112,17 @@ const both = computeVerdict({ ...lift([]), exercises: [
 ] })!;
 assert.equal(both.kind, "record");
 
+// ceinture cardio : une phrase de chiffres ajoutée au commentaire, jamais un verdict à elle seule
+const withHr = computeVerdict({ ...lift([row("a2", "2026-10-19", "B1 - dips", 6, 8, s6(8)), row("a1", "2026-10-12", "B1 - dips", 6, 8, s6(8))]), hr: { avg: 118, max: 162, restDrop: 24 } })!;
+assert.equal(withHr.kind, "validated"); assert.equal(withHr.facts.hrAvg, 118); assert.equal(withHr.facts.hrRestDrop, 24);
+assert.equal(commentTemplate(withHr), "Cible de répétitions validée sur les 6 séries. Le volume de travail est atteint pour ce cycle. FC moyenne 118 bpm, maximale 162 bpm, baisse moyenne de 24 bpm pendant les repos.");
+const noDrop = computeVerdict({ ...lift([row("a1", "2026-10-12", "B1 - dips", 6, 8, s6(8))]), hr: { avg: 118, max: 162, restDrop: null } })!;
+assert.ok(commentTemplate(noDrop).endsWith("FC moyenne 118 bpm, maximale 162 bpm."), "moins de 3 séries mesurées : pas de baisse citée");
+assert.deepEqual(computeVerdict({ ...lift([row("a1", "2026-10-12", "B1 - dips", 6, 8, s6(8))]), hr: null })!.facts, { sport: "WORKOUT", sets: 6, exercises: 1 }, "sans FC, les faits sont inchangés");
+assert.equal(kindOf({ ...lift([]), hr: { avg: 118, max: 162 } }), null, "la FC seule ne crée pas de commentaire");
+
 // ── Tous les gabarits passent le garde-fou ──
-const samples = [rec, val, drift, v, r, u, b, { kind: "constrained" as const, facts: { sport: "RUN" as const } },
+const samples = [rec, val, drift, v, r, u, b, withHr, noDrop, { ...r, facts: { ...r.facts, hrAvg: 120, hrMax: 170, hrRestDrop: 30 } }, { kind: "constrained" as const, facts: { sport: "RUN" as const } },
   { kind: "fatigue" as const, facts: { sport: "RUN" as const, decouplingPct: 6.2 } }, { kind: "fatigue" as const, facts: { sport: "RUN" as const, feeling: "HARD" as const } }];
 for (const s of samples) { const t = commentTemplate(s); assert.equal(validateComment(t, s.kind).ok, true, `${s.kind} : ${t}`); }
 

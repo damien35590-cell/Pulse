@@ -14,6 +14,8 @@ import { getActivityInsight } from "@/lib/data/activity-insight";
 import { isAverageStory } from "@/lib/activity/comparables";
 import { kmSplits } from "@/lib/activity/splits";
 import { heartRate } from "@/lib/activity/heart";
+import { cleanHrSeries, restDrop, setsOf, toSecondSeries } from "@/lib/workout/hr";
+import type { SetDetail } from "@/lib/exercises";
 import { getActivityNote } from "@/lib/coach/activity-note";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -94,6 +96,9 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   // FC : la série à 1 Hz enregistrée, sinon reconstruite depuis la trace. Section masquée sans mesure.
   const hr1hz = st?.hr?.length ? st.hr : buildStream(raw)?.hr ?? [];
   const heart = heartRate(hr1hz, zones.hrMax);
+  // Muscu avec ceinture cardio : série enregistrée à la séance (Activity.hrSeries). Rien sans elle.
+  const lift = a.hrSeries != null ? heartRate(toSecondSeries(cleanHrSeries(a.hrSeries)), zones.hrMax) : null;
+  const drop = lift ? restDrop(setsOf(a.exercises.map((e) => e.setsDetail))) : null;
   // Allure par km : course et rando avec GPS horodaté (FC du km lue dans la trace).
   const splits = (a.type === "RUN" || a.type === "HIKE") ? kmSplits(raw.filter((p) => p.lat != null && p.lng != null) as { lat: number; lng: number; t: number; hr?: number }[]) : [];
 
@@ -155,12 +160,30 @@ export default async function ActivityPage({ params }: { params: { id: string } 
                       <p className="font-semibold text-ink">{e.name}</p>
                       <p className="text-sm text-ink-soft">{e.sets} × {e.reps}{e.loadKg != null ? ` à ${fmtNum(e.loadKg)} kg` : ""}{e.restS != null ? `, repos ${e.restS} s` : ""}</p>
                       {Array.isArray(e.setsDetail) && <p className="font-num text-sm tabular-nums text-ink">Réel : {(e.setsDetail as { reps: number; loadKg: number | null; done: boolean }[]).map((s) => `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`).join(" · ")}</p>}
+                      {Array.isArray(e.setsDetail) && (e.setsDetail as SetDetail[]).some((s) => s.hrPeak != null) && (
+                        <ol className="mt-0.5">
+                          {(e.setsDetail as SetDetail[]).map((s, i) => s.hrPeak != null && (
+                            <li key={i} className="font-num text-xs tabular-nums text-ink-mute">S{i + 1} · pic {s.hrPeak}{s.hrEndRest != null ? ` · récup ${s.hrEndRest}` : ""}</li>
+                          ))}
+                        </ol>
+                      )}
                       {e.comment && <p className="mt-1 text-sm text-ink-soft">{e.comment}</p>}
                     </li>
                   ))}
                 </ul>
                 {a.type === "WORKOUT" && <SaveTemplateButton activityId={a.id} defaultName={a.title} />}
               </Section>
+            )}
+            {lift && (
+              <HeartRate
+                values={lift.values} durationS={lift.durationS} upper={lift.upper} zones={lift.zones} compact
+                metrics={[
+                  ...(a.avgHr ? [{ label: "FC moy.", value: a.avgHr, unit: "bpm" }] : []),
+                  ...(a.maxHr ? [{ label: "FC max", value: a.maxHr, unit: "bpm" }] : []),
+                  ...(drop ? [{ label: "Baisse au repos", value: `-${drop.bpm}`, unit: "bpm" }] : []),
+                ]}
+                note={zones.hrMax ? `FC max ${zones.hrMax} bpm${zones.hrManual ? "" : " (estimée)"}` : undefined}
+              />
             )}
             {splits.length > 1 && (
               <Section title="Allure par km">

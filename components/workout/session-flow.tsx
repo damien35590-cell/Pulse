@@ -10,6 +10,7 @@ import { NewSessionSheet } from "@/components/workout/new-session-sheet";
 import { StoryReveal } from "@/components/record/story-reveal";
 import { saveTemplate } from "@/app/(app)/record/session/actions";
 import { freeTitle, toLift, toPayload } from "@/lib/workout/lift";
+import { clearHrBuffer, useHeartRate } from "@/stores/heart-rate";
 import type { Draft, Kind } from "@/lib/workout/types";
 
 const STORE = "pulse-session-v2";
@@ -29,14 +30,21 @@ function readStored(): Run | null {
   } catch { /* stockage indisponible ou illisible */ }
   return null;
 }
-const clearStored = () => { try { localStorage.removeItem(STORE); } catch { /* */ } };
+const clearStored = () => {
+  try {
+    // La FC d'une séance abandonnée ou terminée part avec elle.
+    const r = JSON.parse(localStorage.getItem(STORE) ?? "null");
+    if (r?.startedAt) clearHrBuffer(String(r.startedAt));
+    localStorage.removeItem(STORE);
+  } catch { /* */ }
+};
 
 /**
  * Parcours d'une séance de muscu : feuille « Nouvelle séance » → préparation → SetLogger → enregistrement.
  * `draft` vient de l'adresse (?suggest, ?from, ?template, ?empty) ; sans lui, on reprend la séance en cours ou on ouvre la feuille.
  * `direct` saute la préparation (bouton « Démarrer » de la suggestion).
  */
-export function SessionFlow({ draft, direct }: { draft: Draft | null; direct: boolean }) {
+export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; direct: boolean; hrMax?: number | null }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("boot");
   const [run, setRun] = useState<Run | null>(null);
@@ -75,7 +83,7 @@ export function SessionFlow({ draft, direct }: { draft: Draft | null; direct: bo
 
   /** Quitter garde les séries validées sur le téléphone ; sans série, il n'y a rien à reprendre. */
   function quit() {
-    if (done(latest.current) === 0) clearStored();
+    if (done(latest.current) === 0) { useHeartRate.getState().discard(); clearStored(); }
     router.push("/record");
   }
 
@@ -83,16 +91,20 @@ export function SessionFlow({ draft, direct }: { draft: Draft | null; direct: bo
     if (!run) return;
     const exercises = exs.filter((e) => e.done.length).map(toPayload);
     if (!exercises.length) throw new Error("Aucune série validée : valide au moins une série avant d’enregistrer.");
+    // Avec une ceinture, la série de FC part avec la séance ; le serveur calcule moyenne, max, pic et récupération de chaque série.
+    const hrSeries = useHeartRate.getState().samples;
     const r = await fetch("/api/activities", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "WORKOUT", title: run.title, kind: run.kind, templateId: run.templateId, startedAt: new Date(run.startedAt).toISOString(),
         movingTimeS: Math.max(60, Math.round((Date.now() - run.startedAt) / 1000)), exercises, gearIds: [],
+        ...(hrSeries.length ? { hrSeries } : {}),
       }),
     });
     if (!r.ok) throw new Error("Impossible d’enregistrer. Tes séries sont conservées : réessaie.");
     const j = await r.json();
+    useHeartRate.getState().discard();
     clearStored();
     // Le modèle est un bonus : s'il échoue, la séance est enregistrée quand même.
     if (opts.templateName) await saveTemplate(j.id, opts.templateName).catch(() => null);
@@ -101,7 +113,7 @@ export function SessionFlow({ draft, direct }: { draft: Draft | null; direct: bo
 
   if (res) return <StoryReveal story={res.story} record={res.record} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />;
   if (phase === "run" && run) {
-    return <SetLogger title={run.title} exercises={run.exercises} startedAt={run.startedAt} templateName={run.title} onChange={persist} onSave={save} onExit={quit} />;
+    return <SetLogger title={run.title} exercises={run.exercises} startedAt={run.startedAt} templateName={run.title} hrMax={hrMax} onChange={persist} onSave={save} onExit={quit} />;
   }
   if (phase === "prep" && draft) return <PrepScreen draft={draft} onStart={startRun} onBack={() => router.push(SESSION)} />;
 

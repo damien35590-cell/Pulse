@@ -1,6 +1,10 @@
 /** Noms d'exercices (texte libre) : clé de comparaison, suggestions, double progression. Sans dépendance : utilisé aussi par tools/. */
 
-export type SetDetail = { reps: number; loadKg: number | null; done: boolean };
+export type SetDetail = {
+  reps: number; loadKg: number | null; done: boolean;
+  /** Séances enregistrées au SetLogger : validation (ISO), repos pris (s), puis FC avec une ceinture (lib/workout/hr.ts). */
+  completedAt?: string; restTakenS?: number; hrPeak?: number | null; hrEndRest?: number | null;
+};
 /** Une occurrence passée d'un exercice : le prévu (sets/reps/loadKg) et, si saisi, le réel série par série. */
 export type Past = { date: string; sets: number; reps: number; loadKg: number | null; restS: number | null; setsDetail: SetDetail[] | null };
 /** Historique d'un exercice, séances de la plus récente à la plus ancienne. */

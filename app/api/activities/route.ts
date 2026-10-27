@@ -9,15 +9,24 @@ import { autoGearIds, gearAlerts, ownGearIds } from "@/lib/data/gear";
 import { processActivity } from "@/lib/pipeline/post-import";
 import { exactExerciseIds } from "@/lib/data/exercises-catalog";
 import { kindOfNames } from "@/lib/workout/kind";
+import { annotateSets, cleanHrSeries, hrStats } from "@/lib/workout/hr";
 
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
-/** Réel série par série : [{ reps, loadKg, done }], sinon rien (colonne optionnelle). */
+/**
+ * Réel série par série : [{ reps, loadKg, done, completedAt?, restTakenS? }], sinon rien (colonne optionnelle).
+ * `completedAt` / `restTakenS` (SetLogger) servent ensuite à calculer la FC de la série (annotateSets).
+ */
 function cleanDetail(v: unknown): Prisma.InputJsonValue | undefined {
   if (!Array.isArray(v) || !v.length) return undefined;
   return v.slice(0, 30).map((s: Record<string, unknown>) => {
     const load = s?.loadKg == null || s.loadKg === "" ? NaN : Number(s.loadKg);
-    return { reps: Math.max(0, Math.round(Number(s?.reps)) || 0), loadKg: Number.isFinite(load) && load >= 0 ? load : null, done: s?.done !== false };
+    const at = s?.completedAt ? Date.parse(String(s.completedAt)) : NaN, rest = Math.round(Number(s?.restTakenS));
+    return {
+      reps: Math.max(0, Math.round(Number(s?.reps)) || 0), loadKg: Number.isFinite(load) && load >= 0 ? load : null, done: s?.done !== false,
+      ...(Number.isFinite(at) ? { completedAt: new Date(at).toISOString() } : {}),
+      ...(rest > 0 && rest <= 3600 ? { restTakenS: rest } : {}),
+    };
   });
 }
 
@@ -39,6 +48,10 @@ export async function POST(req: Request) {
       }).filter((e: { name: string; sets: number; reps: number }) => e.name && e.sets > 0 && e.reps > 0)
     : [];
   if (isWorkout) { b.distanceM = 0; b.elevationGainM = 0; }
+  // Ceinture cardio : série nettoyée, moyenne / max calculées ici, pic et FC en fin de repos écrits dans chaque série. Sans assez de mesures : rien.
+  const hrSamples = isWorkout ? cleanHrSeries(b.hrSeries) : [];
+  const hr = hrStats(hrSamples);
+  if (hr) annotateSets(exercises, hrSamples, +startedAt);
   // Rattachement au catalogue quand la correspondance est exacte ; en cas d'échec, la séance s'enregistre quand même en texte libre.
   if (exercises.length) {
     const ids = await exactExerciseIds(uid, exercises.map((e: { name: string }) => e.name)).catch(() => new Map<string, string>());
@@ -62,6 +75,7 @@ export async function POST(req: Request) {
     const a = await prisma.activity.create({
       data: {
         userId: uid, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
+        avgHr: hr?.avg, maxHr: hr?.max, hrSeries: hr ? (hrSamples as unknown as Prisma.InputJsonValue) : undefined,
         distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined,
         exercises: exercises.length ? { create: exercises } : undefined,

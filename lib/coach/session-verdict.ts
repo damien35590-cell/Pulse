@@ -48,6 +48,8 @@ export type SessionInput = {
   // Musculation
   workoutKind?: "HAUT" | "BAS" | "LIBRE" | null;
   exercises?: StrengthExercise[];
+  /** Ceinture cardio : FC moyenne et max de la séance, baisse moyenne de FC pendant les repos (null s'il y a moins de 3 séries mesurées). */
+  hr?: { avg: number; max: number; restDrop?: number | null } | null;
 };
 
 export type VerdictFacts = {
@@ -63,6 +65,8 @@ export type VerdictFacts = {
   exercise?: string; totalReps?: number; deltaReps?: number; stall?: 0 | 1 | 2; blocked?: boolean; sessionLabel?: string | null;
   // constrained
   reason?: "late" | "second";
+  // muscu avec ceinture cardio (s'ajoute au verdict, n'en crée pas)
+  hrAvg?: number; hrMax?: number; hrRestDrop?: number;
 };
 export type Verdict = { kind: VerdictKind; facts: VerdictFacts };
 
@@ -112,6 +116,11 @@ function strengthVerdicts(input: SessionInput): Strength {
   if (count && allMet) out.met = { sport: "WORKOUT", sets, exercises: count };
   return out;
 }
+/** Faits de FC d'une séance de muscu ; rien (objet vide) sans ceinture, pour que le commentaire reste identique à avant. */
+function hrFacts({ hr }: SessionInput): Pick<VerdictFacts, "hrAvg" | "hrMax" | "hrRestDrop"> {
+  if (!hr || !(hr.avg > 0) || !(hr.max > 0)) return {};
+  return { hrAvg: hr.avg, hrMax: hr.max, ...(hr.restDrop != null ? { hrRestDrop: hr.restDrop } : {}) };
+}
 const label = (k: SessionInput["workoutKind"]) => (k === "HAUT" ? "Haut du corps" : k === "BAS" ? "Bas du corps" : null);
 
 function fatigueFacts(input: SessionInput, sport: "RUN" | "RIDE"): VerdictFacts | null {
@@ -143,10 +152,10 @@ export function computeVerdict(input: SessionInput): Verdict | null {
   const sport = input.type as Sport;
 
   if (sport === "WORKOUT") {
-    const s = strengthVerdicts(input);
-    if (s.record) return { kind: "record", facts: s.record };
-    if (s.under) return { kind: "underperformance", facts: s.under };
-    if (s.met) return constrain(input, s.met);
+    const s = strengthVerdicts(input), hr = hrFacts(input);
+    if (s.record) return { kind: "record", facts: { ...s.record, ...hr } };
+    if (s.under) return { kind: "underperformance", facts: { ...s.under, ...hr } };
+    if (s.met) return constrain(input, { ...s.met, ...hr });
     return null;
   }
 

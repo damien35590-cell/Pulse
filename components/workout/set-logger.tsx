@@ -9,8 +9,12 @@ import { NumberStepper } from "@/components/ui/number-stepper";
 import { BottomSheet, ConfirmSheet } from "@/components/ui/bottom-sheet";
 import { Metric } from "@/components/ui/metric";
 import { Switch } from "@/components/ui/switch";
+import { HrPill, zoneText } from "@/components/workout/hr-pill";
+import { useHeartRate } from "@/stores/heart-rate";
+import { useWakeLock } from "@/lib/use-wake-lock";
 
-export type LiftSet = { reps: number; kg: number };
+/** `at` : instant de validation (ms) ; `restS` : repos réellement pris ensuite (s). Servent à relier la FC à la série (lib/workout/hr.ts). */
+export type LiftSet = { reps: number; kg: number; at?: number; restS?: number };
 export type LiftExercise = {
   name: string;
   sets: number;
@@ -46,7 +50,13 @@ type Props = {
   onChange?: (exercises: LiftExercise[]) => void;
   /** Nom proposé pour « Enregistrer comme modèle » ; sans lui, l'option n'apparaît pas. */
   templateName?: string;
+  /** FC max de l'utilisateur : colore la FC en direct aux couleurs des zones. */
+  hrMax?: number | null;
+  /** Ceinture cardio Bluetooth et écran allumé. Faux pour la démo de /ui-kit. */
+  liveHr?: boolean;
 };
+
+type Rest = { endsAt: number; total: number; next: string; startedAt: number; after: { ex: number; set: number }; hrStart: number | null };
 
 const fr = (v: number) => fmtNum(v, 2);
 const kgTxt = (kg: number, bw?: boolean) => (bw ? (kg ? `+${fr(kg)}` : "PDC") : fr(kg));
@@ -68,13 +78,13 @@ function useNow(active = true) {
  * - La série est pré-remplie (dernière série faite, sinon l'objectif) : la plupart du temps, 1 seul tap suffit.
  * - Retour immédiat : vibration + bouton qui passe au vert + coche qui « pop » dans le tableau, puis repos.
  */
-export function SetLogger({ title, program, exercises, startedAt, onExit, onSave, onChange, templateName }: Props) {
+export function SetLogger({ title, program, exercises, startedAt, onExit, onSave, onChange, templateName, hrMax, liveHr = true }: Props) {
   const [exs, setExs] = useState(() => exercises.map((e) => ({ ...e, done: [...e.done] })));
   const [idx, setIdx] = useState(() => Math.max(0, exercises.findIndex((e) => e.done.length < e.sets)));
   const [edit, setEdit] = useState<number | null>(null); // série déjà faite en cours de correction
   const [draft, setDraft] = useState<LiftSet>({ reps: 0, kg: 0 });
   const [flash, setFlash] = useState(false);
-  const [rest, setRest] = useState<{ endsAt: number; total: number; next: string } | null>(null);
+  const [rest, setRest] = useState<Rest | null>(null);
   const [quit, setQuit] = useState(false);
   const [finished, setFinished] = useState(false);
   const [tplOn, setTplOn] = useState(false);
@@ -83,6 +93,13 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
   const [saveErr, setSaveErr] = useState("");
   const start = useRef(startedAt ?? Date.now());
   const now = useNow();
+  useWakeLock(liveHr);
+  useEffect(() => {
+    if (!liveHr) return;
+    const hr = useHeartRate.getState();
+    hr.begin(String(start.current), start.current);
+    return () => hr.detach();
+  }, [liveHr]);
 
   const ex = exs[idx];
   const k = ex.done.length;
@@ -98,7 +115,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
   // Pré-remplissage : dernière série faite, sinon l'objectif.
   useEffect(() => {
     const e = exs[idx], last = e.done[e.done.length - 1];
-    setDraft(last ? { ...last } : { reps: e.reps, kg: e.kg });
+    setDraft(last ? { reps: last.reps, kg: last.kg } : { reps: e.reps, kg: e.kg });
     setEdit(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx]);
@@ -108,13 +125,14 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
     tap(6);
     if (i === k) { setEdit(null); return; }
     setEdit(i);
-    setDraft({ ...ex.done[i] });
+    setDraft({ reps: ex.done[i].reps, kg: ex.done[i].kg });
   }
 
   function validate() {
     if (flash) return; // anti double tap
     tap(18);
-    const set = { ...draft };
+    // Une série corrigée garde son instant de validation et son repos : la FC reste rattachée à la bonne fenêtre.
+    const set: LiftSet = edit != null ? { ...draft, at: ex.done[edit].at, restS: ex.done[edit].restS } : { ...draft, at: Date.now() };
     if (edit != null) {
       setExs((l) => l.map((e, i) => (i === idx ? { ...e, done: e.done.map((d, j) => (j === edit ? set : d)) } : e)));
       setEdit(null);
@@ -132,8 +150,19 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
       const t = next[nextIdx];
       // Dernière série de l'exercice : repos « après exercice » ; sinon repos entre séries.
       const restS = nextIdx !== idx ? cur.restAfterS ?? cur.restS : cur.restS;
-      if (restS > 0) setRest({ endsAt: Date.now() + restS * 1000, total: restS * 1000, next: `${t.name} · série ${t.done.length + 1}/${t.sets}` });
+      if (restS > 0) {
+        const at = Date.now();
+        setRest({ endsAt: at + restS * 1000, total: restS * 1000, next: `${t.name} · série ${t.done.length + 1}/${t.sets}`, startedAt: at, after: { ex: idx, set: cur.done.length - 1 }, hrStart: liveHr ? useHeartRate.getState().recentPeak(10) : null });
+      }
     }, 600);
+  }
+
+  /** Ferme le repos et note sa durée réelle sur la série qui l'a déclenché. */
+  function endRest(r: Rest) {
+    const took = Math.round((Date.now() - r.startedAt) / 1000);
+    setRest(null);
+    if (took < 1) return;
+    setExs((l) => l.map((e, i) => (i === r.after.ex ? { ...e, done: e.done.map((d, j) => (j === r.after.set ? { ...d, restS: took } : d)) } : e)));
   }
 
   async function save() {
@@ -166,6 +195,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
                 {fmtClock(elapsed)} · {doneSets}/{totalSets} séries
               </p>
             </div>
+            {liveHr && <HrPill hrMax={hrMax} />}
             <button type="button" onClick={() => { tap(10); setFinished(true); }} className="h-10 touch-manipulation rounded-full px-3.5 text-sm font-semibold text-brand transition active:scale-95 active:bg-brand/10">
               Terminer
             </button>
@@ -299,7 +329,8 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
         <RestOverlay
           {...rest}
           onAdd={(s) => setRest((r) => r && { ...r, endsAt: r.endsAt + s * 1000, total: r.total + s * 1000 })}
-          onDone={() => setRest(null)}
+          hrMax={hrMax}
+          onDone={() => endRest(rest)}
         />
       )}
 
@@ -349,8 +380,9 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onSave
 }
 
 /** Repos en plein écran : chiffres de 88 px lisibles téléphone posé au sol, anneau de progression, contrôles sous le pouce. */
-function RestOverlay({ endsAt, total, next, onAdd, onDone }: { endsAt: number; total: number; next: string; onAdd: (s: number) => void; onDone: () => void }) {
+function RestOverlay({ endsAt, total, next, hrStart, hrMax, onAdd, onDone }: { endsAt: number; total: number; next: string; hrStart: number | null; hrMax?: number | null; onAdd: (s: number) => void; onDone: () => void }) {
   const now = useNow();
+  const bpm = useHeartRate((s) => (s.status === "connected" ? s.bpm : null));
   const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
   const done = useRef(false);
   useEffect(() => {
@@ -378,6 +410,14 @@ function RestOverlay({ endsAt, total, next, onAdd, onDone }: { endsAt: number; t
             </svg>
             <span className="absolute inset-0 grid place-items-center font-num text-[88px] font-semibold leading-none tabular-nums">{fmtClock(left)}</span>
           </div>
+          {hrStart != null && bpm != null && (
+            <p aria-label={`Fréquence cardiaque : ${hrStart} puis ${bpm} battements par minute`} className="mt-6 flex items-baseline gap-2 font-num text-metric-md tabular-nums">
+              <span className="text-ink-soft">{hrStart}</span>
+              <span aria-hidden className="text-ink-mute">→</span>
+              <span className={zoneText(bpm, hrMax)}>{bpm}</span>
+              <span className="font-sans text-xs font-medium text-ink-soft">bpm</span>
+            </p>
+          )}
           <p className="mt-8 text-center text-sm text-ink-soft">
             Ensuite · <span className="font-semibold text-ink">{next}</span>
           </p>

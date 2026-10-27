@@ -64,7 +64,7 @@ export function UiKitDemo({ screen: controlled, onScreen }: { screen?: Screen; o
       {screen === "lift" && <LiftDetail back={() => go("list")} />}
       {screen === "tokens" && <Tokens />}
       {screen === "workout" && (
-        <SetLogger title={workout.title} program={workout.program} exercises={workout.exercises} startedAt={Date.now() - workout.startedMinAgo * 60000} onExit={() => go("home")} />
+        <SetLogger title={workout.title} program={workout.program} exercises={workout.exercises} startedAt={Date.now() - workout.startedMinAgo * 60000} liveHr={false} onExit={() => go("home")} />
       )}
       {!controlled && screen !== "workout" && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 flex justify-center px-6">

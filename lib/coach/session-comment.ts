@@ -6,6 +6,7 @@ import { prisma } from "../prisma";
 import { dayKey, localHour } from "../dates";
 import { isCommute } from "../routes/estimate";
 import { loadHistory } from "../workout/history";
+import { restDrop, setsOf } from "../workout/hr";
 import { getCurrentVma } from "../data/training";
 import { getZones } from "../data/zones";
 import { DEFAULT_VMA } from "../training/vma";
@@ -54,7 +55,7 @@ async function samplesOf(activityId: string, trackPoints: unknown): Promise<Trac
 export async function verdictForActivity(activityId: string, records: { label?: string; value: number; beaten: boolean }[]): Promise<Verdict | null> {
   const a = await prisma.activity.findUnique({
     where: { id: activityId },
-    select: { id: true, userId: true, type: true, title: true, source: true, dedupeKey: true, startedAt: true, feeling: true, distanceM: true, movingTimeS: true, avgHr: true, kind: true, trackPoints: true },
+    select: { id: true, userId: true, type: true, title: true, source: true, dedupeKey: true, startedAt: true, feeling: true, distanceM: true, movingTimeS: true, avgHr: true, maxHr: true, kind: true, trackPoints: true },
   });
   if (!a) return null;
   if (isCommute(a)) return null;
@@ -67,12 +68,14 @@ export async function verdictForActivity(activityId: string, records: { label?: 
   const base = { type: a.type, title: a.title, source: a.source, dedupeKey: a.dedupeKey, startHour: localHour(a.startedAt, tz), secondOfDay: earlier.length > 0, feeling: a.feeling };
 
   if (a.type === "WORKOUT") {
-    const mine = await prisma.workoutExercise.findMany({ where: { activityId: a.id }, select: { name: true } });
+    const mine = await prisma.workoutExercise.findMany({ where: { activityId: a.id }, select: { name: true, setsDetail: true } });
     const history = await loadHistory(a.userId);
     const keys = [...new Set(mine.map((e) => groupKey(e.name)).filter((k): k is string => !!k))];
     // Une séance non encore enregistrée au moment du chargement ne figure pas dans l'historique : sans elle, pas de comparaison.
     const exercises = keys.map((k) => ({ rows: history.get(k) ?? [] })).filter((e) => e.rows[0]?.activityId === a.id);
-    return computeVerdict({ ...base, workoutKind: a.kind, exercises });
+    // Ceinture cardio : FC moyenne / max de la séance et baisse moyenne pendant les repos (calculées à l'enregistrement, lib/workout/hr.ts).
+    const hr = a.avgHr && a.maxHr ? { avg: a.avgHr, max: a.maxHr, restDrop: restDrop(setsOf(mine.map((e) => e.setsDetail)))?.bpm ?? null } : null;
+    return computeVerdict({ ...base, workoutKind: a.kind, exercises, hr });
   }
 
   const recentRuns = a.type === "RUN"

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { getZones } from "@/lib/data/zones";
 import { SessionFlow } from "@/components/workout/session-flow";
 import { buildDraftFromSession, buildDraftFromTemplate, getNextSessionSuggestion } from "@/lib/workout/queries";
 import type { Draft } from "@/lib/workout/types";
@@ -25,5 +26,6 @@ export default async function SessionPage({ searchParams }: { searchParams: SP }
   // Séance ou modèle introuvable (supprimé, autre compte) : retour à la feuille plutôt qu'une page vide.
   if (!draft && (searchParams.from || searchParams.template)) redirect("/record/session");
 
-  return <SessionFlow key={JSON.stringify(searchParams)} draft={draft} direct={searchParams.go === "1"} />;
+  const { hrMax } = await getZones(uid);
+  return <SessionFlow key={JSON.stringify(searchParams)} draft={draft} direct={searchParams.go === "1"} hrMax={hrMax} />;
 }

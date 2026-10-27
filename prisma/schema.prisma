@@ -177,6 +177,7 @@ model Activity {
   calories       Int?
   avgHr          Int?
   maxHr          Int?
+  hrSeries       Json?                   // muscu avec ceinture cardio : [{ t: secondes depuis startedAt, bpm }] à 1 Hz au plus (lib/workout/hr.ts) ; avgHr / maxHr en sont calculés côté serveur
   avgPower       Int?                    // W (home trainer, capteur de puissance)
   maxPower       Int?
   polyline       String?      @db.Text   // trace simplifiée (polyline encodée)
@@ -309,7 +310,7 @@ model WorkoutExercise {
   loadKg     Float?
   restS      Int?
   comment    String?
-  setsDetail Json?   // [{ reps, loadKg, done, rir?, isWarmup?, durationS? }] : le réel série par série ; sets/reps/loadKg restent le prévu
+  setsDetail Json?   // [{ reps, loadKg, done, rir?, isWarmup?, durationS?, completedAt?, restTakenS?, hrPeak?, hrEndRest? }] : le réel série par série ; sets/reps/loadKg restent le prévu
   exerciseId String? // Programmes v2 : exercice du catalogue (null = texte libre non rapproché)
   slotId     String? // Programmes v2 : emplacement du programme suivi
   activity Activity             @relation(fields: [activityId], references: [id], onDelete: Cascade)

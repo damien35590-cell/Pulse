@@ -14,10 +14,21 @@ export function toLift(d: DraftExercise): LiftExercise {
   };
 }
 
-/** Un exercice fait → ligne de POST /api/activities : le prévu (sets, reps, charge, repos) et le réel série par série. */
+/**
+ * Un exercice fait → ligne de POST /api/activities : le prévu (sets, reps, charge, repos) et le réel série par série.
+ * `completedAt` (ISO) et `restTakenS` : instant de validation et repos pris ensuite, d'où le serveur tire la FC de chaque série (lib/workout/hr.ts).
+ */
 export function toPayload(e: LiftExercise) {
   const load = (kg: number) => (e.bodyweight && !kg ? null : kg);
-  return { name: e.name, sets: e.sets, reps: e.reps, loadKg: load(e.kg), restS: e.restS, setsDetail: e.done.map((d) => ({ reps: d.reps, loadKg: load(d.kg), done: true, ...(e.timed ? { durationS: d.reps } : {}) })) };
+  return {
+    name: e.name, sets: e.sets, reps: e.reps, loadKg: load(e.kg), restS: e.restS,
+    setsDetail: e.done.map((d) => ({
+      reps: d.reps, loadKg: load(d.kg), done: true,
+      ...(e.timed ? { durationS: d.reps } : {}),
+      ...(d.at ? { completedAt: new Date(d.at).toISOString() } : {}),
+      ...(d.restS ? { restTakenS: d.restS } : {}),
+    })),
+  };
 }
 
 /** Titre par défaut d'une séance libre, comme l'ancien écran : « Musculation du matin ». */
