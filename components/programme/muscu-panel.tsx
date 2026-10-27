@@ -53,7 +53,7 @@ function ProgrammeCard({ v }: { v: StrengthProgramView }) {
         {v.recent.map((r) => (
           <li key={r.id} className="min-w-0 flex-1">
             <Link href={`/activities/${r.id}`} aria-label={`${KIND_TITLE[r.kind]}, ${dayLabel(r.date)}`}
-              className={cn(ui.pressCard, "grid h-11 place-items-center rounded-tile bg-ink font-num text-metric-sm text-bg")}>{LETTER[r.kind]}</Link>
+              className={cn(ui.pressCard, "grid h-11 place-items-center rounded-tile bg-surface-3 font-num text-metric-sm text-ink")}>{LETTER[r.kind]}</Link>
           </li>
         ))}
         <li className="min-w-0 flex-1">
@@ -80,7 +80,7 @@ function ExerciseRow({ r }: { r: ProgressRow }) {
     <li className="flex min-h-14 items-center gap-3 py-2">
       <span className="grid size-10 shrink-0 place-items-center rounded-tile bg-surface-2 font-num text-metric-sm text-ink">{r.code}</span>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold capitalize leading-tight text-ink">{r.name}</p>
+        <p className="truncate font-semibold leading-tight text-ink">{r.name}</p>
         {r.loop ? (
           <p className="mt-0.5 text-sm text-ink-soft"><span className="font-semibold text-warn">Stagne <span className="font-num tabular-nums">2/2</span> · Boucle</span> · repars à <span className="font-num tabular-nums text-ink">{r.loop}</span></p>
         ) : (

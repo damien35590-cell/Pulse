@@ -1,34 +1,39 @@
 /**
- * Cible de la prochaine séance d'un exercice Lafay, d'après les séances passées. Réutilise les règles de l'analyse
- * (lib/analytics/strength.ts) : progrès = toutes les séries à la cible, blocage = 2 séances sans progrès, plafond de 12 reps (20 au squat sauté).
+ * Cible de la prochaine séance d'un exercice Lafay, d'après les séances passées. Les états (progrès, stagne 1/2, stagne 2/2) et la cible de boucle
+ * viennent de lib/workout/loop.ts, la seule source : la carte « Progression » de la page Programme et la séance proposée par « Démarrer » lisent le même résultat.
  * Fonction pure (tests : tools/test-workout.ts).
  */
-import { advice, capOf, entriesOf, isJump, stallsOf, type StrengthRow } from "../analytics/strength";
+import { capOf, entriesOf, isJump, nextVariant, type StrengthRow } from "../analytics/strength";
+import { catalogFor, resolveName } from "./catalog";
+import { loopReps, loopState, type LoopState } from "./loop";
 
 export type LafayChange = "progress" | "repeat" | "evolve" | "restart";
 export type LafayTarget = { variant: string | null; sets: number; reps: number; change: LafayChange; hint: string | null };
 
-/**
- * `rows` : les lignes de CET exercice (même lettre), de la plus récente à la plus ancienne. Renvoie null sans historique.
- *
- * - toutes les séries à la cible → +1 rep par série ;
- * - cible atteinte partout au plafond, ou 2 séances sans progrès → variante suivante à 70 % du plafond (même niveau à 70 % s'il n'y en a pas) ;
- * - sinon → même cible (réessayer).
- * Contrairement à l'écran Analyse, un plafond non atteint partout ne change pas de niveau : on réessaie d'abord.
- */
-export function applyLafayProgress(rows: StrengthRow[]): LafayTarget | null {
+/** `rows` : les lignes de CET exercice, de la plus récente à la plus ancienne. Sans historique : null. */
+export function lafayView(rows: StrengthRow[]): { state: LoopState; target: LafayTarget | null; loop: string | null } {
   const ents = entriesOf(rows), cur = ents[0];
-  if (!cur) return null;
-  const name = rows[0].name, cap = capOf(name), stalls = stallsOf(ents);
+  if (!cur) return { state: "new", target: null, loop: null };
+  const name = rows[0].name, cap = capOf(name), { code } = resolveName(name);
+  const source = catalogFor(code, cur.variant)?.source;
+  const state = loopState([...ents].reverse().map((e) => ({ reps: e.total, variant: e.variant })));
   const stay = (change: LafayChange, reps: number, hint: string | null): LafayTarget => ({ variant: cur.variant, sets: cur.sets, reps, change, hint });
+  let target: LafayTarget;
 
-  if ((cur.n >= cap && cur.met) || stalls >= 2) {
-    if (isJump(name) && cur.n >= cap) return stay("repeat", cur.n, "saute plus haut");
-    const adv = advice(cur, name);
-    if (adv.next) return { variant: adv.next, sets: cur.sets, reps: adv.restart, change: "evolve", hint: adv.hint };
-    if (stalls >= 2) return stay("restart", adv.restart, adv.hint);
-    return stay("repeat", cur.n, "plafond atteint");
-  }
-  if (cur.met) return stay("progress", Math.min(cap, cur.n + 1), null);
-  return stay("repeat", cur.n, null);
+  if (cur.n >= cap && cur.met) {
+    // Plafond atteint partout : niveau suivant de l'échelle, avec la cible de boucle.
+    const next = nextVariant(cur.variant), reps = loopReps(cur.n, source);
+    if (isJump(name)) target = stay("repeat", cur.n, "saute plus haut");
+    else if (next) target = { variant: next, sets: cur.sets, reps, change: "evolve", hint: `passe à ${next} à ${cur.sets}×${reps}` };
+    else target = stay("repeat", cur.n, "plafond atteint");
+  } else if (state === "stall2") {
+    // Deux séances de suite sans gain de répétitions : on repart plus bas sur le même niveau.
+    const reps = loopReps(cur.n, source);
+    target = stay("restart", reps, `repars à ${cur.sets}×${reps}${cur.variant ? ` sur ${cur.variant}` : ""}`);
+  } else if (cur.met) target = stay("progress", Math.min(cap, cur.n + 1), null);
+  else target = stay("repeat", cur.n, null);
+
+  return { state, target, loop: state === "stall2" && target.change === "restart" ? `${target.sets} × ${target.reps}` : null };
 }
+
+export const applyLafayProgress = (rows: StrengthRow[]): LafayTarget | null => lafayView(rows).target;

@@ -6,8 +6,10 @@
 import { prisma } from "@/lib/prisma";
 import { buildStrengthAnalysis, type ExerciseProgress } from "@/lib/analytics/strength";
 import { BUILT_IN, builtInStructure, ensureBuiltInTemplates } from "@/lib/workout/builtin";
-import { catalogFor, isLafayCode } from "@/lib/workout/catalog";
-import { loopReps, loopState, type LoopState } from "@/lib/workout/loop";
+import { isLafayCode } from "@/lib/workout/catalog";
+import { lafayView } from "@/lib/workout/lafay";
+import { loopState, type LoopState } from "@/lib/workout/loop";
+import type { StrengthRow } from "@/lib/analytics/strength";
 import { planExercise } from "@/lib/workout/draft";
 import { historyKey, loadHistory } from "@/lib/workout/history";
 import { nextKind } from "@/lib/workout/kind";
@@ -55,16 +57,16 @@ export type StrengthProgramView = {
 };
 
 const label = (e: DraftExercise) => (isLafayCode(e.code) ? e.name.replace(/\s-\s/, " ") : e.name);
+/** Phrase : « squat sauté » → « Squat sauté » (jamais de casse de titre en CSS). */
+const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const initials = (name: string) => name.split(/[\s-]+/).filter((w) => w.length > 2).slice(0, 3).map((w) => w[0].toUpperCase()).join("") || name.slice(0, 3).toUpperCase();
 
-function rowOf(e: DraftExercise, p: ExerciseProgress | undefined): ProgressRow {
-  const state = p ? loopState(p.points) : "new";
+function rowOf(e: DraftExercise, p: ExerciseProgress | undefined, rows: StrengthRow[]): ProgressRow {
+  // État et cible de boucle : lafayView, comme la séance proposée par « Démarrer » (même historique, même résultat).
+  const { state, loop } = isLafayCode(e.code) ? lafayView(rows) : { state: p ? loopState(p.points) : ("new" as const), loop: null };
   const spark = p ? p.repsPerSession.slice(-SPARK) : [];
-  // Boucle : on repart de la cible de la dernière séance (« 6×8 »), réduite de 30 % (Lafay pur) ou 20 % (hybride, inconnu).
-  const lastTarget = Number(p?.level.split("×")[1]);
-  const loop = state === "stall2" && lastTarget > 0 ? `${e.sets} × ${loopReps(lastTarget, catalogFor(e.code, e.variant)?.source)}` : null;
   return {
-    code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: isLafayCode(e.code) ? e.name.replace(/^.*?s-s/, "") : e.name,
+    code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: upperFirst(isLafayCode(e.code) ? e.name.replace(/^.*?s-s/, "") : e.name),
     target: `${e.sets} × ${e.reps}`, state, stall: state === "stall1" ? "1/2" : state === "stall2" ? "2/2" : null, loop,
     spark, last: spark.length ? spark[spark.length - 1] : null,
   };
@@ -88,7 +90,7 @@ export async function getStrengthProgram(userId: string, now = new Date()): Prom
 
   const progress = new Map(buildStrengthAnalysis([...history.values()].flat(), WEEKS, TZ, now).exercises.map((p) => [p.key, p]));
   const groups = (["HAUT", "BAS"] as const).map((kind) => ({
-    kind, rows: drafts[kind].map((e) => rowOf(e, progress.get(historyKey(e.code, e.variant)))),
+    kind, rows: drafts[kind].map((e) => rowOf(e, progress.get(historyKey(e.code, e.variant)), history.get(historyKey(e.code, e.variant)) ?? [])),
   }));
 
   // Même règle que la suggestion du jour (getNextSessionSuggestion) : alternance d'après la dernière séance haut / bas.

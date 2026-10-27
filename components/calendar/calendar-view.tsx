@@ -20,7 +20,8 @@ const empty = (): Day => ({ sessions: [], races: [], runs: [], workouts: [] });
 const isEmpty = (d: Day) => !d.sessions.length && !d.races.length && !d.runs.length && !d.workouts.length;
 
 const dot = "h-2 w-2 rounded-full";
-const sessionDot = (s: CalSession) => (s.status === "COMPLETED" || s.status === "PARTIAL" ? "bg-emerald-500" : s.status === "SKIPPED" ? "bg-ink-soft/30" : s.isKey ? "bg-orange-500" : "bg-ink-soft/60");
+const KEY_RING = "ring-2 ring-ink";
+const sessionDot = (s: CalSession) => (s.status === "COMPLETED" || s.status === "PARTIAL" ? "bg-act-run" : s.status === "SKIPPED" ? "bg-ink-mute/30" : cn("bg-ink-mute", s.isKey && KEY_RING));
 const statusLabel: Record<SessionStatus, string> = { PLANNED: "Prévue", COMPLETED: "Faite", PARTIAL: "Partielle", MOVED: "Déplacée", SKIPPED: "Passée" };
 const raceLabel = { REGISTERED: "Inscrit", COMPLETED: "Courue", DNS: "Absent", DNF: "Abandon" } as const;
 const StarIcon = ({ className }: { className?: string }) => <Star className={cn("fill-amber-400 text-amber-500", className)} aria-hidden />;
@@ -86,8 +87,8 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
                   <span className="flex min-h-3 flex-wrap items-center justify-center gap-0.5">
                     {d.races.length > 0 && <StarIcon className="h-3 w-3" />}
                     {d.sessions.length > 0 && <span className={cn(dot, sessionDot(d.sessions[0]))} />}
-                    {d.runs.length > 0 && <span className={cn(dot, "bg-emerald-500")} />}
-                    {d.workouts.length > 0 && <span className={cn(dot, "bg-violet-500")} />}
+                    {d.runs.length > 0 && <span className={cn(dot, "bg-act-run")} />}
+                    {d.workouts.length > 0 && <span className={cn(dot, "bg-act-strength")} />}
                   </span>
                 </button>
               );
@@ -107,8 +108,8 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
                     {isEmpty(d) && <span className="text-sm text-ink-soft">—</span>}
                     {d.races.map((r) => <Row key={r.id} icon={<StarIcon className="h-3.5 w-3.5" />} text={r.name} />)}
                     {d.sessions.map((s) => <Row key={s.id} icon={<span className={cn(dot, sessionDot(s))} />} text={s.title} meta={s.durationS ? fmtDuration(s.durationS) : undefined} />)}
-                    {d.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-emerald-500")} />} text={a.title} meta={fmtDuration(a.durationS)} />)}
-                    {d.workouts.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-violet-500")} />} text={a.title} meta={fmtDuration(a.durationS)} />)}
+                    {d.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-act-run")} />} text={a.title} meta={fmtDuration(a.durationS)} />)}
+                    {d.workouts.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-act-strength")} />} text={a.title} meta={fmtDuration(a.durationS)} />)}
                   </span>
                 </button>
               </li>
@@ -118,7 +119,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
       )}
 
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-soft" aria-label="Légende">
-        <Leg c="bg-orange-500" t="Séance clé" /><Leg c="bg-ink-soft/60" t="Séance prévue" /><Leg c="bg-emerald-500" t="Running fait" /><Leg c="bg-violet-500" t="Muscu" />
+        <Leg c={cn("bg-ink-mute", KEY_RING)} t="Séance clé" /><Leg c="bg-ink-mute" t="Séance prévue" /><Leg c="bg-act-run" t="Running fait" /><Leg c="bg-act-strength" t="Muscu" />
         <li className="flex items-center gap-1"><StarIcon className="h-3 w-3" />Course objectif</li>
       </ul>
 
@@ -128,8 +129,8 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
           {isEmpty(sel) && <p className="text-sm text-ink-soft">Rien de prévu ni de fait ce jour-là.</p>}
           {sel.races.map((r) => <Row key={r.id} icon={<StarIcon className="h-3.5 w-3.5" />} text={r.name} meta={raceLabel[r.status]} />)}
           {sel.sessions.map((s) => <Row key={s.id} icon={<span className={cn(dot, sessionDot(s))} />} text={s.title} meta={[statusLabel[s.status], s.isKey ? "clé" : null, s.durationS ? fmtDuration(s.durationS) : null].filter(Boolean).join(" · ")} />)}
-          {sel.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-emerald-500")} />} text={a.title} meta={`Running · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
-          {sel.workouts.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-violet-500")} />} text={a.title} meta={`Muscu · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
+          {sel.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-act-run")} />} text={a.title} meta={`Running · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
+          {sel.workouts.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-act-strength")} />} text={a.title} meta={`Muscu · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
         </div>
       )}
     </section>

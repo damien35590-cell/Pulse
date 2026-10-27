@@ -1,7 +1,7 @@
 // Lancer avec : npx tsx tools/test-workout.ts
 import assert from "node:assert/strict";
 import type { StrengthRow } from "../lib/analytics/strength";
-import { applyLafayProgress } from "../lib/workout/lafay";
+import { applyLafayProgress, lafayView } from "../lib/workout/lafay";
 import { kindOfNames, nextKind } from "../lib/workout/kind";
 import { defaultVariant, displayName, resolveName, restAfterFor, variantsOf } from "../lib/workout/catalog";
 import { planExercise, type Structure } from "../lib/workout/draft";
@@ -44,20 +44,20 @@ assert.deepEqual([t.variant, t.sets, t.reps, t.change], ["B1", 6, 9, "progress"]
 // Cible ratée (8·8·8·7·6·5 = 42 sur 6×8) → même cible.
 t = applyLafayProgress([row("a", "2026-10-12", "B1 - dips", 6, 8, [8, 8, 8, 7, 6, 5])])!;
 assert.deepEqual([t.variant, t.reps, t.change], ["B1", 8, "repeat"]);
-// Plafond de 12 atteint partout → niveau suivant à arrondi(12 × 0,7) = 8.
+// Plafond de 12 atteint partout → niveau suivant à la cible de boucle : floor(12 × 0,7) = 8 (Lafay pur : −30 %).
 t = applyLafayProgress([row("a", "2026-10-12", "B1 - dips", 6, 12, six(12))])!;
 assert.deepEqual([t.variant, t.reps, t.change, t.hint], ["B2", 8, "evolve", "passe à B2 à 6×8"]);
 // Plafond visé mais pas atteint partout → on réessaie, sans changer de niveau.
 t = applyLafayProgress([row("a", "2026-10-12", "B1 - dips", 6, 12, [12, 12, 11, 11, 10, 10])])!;
 assert.deepEqual([t.variant, t.reps, t.change], ["B1", 12, "repeat"]);
-// Deux séances sans progrès (total égal, cible non atteinte) → niveau suivant à 70 %.
+// Deux séances de suite sans gain de total (48, 48 après 60) → boucle : même niveau, floor(10 × 0,7) = 7.
 t = applyLafayProgress([
   row("c", "2026-10-19", "B2 - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
   row("b", "2026-10-15", "B2 - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
   row("a", "2026-10-12", "B2 - dips", 6, 10, six(10)),
 ])!;
-assert.deepEqual([t.variant, t.reps, t.change], ["B", 7, "evolve"]);
-// Forme finale bloquée deux fois → on repart à 70 % sur le même niveau.
+assert.deepEqual([t.variant, t.reps, t.change, t.hint], ["B2", 7, "restart", "repars à 6×7 sur B2"]);
+// Forme finale bloquée deux fois → même résultat : on repart plus bas sur le même niveau.
 t = applyLafayProgress([
   row("c", "2026-10-19", "B - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
   row("b", "2026-10-15", "B - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
@@ -69,6 +69,39 @@ t = applyLafayProgress([row("a", "2026-10-12", "F - squat sauté", 6, 20, six(20
 assert.deepEqual([t.reps, t.change, t.hint], [20, "repeat", "saute plus haut"]);
 t = applyLafayProgress([row("a", "2026-10-12", "F - squat sauté", 6, 15, six(15))])!;
 assert.equal(t.reps, 16, "le plafond du squat sauté est 20, pas 12");
+
+// Un seul non-gain (stagne 1/2) : on réessaie la même cible, pas de boucle.
+t = applyLafayProgress([
+  row("b", "2026-10-15", "B2 - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
+  row("a", "2026-10-12", "B2 - dips", 6, 10, six(10)),
+])!;
+assert.deepEqual([t.reps, t.change], [10, "repeat"]);
+// Un changement de variante remet le compteur à zéro : B1 puis B2 (une seule séance en B2) ne boucle pas.
+t = applyLafayProgress([
+  row("c", "2026-10-19", "B2 - dips", 6, 8, [8, 8, 7, 7, 6, 6]),
+  row("b", "2026-10-15", "B1 - dips", 6, 12, six(12)),
+  row("a", "2026-10-12", "B1 - dips", 6, 12, six(12)),
+])!;
+assert.equal(t.change, "repeat");
+
+// ── La carte « Progression » et « Démarrer » proposent la même cible pour le même historique ──
+const same = (rows: StrengthRow[], s: Structure) => {
+  const card = lafayView(rows), session = planExercise(s, rows);
+  assert.equal(session.reps, card.target!.reps, "mêmes répétitions");
+  assert.equal(session.variant, card.target!.variant, "même niveau");
+  return { card, session };
+};
+const st: Structure = { code: "B", variant: "B2", sets: 6, reps: 8, restSec: 30, restAfterSec: 120, loadKg: null, note: null };
+let r = same([
+  row("c", "2026-10-19", "B2 - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
+  row("b", "2026-10-15", "B2 - dips", 6, 10, [9, 9, 8, 8, 7, 7]),
+  row("a", "2026-10-12", "B2 - dips", 6, 10, six(10)),
+], st);
+assert.deepEqual([r.card.state, r.card.loop, r.session.reps], ["stall2", "6 × 7", 7], "Lafay pur : −30 %, arrondi à l'inférieur");
+r = same([row("b", "2026-10-15", "B2 - dips", 6, 10, [9, 9, 8, 8, 7, 7]), row("a", "2026-10-12", "B2 - dips", 6, 10, six(10))], st);
+assert.deepEqual([r.card.state, r.card.loop], ["stall1", null]);
+r = same([row("b", "2026-10-15", "B2 - dips", 6, 8, six(8)), row("a", "2026-10-12", "B2 - dips", 6, 7, six(7))], st);
+assert.deepEqual([r.card.state, r.card.loop], ["progress", null]);
 
 // ── planExercise : structure + historique → cible du jour ──
 const base: Structure = { code: "B", variant: "B1", sets: 6, reps: 8, restSec: 30, restAfterSec: 120, loadKg: null, note: null };
