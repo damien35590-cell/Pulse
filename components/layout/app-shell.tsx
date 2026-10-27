@@ -1,4 +1,5 @@
 import { BottomNav } from "./bottom-nav";
+import { PendingSync } from "@/components/workout/pending-sync";
 
 /**
  * Coque mobile : contenu + bottom nav, safe areas gérées.
@@ -8,6 +9,7 @@ export function AppShell({ children, pendingBadges = 0 }: { children: React.Reac
   return (
     <div className="mx-auto min-h-dvh max-w-md pt-safe-top">
       <main className="px-4 pb-[calc(theme(spacing.nav)_+_1.5rem)] pt-4">{children}</main>
+      <PendingSync />
       <BottomNav pendingBadges={pendingBadges} />
     </div>
   );

@@ -10,6 +10,7 @@ import { EditProfile } from "@/components/profile/edit-profile";
 import { RecordsTabs } from "@/components/profile/records-tabs";
 import { NotificationsRow } from "@/components/profile/notifications-row";
 import { ThemePicker } from "@/components/profile/theme-picker";
+import { PendingRow } from "@/components/profile/pending-row";
 import { BackupRow } from "@/components/profile/backup-row";
 import { getLastBackupAt } from "@/lib/backup/drive-backup";
 import { InstallRow } from "@/components/profile/install-row";
@@ -79,6 +80,7 @@ export default async function ProfilePage() {
           <SettingsRow icon={<Dumbbell aria-hidden />} title="Matériel de muscu" href="/vous/materiel-muscu" value={`${equipment.filter((e) => e !== "aucun").length} sur ${Object.keys(EQUIPMENT_LABELS).length}`} />
           <NotificationsRow prefs={notifyPrefs} />
           <BackupRow lastBackupAt={lastBackup?.toISOString() ?? null} />
+          <PendingRow />
           <ThemePicker />
           <SettingsRow icon={<UserRound aria-hidden />} title="Compte" value={me?.email ?? s.user.email ?? "Non renseigné"} trailing={<span aria-hidden />} />
           <InstallRow />

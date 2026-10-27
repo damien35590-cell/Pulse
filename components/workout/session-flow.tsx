@@ -10,6 +10,7 @@ import { NewSessionSheet } from "@/components/workout/new-session-sheet";
 import { StoryReveal } from "@/components/record/story-reveal";
 import { saveTemplate } from "@/app/(app)/record/session/actions";
 import { freeTitle, toLift, toPayload } from "@/lib/workout/lift";
+import { enqueuePending, isRetryable, newClientId, removePending } from "@/lib/workout/pending-uploads";
 import { clearHrBuffer, useHeartRate } from "@/stores/heart-rate";
 import type { Draft, Kind } from "@/lib/workout/types";
 
@@ -17,16 +18,19 @@ const STORE = "pulse-session-v2";
 const MAX_AGE_MS = 12 * 3600 * 1000; // une séance laissée plus longtemps n'est plus reprise
 const SESSION = "/record/session";
 
-type Run = { title: string; kind: Kind; templateId: string | null; startedAt: number; exercises: LiftExercise[] };
+type Run = { clientId: string; title: string; kind: Kind; templateId: string | null; startedAt: number; exercises: LiftExercise[] };
 type Phase = "boot" | "pick" | "conflict" | "prep" | "run";
 
 const done = (r: Run | LiftExercise[]) => (Array.isArray(r) ? r : r.exercises).reduce((n, e) => n + e.done.length, 0);
 
-/** La séance en cours sur ce téléphone (au moins une série validée, moins de 12 h), sinon null. */
+/** La séance en cours sur ce téléphone, sans limite d'âge dès qu'elle a une série validée ; une séance vide de plus de 12 h est oubliée. */
 function readStored(): Run | null {
   try {
     const r = JSON.parse(localStorage.getItem(STORE) ?? "null");
-    if (r?.v === 2 && Array.isArray(r.exercises) && Date.now() - r.startedAt < MAX_AGE_MS && done(r.exercises) > 0) return r as Run;
+    if (r?.v === 2 && Array.isArray(r.exercises)) {
+      if (done(r.exercises) > 0) return { ...r, clientId: typeof r.clientId === "string" ? r.clientId : newClientId() } as Run;
+      if (Date.now() - r.startedAt >= MAX_AGE_MS) clearStored();
+    }
   } catch { /* stockage indisponible ou illisible */ }
   return null;
 }
@@ -53,7 +57,7 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
   const latest = useRef<LiftExercise[]>([]);
 
   function startRun(d: Draft) {
-    const r: Run = { title: d.title || freeTitle(new Date()), kind: d.kind, templateId: d.templateId, startedAt: Date.now(), exercises: d.exercises.map(toLift) };
+    const r: Run = { clientId: newClientId(), title: d.title || freeTitle(new Date()), kind: d.kind, templateId: d.templateId, startedAt: Date.now(), exercises: d.exercises.map(toLift) };
     latest.current = r.exercises;
     setRun(r);
     setPhase("run");
@@ -78,7 +82,7 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
   function persist(exs: LiftExercise[]) {
     latest.current = exs;
     if (!run) return;
-    try { localStorage.setItem(STORE, JSON.stringify({ v: 2, title: run.title, kind: run.kind, templateId: run.templateId, startedAt: run.startedAt, exercises: exs })); } catch { /* stockage indisponible */ }
+    try { localStorage.setItem(STORE, JSON.stringify({ v: 2, clientId: run.clientId, title: run.title, kind: run.kind, templateId: run.templateId, startedAt: run.startedAt, exercises: exs })); } catch { /* stockage indisponible */ }
   }
 
   /** Quitter garde les séries validées sur le téléphone ; sans série, il n'y a rien à reprendre. */
@@ -93,17 +97,23 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
     if (!exercises.length) throw new Error("Aucune série validée : valide au moins une série avant d’enregistrer.");
     // Avec une ceinture, la série de FC part avec la séance ; le serveur calcule moyenne, max, pic et récupération de chaque série.
     const hrSeries = useHeartRate.getState().samples;
-    const r = await fetch("/api/activities", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "WORKOUT", title: run.title, kind: run.kind, templateId: run.templateId, startedAt: new Date(run.startedAt).toISOString(),
+    const body = {
+        clientId: run.clientId, type: "WORKOUT", title: run.title, kind: run.kind, templateId: run.templateId, startedAt: new Date(run.startedAt).toISOString(),
         movingTimeS: Math.max(60, Math.round((Date.now() - run.startedAt) / 1000)), exercises, gearIds: [],
         ...(hrSeries.length ? { hrSeries } : {}),
-      }),
-    });
-    if (!r.ok) throw new Error("Impossible d’enregistrer. Tes séries sont conservées : réessaie.");
+    };
+    let r: Response | null = null;
+    try { r = await fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch { /* pas de réseau */ }
+    if (!r?.ok) {
+      // Réseau coupé ou erreur serveur : la séance quitte le stockage de la séance en cours pour la file d'envoi (IndexedDB), qui la renvoie seule.
+      if (!r || isRetryable(r.status)) {
+        const queued = await enqueuePending({ clientId: run.clientId, body, title: run.title, templateName: opts.templateName }).then(() => true, () => false);
+        if (queued) { try { localStorage.removeItem(STORE); } catch { /* */ } throw new Error("Impossible d’enregistrer pour l’instant. Séance gardée sur le téléphone, envoi automatique dès que possible."); }
+      }
+      throw new Error("Impossible d’enregistrer. Tes séries sont conservées : réessaie.");
+    }
     const j = await r.json();
+    await removePending(run.clientId).catch(() => null); // un essai précédent avait pu la mettre en file
     useHeartRate.getState().discard();
     clearStored();
     // Le modèle est un bonus : s'il échoue, la séance est enregistrée quand même.

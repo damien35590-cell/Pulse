@@ -11,6 +11,7 @@ import { exactExerciseIds } from "@/lib/data/exercises-catalog";
 import { kindOfNames } from "@/lib/workout/kind";
 import { annotateSets, cleanHrSeries, hrStats } from "@/lib/workout/hr";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
 /**
@@ -38,6 +39,16 @@ export async function POST(req: Request) {
   const startedAt = new Date(b?.startedAt);
   if (!b || !TYPES.includes(b.type) || !b.title || !(b.movingTimeS > 0) || isNaN(+startedAt))
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+
+  // Rejeu d'une séance déjà enregistrée (réponse perdue, file d'envoi du téléphone) : on renvoie l'existante au lieu d'en créer une deuxième.
+  const clientId = typeof b.clientId === "string" && UUID.test(b.clientId) ? b.clientId.toLowerCase() : null;
+  const already = async () => {
+    if (!clientId) return null;
+    const a = await prisma.activity.findUnique({ where: { clientId }, select: { id: true, userId: true, story: true } });
+    return a?.userId === uid ? NextResponse.json({ id: a.id, story: a.story ?? "", tag: null, record: false, gearAlerts: [], duplicate: true }, { status: 200 }) : null;
+  };
+  const replay = await already();
+  if (replay) return replay;
 
   // Musculation : blocs d'exercices validés et nettoyés ; pas de distance ni de dénivelé.
   const isWorkout = b.type === "WORKOUT";
@@ -74,7 +85,7 @@ export async function POST(req: Request) {
   try {
     const a = await prisma.activity.create({
       data: {
-        userId: uid, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
+        userId: uid, clientId, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
         avgHr: hr?.avg, maxHr: hr?.max, hrSeries: hr ? (hrSamples as unknown as Prisma.InputJsonValue) : undefined,
         distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined,
@@ -95,7 +106,7 @@ export async function POST(req: Request) {
       record: post.records.some((r) => r.beaten && !!r.label) || post.story?.tag === "record", gearAlerts: worn,
     }, { status: 201 });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return NextResponse.json({ error: "duplicate" }, { status: 409 });
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return (await already()) ?? NextResponse.json({ error: "duplicate" }, { status: 409 });
     throw e;
   }
 }
