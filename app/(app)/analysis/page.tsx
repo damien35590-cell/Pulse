@@ -17,10 +17,12 @@ import { getAdvanced } from "@/lib/data/advanced";
 import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
 import { getHikingAnalysis } from "@/lib/analytics/hiking";
-import { parsePeriod, periodParams } from "@/lib/analysis/period";
+import { parsePeriod, periodParams, weeksLabel } from "@/lib/analysis/period";
 import { overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
 import { lastDebrief } from "@/lib/coach/store";
+import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
+import { TopBar } from "@/components/layout/top-bar";
 import { PeriodPicker } from "@/components/analysis/period-picker";
 import { CoachCard } from "@/components/analysis/coach-card";
 import { EvolutionCard } from "@/components/analysis/evolution-card";
@@ -91,12 +93,13 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   // Muscu : les séries du programme (modèles haut / bas) servent à la cible affichée, comme sur la page Programme.
   const program = S === "WORKOUT" ? await getStrengthProgram(uid, now) : null;
   const setsByKey = new Map(program?.groups.flatMap((g) => g.rows).map((r) => [r.key, r.sets]) ?? []);
+  const bodyKg = S === "WORKOUT" ? (await prisma.user.findUnique({ where: { id: uid }, select: { weightKg: true } }))?.weightKg ?? 70 : 70;
   const [adv, runGoal, plans, ai, strength, cycling, hiking] = await Promise.all([
     getAdvanced(uid, TZ),
     S === "RUN" ? getRunGoal(uid) : null,
     S === "RUN" || S === "WORKOUT" || S === "all" ? getPlanAdherence(uid, period.startKey, period.endKey, todayKey, planSport) : [],
     aiScope && cur.length > 0 ? aiProps() : null,
-    S === "WORKOUT" ? getStrengthAnalysis(uid, TZ, W, now, (k) => setsByKey.get(k)) : null,
+    S === "WORKOUT" ? getStrengthAnalysis(uid, TZ, W, now, (k) => setsByKey.get(k), bodyKg) : null,
     S === "RIDE" ? getCyclingAnalysis(uid, TZ, W, now) : null,
     S === "HIKE" ? getHikingAnalysis(uid, TZ, W, now) : null,
   ]);
@@ -197,7 +200,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold leading-none">Analyse</h1>
+      <TopBar title="Analyse" />
       <PeriodPicker weeks={W} current={period.current} endKey={period.endKey} startKey={period.startKey} preset={period.preset} today={todayKey} />
       <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">
         {[["all", "Tous"], ...sports.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}
@@ -236,6 +239,12 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
                     ))}
                   </ul>
                 </div>
+              </Section>
+            )}
+
+            {strength && (
+              <Section title="Muscles sollicités">
+                <div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={strength.muscles} hasData={strength.summary.sessions > 0} span={weeksLabel(W)} /></div>
               </Section>
             )}
 

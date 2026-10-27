@@ -1,4 +1,5 @@
 // Lancer avec : npx tsx tools/test-coach-notes.ts
+import { volumeByMuscle } from "../lib/muscles";
 import assert from "node:assert/strict";
 import { frame, overviewNotes, timeChange, planNotes, rankNotes, rateChange, runNotes, strengthNotes, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
 import type { StrengthAnalysis } from "../lib/analytics/strength";
@@ -93,7 +94,7 @@ assert.deepEqual(runNotes({ acts: [], period }), []);
 // ───────── Muscu ─────────
 const sa = (o: Partial<StrengthAnalysis> = {}): StrengthAnalysis => ({
   empty: false, summary: { sessions: 10, sets: 120, reps: 1000, tonnage: null }, weekly: [],
-  exercises: [], regularity: { perWeek: 2.5, target: [2, 3], upperPct: 50, lowerPct: 50 }, insights: [], prev: { sessions: 10, reps: 800 }, ...o,
+  exercises: [], regularity: { perWeek: 2.5, target: [2, 3], upperPct: 50, lowerPct: 50 }, insights: [], muscles: volumeByMuscle([]), prev: { sessions: 10, reps: 800 }, ...o,
 });
 const ex = (name: string, status: "progress" | "stall1" | "stall2" | "evolve", hint: string | null = null) => ({
   key: name, name, variant: null, level: "6×8", status, sessions: 4, repsPerSession: [], points: [], lastDay: "2026-10-20", hint, nextVariant: null, restartTarget: null,

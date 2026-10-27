@@ -8,6 +8,7 @@ import { generateRunBaseVma, startMonday } from "@/lib/training/generate";
 import { estimateRun, resolveSteps, summarizeRun } from "@/lib/training/resolve";
 import { DEFAULT_VMA, pickVma, type CurrentVma } from "@/lib/training/vma";
 import { getStoredVma, onThresholdsChange } from "@/lib/data/zone-ribbon";
+import { pickSession } from "@/lib/training/match";
 import { RUN_BASE_VMA, blockOf, weekInBlock } from "@/lib/training/catalog/run-base-vma";
 import { planRibbon } from "@/lib/art/plan-ribbon";
 import type { RibbonSegment } from "@/lib/art/zone-ribbon";
@@ -83,6 +84,10 @@ export async function createRunProgram(userId: string, o: { sessionsPerWeek: 2 |
 export const nextPlanned = (programId: string) =>
   prisma.plannedSession.findFirst({ where: { programId, status: "PLANNED" }, orderBy: [{ week: { number: "asc" } }, { orderInWeek: "asc" }] });
 
+/** Séances à faire dans l'ordre de la file (semaine puis orderInWeek), pour l'appariement. */
+const queuePlanned = (programId: string) =>
+  prisma.plannedSession.findMany({ where: { programId, status: "PLANNED" }, orderBy: [{ week: { number: "asc" } }, { orderInWeek: "asc" }], take: 4 });
+
 /** Plus aucune séance à faire : le programme est terminé. */
 export async function finishIfDone(programId: string) {
   if (await nextPlanned(programId)) return false;
@@ -99,6 +104,23 @@ export async function reopenIfNeeded(programId: string) {
   return true;
 }
 
+/**
+ * « Détacher cette sortie » : la séance repasse à faire, l'activité garde toutes ses données, et la paire est mémorisée
+ * (rejectedActivityIds) pour que l'appariement automatique ne la relie plus. Renvoie le programme concerné, ou null si rien à détacher.
+ */
+export async function detachActivity(userId: string, sessionId: string): Promise<string | null> {
+  const s = await prisma.plannedSession.findFirst({ where: { id: sessionId, userId, completedActivityId: { not: null } }, select: { id: true, programId: true, completedActivityId: true, rejectedActivityIds: true } });
+  if (!s?.completedActivityId) return null;
+  const res = await prisma.plannedSession.updateMany({
+    where: { id: s.id, completedActivityId: s.completedActivityId },
+    data: { status: "PLANNED", completedActivityId: null, completedAt: null, complianceScore: null, rejectedActivityIds: [...new Set([...s.rejectedActivityIds, s.completedActivityId])] },
+  });
+  if (!res.count) return null;
+  await reopenIfNeeded(s.programId);
+  refresh();
+  return s.programId;
+}
+
 const compliance =(actualS: number, plannedS: number | null) => (plannedS ? Math.min(100, Math.round((actualS / plannedS) * 100)) : null);
 
 /**
@@ -106,6 +128,8 @@ const compliance =(actualS: number, plannedS: number | null) => (plannedS ? Math
  * Si une séance a été cochée « faite » à la main le même jour sans sortie, l'activité vient la compléter au lieu
  * de consommer la suivante. Une activité n'est jamais reliée deux fois (completedActivityId est unique).
  * Les sorties antérieures au jour d'activation du programme (import d'historique) ne sont pas reliées.
+ * Appariement par intensité (lib/training/match.ts) : une séance clé n'accepte qu'une sortie intense, un footing facile ne valide qu'une
+ * séance d'endurance (on regarde les premières séances de la file, pas seulement la prochaine). Une paire détachée à la main n'est jamais reliée de nouveau.
  */
 export async function linkActivityToPlannedSession(a: { id: string; userId: string; type: string; startedAt: Date; movingTimeS: number }) {
   if (a.type !== "RUN" || a.movingTimeS < MIN_LINK_S) return null;
@@ -114,14 +138,19 @@ export async function linkActivityToPlannedSession(a: { id: string; userId: stri
   if (!p || (p.activatedAt && dayKey(a.startedAt, TZ) < dayKey(p.activatedAt, TZ))) return null;
 
   const key = dayKey(a.startedAt, TZ);
+  const [row, vmaKmh] = await Promise.all([
+    prisma.activity.findUnique({ where: { id: a.id }, select: { isInterval: true, sessionType: true, zoneRibbon: true, distanceM: true } }),
+    getStoredVma(a.userId),
+  ]);
+  const act = { id: a.id, isInterval: row?.isInterval, sessionType: row?.sessionType, zoneRibbon: row?.zoneRibbon, distanceM: row?.distanceM, movingTimeS: a.movingTimeS, vmaKmh };
   const manual = (await prisma.plannedSession.findMany({
     where: { programId: p.id, status: "COMPLETED", completedActivityId: null, completedAt: { gte: new Date(+a.startedAt - 2 * 864e5), lte: new Date(+a.startedAt + 2 * 864e5) } },
-    select: { id: true, completedAt: true, plannedDurationS: true },
-  })).find((s) => s.completedAt && dayKey(s.completedAt, TZ) === key);
+    select: { id: true, kind: true, isKeySession: true, rejectedActivityIds: true, completedAt: true, plannedDurationS: true },
+  })).find((s) => s.completedAt && dayKey(s.completedAt, TZ) === key && !s.rejectedActivityIds.includes(a.id)); // cochée à la main : l'intensité ne la refuse pas
 
   // Deux essais : un import concurrent a pu prendre la même séance entre-temps.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const target = manual && attempt === 0 ? manual : await nextPlanned(p.id);
+    const target = manual && attempt === 0 ? manual : pickSession(await queuePlanned(p.id), act);
     if (!target) return null;
     try {
       const res = await prisma.plannedSession.updateMany({

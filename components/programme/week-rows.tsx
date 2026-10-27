@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, Circle, SkipForward } from "lucide-react";
 import type { SessionStatus } from "@prisma/client";
 import { EffortStrip } from "@/components/art/effort-strip";
+import { DetachSession } from "@/components/training/program-actions";
 import { KeyBadge } from "@/components/training/program-card";
 import type { RibbonSegment } from "@/lib/art/zone-ribbon";
 import { cn } from "@/lib/utils";
@@ -14,7 +15,7 @@ export const weekDay = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: 
 /** Séances de la semaine déjà traitées (faites). */
 export const doneIn = (w: { sessions: { status: SessionStatus }[] }) => w.sessions.filter((s) => s.status === "COMPLETED").length;
 
-/** Une ligne de séance : état, titre, ligne d'allure, « Voir la sortie » quand elle est faite, vignette de la forme prévue (52 × 32). */
+/** Une ligne de séance : état, titre, ligne d'allure, « Voir la sortie » et « Détacher cette sortie » quand elle est faite, vignette de la forme prévue (52 × 32). */
 export function SessionRow({ s }: { s: WeekSession }) {
   const Icon = s.status === "COMPLETED" ? Check : s.status === "SKIPPED" ? SkipForward : Circle;
   return (
@@ -28,7 +29,12 @@ export function SessionRow({ s }: { s: WeekSession }) {
           {s.isKey && <KeyBadge />}
         </div>
         {s.summary && <p className="mt-0.5 truncate font-num text-sm tabular-nums text-ink-soft">{s.summary}</p>}
-        {s.status === "COMPLETED" && s.activityId && <Link href={`/activities/${s.activityId}`} className="-mb-2 inline-flex min-h-11 items-center text-sm font-semibold text-brand">Voir la sortie</Link>}
+        {s.status === "COMPLETED" && s.activityId && (
+          <div className="-mb-2 flex flex-wrap items-center gap-x-4">
+            <Link href={`/activities/${s.activityId}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Voir la sortie</Link>
+            <DetachSession sessionId={s.id} />
+          </div>
+        )}
         {s.status === "SKIPPED" && <p className="text-xs text-ink-mute">Passée</p>}
       </div>
       {s.ribbon.length > 0 && <EffortStrip mini segments={s.ribbon} />}

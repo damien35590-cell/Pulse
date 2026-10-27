@@ -6,7 +6,7 @@
 import { prisma } from "../prisma";
 import { dayKey, shiftDay, weekKeys } from "../dates";
 import { exerciseKey, type SetDetail } from "../exercises";
-import { lafayCode, musclesOf, UPPER_GROUPS } from "../muscles";
+import { lafayCode, musclesOf, volumeByMuscle, UPPER_GROUPS, type Group, type MuscleLoad } from "../muscles";
 import { isVariantCode, ladderKey, nextInLadder } from "../workout/catalog";
 import { lafayView } from "../workout/lafay";
 
@@ -34,6 +34,8 @@ export type StrengthAnalysis = {
   exercises: ExerciseProgress[];
   regularity: { perWeek: number; target: readonly [number, number]; upperPct: number | null; lowerPct: number | null };
   insights: string[];
+  /** Volume par muscle sur la période : descriptif, affiché dès une séance (le seuil MIN_SESSIONS ne vaut que pour juger). */
+  muscles: Record<Group, MuscleLoad>;
   /** Période précédente de même durée (null si l'historique chargé ne la couvre pas). */
   prev: { sessions: number; reps: number } | null;
 };
@@ -104,7 +106,7 @@ export function advice(e: Entry, name: string): { hint: string; next: string | n
 }
 
 /** `setsOf` : séries prévues d'un exercice (clé de groupe → séries du programme) ; à défaut, celles de sa dernière séance. */
-export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: string, now = new Date(), setsOf?: (key: string) => number | undefined): StrengthAnalysis {
+export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: string, now = new Date(), setsOf?: (key: string) => number | undefined, bodyKg = 70): StrengthAnalysis {
   const mon = weekKeys(now, tz)[0], first = shiftDay(mon, -7 * (weeks - 1));
   const weekOf = (d: Date) => Math.floor((Date.parse(dayKey(d, tz)) - Date.parse(first)) / (7 * 864e5)); // < 0 avant la période
   const inPeriod = rows.filter((r) => weekOf(r.startedAt) >= 0 && doneSets(r).length > 0);
@@ -162,6 +164,7 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
     empty: inPeriod.length === 0, summary,
     weekly: weekly.map((w) => ({ weekStart: w.weekStart, reps: w.reps, sets: w.sets, sessions: w.ids.size })),
     exercises, regularity, insights: insightsOf(rows, exercises, weekOf, weeks, tz, summary.sessions >= MIN_SESSIONS),
+    muscles: volumeByMuscle(inPeriod.flatMap((r) => doneSets(r).map((x) => ({ name: r.name, sets: 1, reps: x.reps, loadKg: x.loadKg }))), bodyKg),
     prev: inPrev.length ? { sessions: new Set(inPrev.map((r) => r.activityId)).size, reps: inPrev.reduce((s, r) => s + sumReps(doneSets(r)), 0) } : null,
   };
 }
@@ -198,7 +201,7 @@ function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: 
 }
 const exerciseLabel = (k: string, name: string) => (k.startsWith("lafay:") ? name.trim().replace(/\s*[-–:.].*$/, "").toUpperCase() : name);
 
-export async function getStrengthAnalysis(userId: string, tz: string, weeks: number, now = new Date(), setsOf?: (key: string) => number | undefined): Promise<StrengthAnalysis> {
+export async function getStrengthAnalysis(userId: string, tz: string, weeks: number, now = new Date(), setsOf?: (key: string) => number | undefined, bodyKg = 70): Promise<StrengthAnalysis> {
   // Deux périodes (comparaison avec la précédente), et au moins 8 semaines : la comparaison « 4 semaines contre 4 semaines » en a besoin
   const since = new Date(Date.parse(shiftDay(weekKeys(now, tz)[0], -7 * (Math.max(2 * weeks, 8) - 1))) - 864e5);
   const found = await prisma.workoutExercise.findMany({
@@ -209,5 +212,5 @@ export async function getStrengthAnalysis(userId: string, tz: string, weeks: num
     activityId: e.activityId, startedAt: e.activity.startedAt, name: e.name, sets: e.sets, reps: e.reps, loadKg: e.loadKg,
     setsDetail: Array.isArray(e.setsDetail) ? (e.setsDetail as unknown as SetDetail[]) : null,
   }));
-  return buildStrengthAnalysis(rows, weeks, tz, now, setsOf);
+  return buildStrengthAnalysis(rows, weeks, tz, now, setsOf, bodyKg);
 }

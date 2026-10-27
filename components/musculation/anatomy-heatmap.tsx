@@ -79,15 +79,15 @@ function Body({ title, shapes, front, data, ref0, active, setActive }: Props & {
   );
 }
 
-/** Carte musculaire des 7 derniers jours : du pêche au rouge profond selon le tonnage. Survol ou toucher pour le détail. */
-export function AnatomyHeatmap({ data, hasData }: { data: Record<Group, MuscleLoad>; hasData: boolean }) {
+/** Carte musculaire (7 jours par défaut, ou la période d'analyse) : du pêche au rouge profond selon le tonnage. Survol ou toucher pour le détail. */
+export function AnatomyHeatmap({ data, hasData, span = "7 jours" }: { data: Record<Group, MuscleLoad>; hasData: boolean; span?: string }) {
   const [active, setActive] = useState<Group | null>(null);
   const ref0 = Math.max(6000, ...GROUPS.map((g) => data[g].tonnage)), a = active ? data[active] : null, props = { data, ref0, active, setActive };
   return (
     <div>
       <div className="flex gap-2 rounded-2xl bg-gradient-to-b from-surface-2/60 to-transparent px-1 pt-3"><Body title="Face" shapes={FRONT} front {...props} /><Body title="Dos" shapes={BACK} {...props} /></div>
       <p className="mt-2 min-h-[44px] text-center text-sm" aria-live="polite">
-        {a && active ? <><b>{cap(active)}</b> : {fmtKg(a.tonnage)}, {a.sets.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} séries sur 7 jours</> : <span className="text-ink-soft">{hasData ? "Touchez un muscle pour voir son volume." : "Aucune séance de musculation ces 7 derniers jours."}</span>}
+        {a && active ? <><b>{cap(active)}</b> : {fmtKg(a.tonnage)}, {a.sets.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} séries sur {span}</> : <span className="text-ink-soft">{hasData ? "Touchez un muscle pour voir son volume." : `Aucune séance de musculation sur ${span}.`}</span>}
       </p>
       <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
         {GROUPS.map((g) => {

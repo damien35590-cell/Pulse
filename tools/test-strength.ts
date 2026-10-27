@@ -87,3 +87,9 @@ assert.equal(e.hint, "saute plus haut");
 }
 
 console.log("test-strength : ok");
+
+// Carte des muscles : descriptive, présente dès une séance (le seuil MIN_SESSIONS ne vaut que pour juger la progression)
+const one = buildStrengthAnalysis([row("m1", "2026-10-19", "Squat", 3, 5, [5, 5, 5], 80)], 4, tz, now);
+assert.equal(one.summary.sessions, 1);
+assert.ok(one.muscles["quadriceps"].tonnage > 0, "une seule séance suffit pour la carte");
+assert.equal(buildStrengthAnalysis([], 4, tz, now).muscles["quadriceps"].tonnage, 0);

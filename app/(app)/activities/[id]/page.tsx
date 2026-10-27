@@ -32,7 +32,9 @@ import { PowerChart } from "@/components/activity/power-chart";
 import { FeelNote, FeelPrompt } from "@/components/activity/feelnote";
 import { BikeTypeSwitch } from "@/components/activity/bike-type-switch";
 import { SessionTypeControl } from "@/components/activity/session-type";
-import { detectedSessionType, type SessionType } from "@/lib/art/session-type";
+import { detectedSessionType } from "@/lib/art/session-type";
+import { DetachSession } from "@/components/training/program-actions";
+import { isVirtual } from "@/lib/art/card";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
 import { getGear } from "@/lib/data/gear";
@@ -81,6 +83,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       })).filter((x) => !isCommute(x)).slice(0, COMPARE_MAX).map(comparable)
     : [];
 
+  // Séance du programme que cette sortie valide (bloc « Séance du programme », avec « Détacher cette sortie »).
+  const planned = a.type === "RUN" ? await prisma.plannedSession.findFirst({ where: { completedActivityId: a.id, userId: s.user.id }, select: { id: true, title: true, description: true, isKeySession: true } }) : null;
   const route = a.polyline ? decodePolyline(a.polyline) : [];
   const raw = (a.trackPoints as TP[] | null) ?? [];
   const t0 = raw[0]?.t ?? 0;
@@ -142,7 +146,19 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         }
         sections={
           <>
-            {(a.type === "RUN" || a.type === "RIDE" || a.type === "HIKE") && a.zoneRibbon != null && <SessionTypeControl id={a.id} detected={detectedSessionType(a.isInterval)} current={(a.sessionType as SessionType | null)} />}
+            {(a.type === "RUN" || a.type === "RIDE") && a.zoneRibbon != null && <SessionTypeControl id={a.id} type={a.type} detected={detectedSessionType(a.isInterval, a.type)} current={a.sessionType} />}
+            {planned && (
+              <Section title="Séance du programme">
+                <div className={cn(ui.card, "p-4")}>
+                  <p className="font-semibold text-ink">{planned.title}</p>
+                  {planned.description && <p className="mt-0.5 text-sm text-ink-soft">{planned.description}</p>}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4">
+                    <Link href="/plan" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Voir le programme</Link>
+                    <DetachSession sessionId={planned.id} />
+                  </div>
+                </div>
+              </Section>
+            )}
             {note && (
               <section aria-label="Note du coach" className={cn(ui.card, "flex gap-3 p-4")}>
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><MessageSquareText className="size-4" aria-hidden /></span>
@@ -222,7 +238,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       >
         {a.sessionType === "race" && <span className={cn(ui.chip, "mt-1")}><Flag className="size-3.5" aria-hidden />Compétition</span>}
         {a.raceEvent && <Link href={`/events/${a.raceEvent.id}`} className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand/10 px-3 text-sm font-semibold text-brand"><Flag className="size-4" aria-hidden />Course · {a.raceEvent.name}</Link>}
-        {(a.type === "RIDE" || a.type === "EBIKE") && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
+        {(a.type === "RIDE" || a.type === "EBIKE") && !isVirtual(a) && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
         <dl className="mt-5">
           {hasDist
             ? <Metric size="hero" label="Distance" value={fmtKm(a.distanceM)} unit="km" />

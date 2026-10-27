@@ -55,12 +55,14 @@ export function PeriodPicker({ weeks, current, endKey, startKey, preset, today }
 
   return (
     <>
-      <Segmented
-        className="mt-4"
-        options={options}
-        value={preset ? String(preset) : "custom"}
-        onChange={(v) => (v === "custom" ? openSheet() : go(Number(v), null))}
-      />
+      {/* Collé sous la barre au défilement, comme les filtres d'Activités */}
+      <div className="sticky top-bar z-20 -mx-4 bg-bg/80 px-4 py-1 backdrop-blur-xl">
+        <Segmented
+          options={options}
+          value={preset ? String(preset) : "custom"}
+          onChange={(v) => (v === "custom" ? openSheet() : go(Number(v), null))}
+        />
+      </div>
       <button type="button" onClick={openSheet} className={cn(ui.pressCard, "mt-2 flex min-h-12 w-full items-center gap-2 rounded-tile px-1 text-left text-sm text-ink-soft")}>
         <CalendarRange className="size-4 shrink-0 text-ink-mute" aria-hidden />
         <span className="flex-1">{periodLabel({ startKey, endKey })}</span>

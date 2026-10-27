@@ -1,8 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Pause, Play, SkipForward } from "lucide-react";
-import { completePlannedSession, saveVmaTest, skipPlannedSession, toggleProgramPause, updateVma } from "@/app/actions";
+import { Check, Pause, Play, SkipForward, Unlink } from "lucide-react";
+import { ConfirmSheet } from "@/components/ui/bottom-sheet";
+import { completePlannedSession, detachPlannedSession, saveVmaTest, skipPlannedSession, toggleProgramPause, updateVma } from "@/app/actions";
 import { celebrate, tap } from "@/lib/haptics";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -102,5 +103,27 @@ export function VmaRow({ vmaKmh, label }: { vmaKmh: number; label: string }) {
         </form>
       )}
     </div>
+  );
+}
+
+/** « Détacher cette sortie » : la séance repasse à faire, la sortie garde ses données et ne sera plus reliée automatiquement à cette séance. */
+export function DetachSession({ sessionId, className }: { sessionId: string; className?: string }) {
+  const { pending, err, run } = useAction();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" disabled={pending} onClick={() => { tap(); setOpen(true); }} className={cn("inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-ink-soft disabled:opacity-50", className)}>
+        <Unlink className="size-4" aria-hidden />Détacher cette sortie
+      </button>
+      {err && <p role="alert" className="text-sm font-semibold text-bad">{err}</p>}
+      <ConfirmSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        onConfirm={() => { tap(10); run(() => detachPlannedSession(sessionId)); }}
+        title="Détacher cette sortie ?"
+        message="La séance repasse à faire. La sortie garde toutes ses données et ne sera plus reliée automatiquement à cette séance."
+        confirmLabel="Détacher"
+      />
+    </>
   );
 }

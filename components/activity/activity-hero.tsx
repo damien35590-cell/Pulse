@@ -1,6 +1,5 @@
 "use client";
 import { useRef, useState } from "react";
-import { Pencil } from "lucide-react";
 import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
 import { TopoMapHeroLazy } from "@/components/activity/topo-map-lazy";
@@ -9,7 +8,6 @@ import { EditableTitle } from "@/components/activity/editable-title";
 import { ActivityMenu } from "@/components/activity/activity-menu";
 import { useTrackCursor } from "@/components/activity/activity-track";
 import type { TrackPoint } from "@/components/activity/interactive-topo-map";
-import { tap } from "@/lib/haptics";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +28,7 @@ type Props = {
 };
 
 /**
- * Tête de fiche d'activité : carte plein cadre (~40 % de l'écran) sous une barre transparente (retour, renommer, « … »),
+ * Tête de fiche d'activité : carte plein cadre (~40 % de l'écran) sous une barre transparente (retour, « … » qui porte Renommer et Supprimer),
  * puis une carte à coins de feuille qui chevauche le bas de la carte (titre, méta, chiffres). Sans GPS : barre normale, même carte.
  * Les sections passées (`sections`) puis le profil d'altitude suivent la carte de contenu ; le profil et partage son curseur avec la carte.
  */
@@ -48,14 +46,7 @@ export function ActivityHero({ id, title, points, gain, elevationColor, meta, ch
         backLabel="Activités"
         collapseAt={hasMap ? mapRef : titleRef}
         overlay={hasMap}
-        actions={
-          <>
-            <button type="button" onClick={() => { tap(); setEditing(true); }} aria-label="Renommer l’activité" className={ui.iconBtn}>
-              <Pencil className="size-5" aria-hidden />
-            </button>
-            <ActivityMenu id={id} />
-          </>
-        }
+        actions={<ActivityMenu id={id} onRename={() => setEditing(true)} />}
       />
       {hasMap && (
         // -mt-bar : la carte remonte sous la barre transparente, jusqu'au bord de l'écran.

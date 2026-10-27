@@ -803,6 +803,7 @@ model PlannedSession {
   status              SessionStatus @default(PLANNED)
   originalDate        DateTime?     @db.Date
   completedActivityId String?       @unique
+  rejectedActivityIds String[]      @default([]) // sorties détachées à la main de cette séance : l'appariement automatique ne les y relie plus jamais (lib/training/match.ts)
   complianceScore     Int?          // 0–100 : réalisé vs prévu
   skipReason          String?
   completedAt         DateTime?

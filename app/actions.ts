@@ -10,7 +10,7 @@ import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
 import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
-import { createRunProgram, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
+import { createRunProgram, detachActivity, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
 import { revokeLostBadges } from "@/lib/data/badges";
 import { isSessionType } from "@/lib/art/session-type";
 import { getZones } from "@/lib/data/zones";
@@ -91,6 +91,14 @@ export async function completePlannedSession(id: string): Promise<Res> {
   await prisma.plannedSession.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
   await finishIfDone(s.programId);
   programPaths();
+  return { ok: true };
+}
+
+/** « Détacher cette sortie » : la séance repasse à faire, la sortie garde ses données, et l'appariement automatique ne la relie plus à cette séance. */
+export async function detachPlannedSession(sessionId: string): Promise<Res> {
+  const userId = await uid();
+  if (!(await detachActivity(userId, sessionId))) return { ok: false, error: "Cette séance n'a pas de sortie liée." };
+  programPaths(); revalidatePath("/activities", "layout");
   return { ok: true };
 }
 
