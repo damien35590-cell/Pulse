@@ -732,6 +732,7 @@ model Program {
   revision           Int             @default(1)
   lastRecalibratedAt DateTime?
   activatedAt        DateTime?
+  garminSync         Boolean         @default(true) // envoi nocturne vers Intervals.icu → montre ; indépendant du statut du programme
   pausedAt           DateTime?
   completedAt        DateTime?
   createdAt          DateTime        @default(now())

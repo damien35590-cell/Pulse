@@ -14,7 +14,6 @@ const STATE: Record<ExerciseState, { label: string; tone: string }> = {
   progress: { label: "Progrès", tone: "text-good" },
   stall1: { label: "Stagne", tone: "text-warn" },
   stall2: { label: "Stagne", tone: "text-warn" },
-  evolve: { label: "Boucle", tone: "text-good" },
   new: { label: "Nouveau", tone: "text-ink-mute" },
 };
 const dayLabel = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }).format(new Date(iso));
@@ -82,7 +81,11 @@ function ExerciseRow({ r }: { r: ProgressRow }) {
       <span className="grid size-10 shrink-0 place-items-center rounded-tile bg-surface-2 font-num text-metric-sm text-ink">{r.code}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold capitalize leading-tight text-ink">{r.name}</p>
-        <p className="mt-0.5 truncate text-sm text-ink-soft">Cible <span className="font-num tabular-nums">{r.target}</span> · <span className={cn("font-semibold", st.tone)}>{st.label}{r.stall && <span className="font-num tabular-nums"> {r.stall}</span>}</span></p>
+        {r.loop ? (
+          <p className="mt-0.5 text-sm text-ink-soft"><span className="font-semibold text-warn">Stagne <span className="font-num tabular-nums">2/2</span> · Boucle</span> · repars à <span className="font-num tabular-nums text-ink">{r.loop}</span></p>
+        ) : (
+          <p className="mt-0.5 truncate text-sm text-ink-soft">Cible <span className="font-num tabular-nums">{r.target}</span> · <span className={cn("font-semibold", st.tone)}>{st.label}{r.stall && <span className="font-num tabular-nums"> {r.stall}</span>}</span></p>
+        )}
       </div>
       {r.spark.length > 0 && <Spark values={r.spark} />}
       <p className="w-9 shrink-0 text-right font-num text-metric-sm tabular-nums text-ink">{r.last ?? "—"}</p>
@@ -101,7 +104,7 @@ function Progression({ v }: { v: StrengthProgramView }) {
           <ul className="divide-y divide-surface-2">{g.rows.map((r) => <ExerciseRow key={`${g.kind}-${r.code}-${r.name}`} r={r} />)}</ul>
         </div>
       ))}
-      <p className="mt-3 text-xs text-ink-mute">Barres = total de répétitions des 4 dernières séances · chiffre = la dernière · stagne 2/2 : on change de variante</p>
+      <p className="mt-3 text-xs text-ink-mute">Barres = total de répétitions des 4 dernières séances · chiffre = la dernière · deux séances sans gain : on repart plus bas (boucle)</p>
     </section>
   );
 }

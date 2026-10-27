@@ -33,7 +33,7 @@ export default async function PlanPage() {
   return (
     <ProgrammeScreen
       defaultTab={defaultTab}
-      menu={run && { programId: run.id, vma: { vmaKmh: run.vma.vmaKmh, label: run.vma.label } }}
+      menu={run && { programId: run.id, paused: run.status === "PAUSED", vma: { vmaKmh: run.vma.vmaKmh, label: run.vma.label } }}
       run={run
         ? <RunPanel p={run} goal={goal} calendar={calendar} />
         : <RunEmpty vma={vma && { vmaKmh: vma.vmaKmh, label: vma.label, estimated: vma.source === "ESTIMATED" }} calendar={calendar} />}

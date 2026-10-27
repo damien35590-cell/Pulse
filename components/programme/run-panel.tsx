@@ -20,7 +20,7 @@ export function RunPanel({ p, goal, calendar }: { p: RunProgramView; goal: Cover
       <RunWeek p={p} />
       {calendar}
       <PlanBars weeks={weeks} current={p.current.number} />
-      <GarminRow programId={p.id} paused={p.status === "PAUSED"} syncedAt={p.intervalsSyncedAt} />
+      <GarminRow programId={p.id} enabled={p.garminSync} paused={p.status === "PAUSED"} syncedAt={p.intervalsSyncedAt} />
       <p className="px-1 text-xs text-ink-mute">Ce n’est pas un avis médical : ajustez selon vos sensations.</p>
     </div>
   );

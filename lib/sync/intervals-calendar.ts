@@ -51,11 +51,13 @@ export async function syncProgramToIntervals(userId: string, days = CALENDAR_DAY
 
   const today = dayKey(now, TZ), last = shiftDay(today, days);
   const program = await prisma.program.findFirst({
-    where: { userId, sport: "RUN", status: "ACTIVE" }, orderBy: { createdAt: "desc" }, select: { id: true, generatorInput: true },
+    where: { userId, sport: "RUN", status: "ACTIVE" }, orderBy: { createdAt: "desc" }, select: { id: true, generatorInput: true, garminSync: true },
   });
 
   // À envoyer : séances à faire du programme actif, de aujourd'hui à J+14. Les séances en retard (date passée) ne partent pas.
-  const planned = program
+  // Interrupteur « Envoi sur Garmin » éteint : rien n'est envoyé et tout ce que Pulse a mis dans le calendrier est retiré (le programme, lui, reste actif).
+  const push = !!program?.garminSync;
+  const planned = program && push
     ? await prisma.plannedSession.findMany({
         where: { userId, programId: program.id, sport: "RUN", status: "PLANNED", date: { gte: utcDay(today), lte: utcDay(last) } },
         orderBy: [{ date: "asc" }, { orderInWeek: "asc" }],
@@ -63,7 +65,7 @@ export async function syncProgramToIntervals(userId: string, days = CALENDAR_DAY
       })
     : [];
   // À ne pas supprimer : séances déjà faites aujourd'hui ou plus tard (leur événement reste, Intervals le rapproche de l'activité).
-  const done = await prisma.plannedSession.findMany({ where: { userId, sport: "RUN", status: { in: ["COMPLETED", "PARTIAL"] }, date: { gte: utcDay(today) } }, select: { id: true } });
+  const done = !push ? [] : await prisma.plannedSession.findMany({ where: { userId, sport: "RUN", status: { in: ["COMPLETED", "PARTIAL"] }, date: { gte: utcDay(today) } }, select: { id: true } });
   const keep = new Set([...planned, ...done].map((s) => s.id));
 
   let sent = 0;

@@ -17,7 +17,7 @@ const TABS = [{ value: "run", label: "Running" }, { value: "gym", label: "Muscu"
 export function ProgrammeScreen({ defaultTab, menu, run, gym }: {
   defaultTab: Tab;
   /** Programme running en cours (le menu « ⋯ » n'a de sens qu'avec lui), sinon null. */
-  menu: { programId: string; vma: { vmaKmh: number; label: string } } | null;
+  menu: { programId: string; paused: boolean; vma: { vmaKmh: number; label: string } } | null;
   run: ReactNode;
   gym: ReactNode;
 }) {

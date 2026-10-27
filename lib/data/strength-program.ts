@@ -4,9 +4,10 @@
  * (lib/workout/builtin.ts) et la règle Lafay (lib/workout/lafay.ts). Tout est calculé ici à partir de l'historique.
  */
 import { prisma } from "@/lib/prisma";
-import { buildStrengthAnalysis, type ExerciseProgress, type StrengthStatus } from "@/lib/analytics/strength";
+import { buildStrengthAnalysis, type ExerciseProgress } from "@/lib/analytics/strength";
 import { BUILT_IN, builtInStructure, ensureBuiltInTemplates } from "@/lib/workout/builtin";
-import { isLafayCode } from "@/lib/workout/catalog";
+import { catalogFor, isLafayCode } from "@/lib/workout/catalog";
+import { loopReps, loopState, type LoopState } from "@/lib/workout/loop";
 import { planExercise } from "@/lib/workout/draft";
 import { historyKey, loadHistory } from "@/lib/workout/history";
 import { nextKind } from "@/lib/workout/kind";
@@ -19,7 +20,7 @@ const WEEKS = 12;
 export const RECENT = 6;
 export const SPARK = 4;
 
-export type ExerciseState = StrengthStatus | "new";
+export type ExerciseState = LoopState;
 export type ProgressRow = {
   /** « B2 », ou les initiales d'un exercice hors Lafay. */
   code: string;
@@ -29,6 +30,8 @@ export type ProgressRow = {
   state: ExerciseState;
   /** « 1/2 » ou « 2/2 » quand l'exercice stagne. */
   stall: string | null;
+  /** « 6 × 6 » : cible de boucle (« repars à … »), seulement à stagne 2/2. */
+  loop: string | null;
   /** Total de répétitions des SPARK dernières séances, du plus ancien au plus récent. */
   spark: number[];
   last: number | null;
@@ -55,11 +58,14 @@ const label = (e: DraftExercise) => (isLafayCode(e.code) ? e.name.replace(/\s-\s
 const initials = (name: string) => name.split(/[\s-]+/).filter((w) => w.length > 2).slice(0, 3).map((w) => w[0].toUpperCase()).join("") || name.slice(0, 3).toUpperCase();
 
 function rowOf(e: DraftExercise, p: ExerciseProgress | undefined): ProgressRow {
-  const state: ExerciseState = p?.status ?? "new";
+  const state = p ? loopState(p.points) : "new";
   const spark = p ? p.repsPerSession.slice(-SPARK) : [];
+  // Boucle : on repart de la cible de la dernière séance (« 6×8 »), réduite de 30 % (Lafay pur) ou 20 % (hybride, inconnu).
+  const lastTarget = Number(p?.level.split("×")[1]);
+  const loop = state === "stall2" && lastTarget > 0 ? `${e.sets} × ${loopReps(lastTarget, catalogFor(e.code, e.variant)?.source)}` : null;
   return {
-    code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: isLafayCode(e.code) ? e.name.replace(/^.*?\s-\s/, "") : e.name,
-    target: `${e.sets} × ${e.reps}`, state, stall: state === "stall1" ? "1/2" : state === "stall2" ? "2/2" : null,
+    code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: isLafayCode(e.code) ? e.name.replace(/^.*?s-s/, "") : e.name,
+    target: `${e.sets} × ${e.reps}`, state, stall: state === "stall1" ? "1/2" : state === "stall2" ? "2/2" : null, loop,
     spark, last: spark.length ? spark[spark.length - 1] : null,
   };
 }

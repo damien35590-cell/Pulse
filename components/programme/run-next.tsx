@@ -53,7 +53,7 @@ export function RunNext({ p }: { p: RunProgramView }) {
               <p className="mt-1 text-sm text-ink-soft"><span className="font-num tabular-nums">{n.summary}</span>{n.summary && " · "}<span className="font-num tabular-nums">≈ {fmtDuration(n.durationS)}</span></p>
             </div>
             {paused
-              ? <p className="flex items-center gap-2 text-sm text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />Programme en pause. Réactive-le avec l’interrupteur « Envoi sur Garmin » plus bas.</p>
+              ? <p className="flex items-center gap-2 text-sm text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />Programme en pause. Reprends-le depuis le menu « ⋯ » en haut de la page.</p>
               : <SessionActions id={n.id} />}
             <Steps s={n} />
           </>

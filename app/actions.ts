@@ -124,14 +124,13 @@ export async function toggleProgramPause(id: string): Promise<Res> {
 }
 
 /**
- * Interrupteur « Envoi sur Garmin » : actif = programme actif, séances des 14 prochains jours dans Intervals.icu (→ montre), mises à jour chaque nuit ;
- * éteint = programme en pause (même effet que l'ancien bouton « Mettre en pause » : plus d'envoi, les séances déjà envoyées sont retirées).
- * Le changement d'état est fait même si Intervals.icu échoue : `warning` dit alors ce qui n'est pas parti.
+ * Interrupteur « Envoi sur Garmin » : actif = la synchro de nuit pousse les 14 prochains jours dans Intervals.icu (→ montre) ;
+ * éteint = elle n'envoie plus rien et retire les séances Pulse du calendrier. Le statut du programme (actif / en pause) ne change pas.
+ * Le réglage est enregistré même si Intervals.icu échoue : `warning` dit alors ce qui n'est pas parti.
  */
 export async function setGarminSync(id: string, on: boolean): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
-  const userId = await uid(), p = await prisma.program.findFirst({ where: { id, userId, status: { in: ["ACTIVE", "PAUSED"] } }, select: { status: true } });
-  if (!p) return { ok: false, error: "Programme introuvable." };
-  if ((p.status === "ACTIVE") !== on) await prisma.program.update({ where: { id }, data: on ? { status: "ACTIVE", pausedAt: null } : { status: "PAUSED", pausedAt: new Date() } });
+  const userId = await uid(), r = await prisma.program.updateMany({ where: { id, userId, status: { in: ["ACTIVE", "PAUSED"] } }, data: { garminSync: !!on } });
+  if (!r.count) return { ok: false, error: "Programme introuvable." };
   programPaths();
   try { await syncProgramToIntervals(userId); }
   catch (e) { return { ok: true, warning: e instanceof Error ? e.message : "Envoi impossible." }; }

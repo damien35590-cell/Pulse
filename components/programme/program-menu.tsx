@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
-import { deleteRunProgram } from "@/app/actions";
+import { MoreHorizontal, Pause, Play, RotateCcw, Trash2 } from "lucide-react";
+import { deleteRunProgram, toggleProgramPause } from "@/app/actions";
 import { BottomSheet, ConfirmSheet } from "@/components/ui/bottom-sheet";
 import { RunProgramForm } from "@/components/training/run-program-form";
 import { tap } from "@/lib/haptics";
@@ -12,12 +12,18 @@ import { cn } from "@/lib/utils";
 const row = "flex min-h-14 w-full items-center gap-3 rounded-tile bg-surface px-4 py-2 text-left font-semibold select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.985] active:bg-surface-3";
 
 /** Bouton « ⋯ » de la page : « Recommencer un nouveau programme » (formulaire en feuille) et « Supprimer ce programme » (confirmation en feuille). Programme running. */
-export function ProgramMenu({ programId, vma }: { programId: string; vma: { vmaKmh: number; label: string } }) {
+export function ProgramMenu({ programId, paused, vma }: { programId: string; paused: boolean; vma: { vmaKmh: number; label: string } }) {
   const [sheet, setSheet] = useState<"menu" | "restart" | "delete" | null>(null);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
 
+  const pause = () => start(async () => {
+    const r = await toggleProgramPause(programId);
+    if (!r.ok) { setErr(r.error); return; }
+    setSheet(null);
+    router.refresh();
+  });
   const remove = () => start(async () => {
     const r = await deleteRunProgram(programId);
     if (!r.ok) { setErr(r.error); setSheet("menu"); return; }
@@ -31,6 +37,7 @@ export function ProgramMenu({ programId, vma }: { programId: string; vma: { vmaK
       </button>
       <BottomSheet open={sheet === "menu"} onClose={() => setSheet(null)} title="Programme running">
         <div className="mt-3 grid gap-2 pb-2">
+          <button type="button" disabled={pending} onClick={pause} className={row}>{paused ? <Play className="size-5 text-ink-soft" aria-hidden /> : <Pause className="size-5 text-ink-soft" aria-hidden />}{paused ? "Reprendre" : "Mettre en pause"}</button>
           <button type="button" onClick={() => setSheet("restart")} className={row}><RotateCcw className="size-5 text-ink-soft" aria-hidden />Recommencer un nouveau programme</button>
           <button type="button" onClick={() => setSheet("delete")} className={cn(row, "text-bad")}><Trash2 className="size-5" aria-hidden />Supprimer ce programme</button>
           {err && <p role="alert" className="text-sm font-semibold text-bad">{err}</p>}

@@ -151,6 +151,8 @@ export type RunProgramView = {
   pendingTest: { sessionId: string } | null;
   /** Dernier envoi réussi vers le calendrier Intervals.icu (séances à faire), ISO ; null = jamais envoyé. */
   intervalsSyncedAt: string | null;
+  /** Interrupteur « Envoi sur Garmin » (Program.garminSync), indépendant du statut. */
+  garminSync: boolean;
 };
 
 /** Programme RUN actif (ou en pause), avec allures recalculées à partir de la VMA du moment. Null s'il n'y en a pas. */
@@ -204,7 +206,7 @@ export async function getRunProgram(userId: string, now = new Date()): Promise<R
     doneCount: flat.filter(({ s }) => s.status !== "PLANNED").length, totalCount: flat.length,
     vma: { vmaKmh, label: current?.label ?? "par défaut", measuredAt: current?.measuredAt?.toISOString() ?? null },
     pendingTest: test ? { sessionId: test.id } : null,
-    intervalsSyncedAt: syncedAt ? new Date(syncedAt).toISOString() : null,
+    intervalsSyncedAt: syncedAt ? new Date(syncedAt).toISOString() : null, garminSync: p.garminSync,
   };
 }
 
