@@ -74,7 +74,7 @@ export function ActivitySummary({ a, href, onSelect }: { a: ActivitySummaryData;
         : a.effort
         ? <EffortStrip segments={a.effort.segments} label={a.effort.label} className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] rounded-b-card" />
         : (hasMap || a.ribbon) && (
-          <div className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] overflow-hidden rounded-b-card">
+          <div className="-mx-4 -mb-4 mt-4 w-[calc(100%_+_2rem)] overflow-hidden rounded-b-card border-t border-line dark:border-t-0">
             {hasMap && <RoutePreview points={a.route!} />}
             {a.ribbon && <ZoneRibbon segments={a.ribbon} />}
           </div>

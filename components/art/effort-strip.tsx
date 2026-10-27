@@ -12,7 +12,7 @@ const HEIGHT: Record<RibbonZone, string> = { 1: "27%", 2: "42%", 3: "56%", 4: "7
  */
 export function EffortStrip({ segments, label, mini, className }: { segments: RibbonSegment[]; label?: string; mini?: boolean; className?: string }) {
   return (
-    <div aria-hidden className={cn("relative flex w-full items-end overflow-hidden", mini ? "h-8 w-[52px] shrink-0 gap-px rounded-tile bg-art-run-bg opacity-60" : "h-24 gap-0.5 bg-viz-ride-bg", className)}>
+    <div aria-hidden className={cn("relative flex w-full items-end overflow-hidden", mini ? "h-8 w-[52px] shrink-0 gap-px rounded-tile bg-art-run-bg opacity-60" : "h-24 gap-0.5 border-t border-line bg-viz-ride-bg dark:border-t-0", className)}>
       {segments.map((s, i) => (
         <span key={i} className={cn("min-w-0", ZONE_BG[s.z])} style={{ flex: `${s.f} 1 0%`, height: HEIGHT[s.z] }} />
       ))}

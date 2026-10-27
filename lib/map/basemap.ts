@@ -15,7 +15,7 @@ export type BasemapStyle = { style: string; filter?: string };
 /** CHOIX DU FOND DE CARTE : changer de fond = modifier cette constante (un style, un filtre éventuel, par thème). */
 export const BASEMAP: Record<MapTheme, BasemapStyle> = {
   dark: { style: "alidade_smooth_dark" },
-  light: { style: "alidade_bright" },
+  light: { style: "alidade_smooth" },
 };
 
 export const styleUrl = (style: string) => `https://tiles-eu.stadiamaps.com/tiles/${style}/{z}/{x}/{y}{r}.png`;
