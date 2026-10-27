@@ -148,11 +148,12 @@ export function contextChips(target: Candidate, pool: Candidate[], o: { tz: stri
 export type InsightLine = { text: string; tone: PaceInsight["tone"] };
 
 /**
- * La phrase unique d'une carte du fil, même formulation que la fiche : écart d'allure, sinon première pastille, sinon l'anecdote
+ * La phrase unique d'une carte du fil, même formulation que la fiche : écart d'allure notable (jamais « dans ta moyenne »), sinon première pastille, sinon l'anecdote
  * (Activity.story) sauf quand elle compare à la moyenne des 30 jours (ancienne comparaison, remplacée par celle-ci).
  */
 export function insightLine(i: { pace: PaceInsight | null; chips: string[] }, story?: string | null): InsightLine | null {
-  if (i.pace) return { text: i.pace.text, tone: i.pace.tone };
+  // Écart d'allure neutre (« dans ta moyenne ») : rien de notable, pas de ligne.
+  if (i.pace && i.pace.tone !== "neutral") return { text: i.pace.text, tone: i.pace.tone };
   if (i.chips[0]) return { text: i.chips[0], tone: "neutral" };
   return story && !isAverageStory(story) ? { text: story, tone: "neutral" } : null;
 }

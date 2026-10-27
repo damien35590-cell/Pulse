@@ -31,6 +31,8 @@ export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
     const pts = [...byDay.values()].sort((x, y) => x.t - y.t);
     return pts.map((p, j) => ({ ...p, mark: j > 0 && p.variant && p.variant !== pts[j - 1].variant ? (pts[j - 1].variant ? `${pts[j - 1].variant}→${p.variant}` : p.variant) : undefined }));
   });
+  // Séances distinctes (jours) de l'exercice choisi : une courbe n'a de sens qu'à partir de 2.
+  const curDays = new Set(cur.points.map((p) => p.day)).size;
   const all = series.flat(), DAY = 864e5, ticks = niceTicks(Math.max(...all.map((p) => p.reps)));
   const tick = { fontSize: 11, fill: c.inkMute };
   // La courbe choisie est tracée en dernier : elle passe au-dessus des autres
@@ -41,12 +43,15 @@ export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="Exercice">
           {ladders.map((l) => (
             <button key={l.key} type="button" role="tab" aria-selected={l.key === cur.key} onClick={() => { if (l.key !== cur.key) { tap(6); setSel(l.key); } }}
-              className={cn("inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-semibold touch-manipulation", l.key === cur.key ? "bg-brand text-brand-ink" : "bg-surface-2 text-ink-soft")}>
+              className={cn("inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-4 text-sm font-semibold touch-manipulation", l.key === cur.key ? "bg-ink text-bg" : "bg-surface-2 text-ink-soft")}>
               {l.name}
             </button>
           ))}
         </div>
       )}
+      {curDays < 2 ? (
+        <p className="rounded-tile bg-surface-2 px-4 py-6 text-center text-sm text-ink-soft">Courbe disponible à partir de 2 séances.</p>
+      ) : (
       <div className="h-48" role="img" aria-label="Total de répétitions par séance, par exercice">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart margin={{ top: 16, right: 16, left: -20, bottom: 0 }}>
@@ -70,8 +75,9 @@ export function ProgressionChart({ ladders }: { ladders: Ladder[] }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+      )}
       <dl className="grid grid-cols-3 gap-3">
-        <Metric label="Niveau" value={cur.level} size="md" />
+        <Metric label="Cible" value={cur.level} size="md" />
         <Metric label="Variante" value={cur.variant ?? "–"} size="md" tone={cur.variant ? "default" : "soft"} />
         <Metric label="Dernière" value={fmtDayKey(cur.lastDay)} size="md" />
       </dl>

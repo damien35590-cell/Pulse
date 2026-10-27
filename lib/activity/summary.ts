@@ -37,11 +37,6 @@ export function cells(a: SummaryActivity): Cell[] {
   return list.filter((c): c is Cell => c !== null).slice(0, 3);
 }
 
-/** Une carte d'endurance a toujours sa phrase : à défaut de comparaison, la place de la sortie dans la semaine (vraie même pour la 1re). */
-function fallbackLine(type: string, rank?: number): InsightLine | undefined {
-  return (type === "RUN" || type === "RIDE" || type === "HIKE") && rank ? { text: rank === 1 ? "1ʳᵉ sortie de la semaine" : `${rank}ᵉ sortie de la semaine`, tone: "neutral" } : undefined;
-}
-
 /** Sans trace GPS, une sortie avec FC garde un visuel : temps par zone tiré du ruban (fractions du temps) quand il vient de la FC. */
 function ribbonZones(a: SummaryActivity): ZoneSlice[] | undefined {
   if (!["RUN", "RIDE", "HIKE"].includes(a.type) || a.zoneRibbonSource !== "hr") return undefined;
@@ -60,13 +55,13 @@ export function summaryData(a: SummaryActivity, insight: ActivityInsight | undef
   const route = isSoftActivity(a) ? undefined : previewTrack(a.polyline);
   // Art : ruban, profil d'effort ou séries de muscu selon les données (jamais pour une activité douce).
   const art = isSoftActivity(a) ? {} : cardArt({
-    type: a.type, source: a.source, hasRoute: !!route && route.length > 1, zoneRibbon: a.zoneRibbon, zoneRibbonSource: a.zoneRibbonSource, isInterval: a.isInterval, sessionType: a.sessionType, plannedSession: a.plannedSession,
+    type: a.type, title: a.title, source: a.source, hasRoute: !!route && route.length > 1, zoneRibbon: a.zoneRibbon, zoneRibbonSource: a.zoneRibbonSource, isInterval: a.isInterval, sessionType: a.sessionType, plannedSession: a.plannedSession,
     exercises: a.exercises?.flatMap((e) => (e.name ? [{ name: e.name, sets: e.sets, reps: e.reps, setsDetail: e.setsDetail }] : [])),
   });
   return {
     id: a.id, type: a.type, title: a.title, competition: a.sessionType === "race" || undefined, when: fmtWhen(a.startedAt, tz),
     metrics: cells(a).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
-    insight: a.type === "WORKOUT" ? insight?.strength : insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? fallbackLine(a.type, insight?.weekRank),
+    insight: a.type === "WORKOUT" ? insight?.strength : insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
     zones: !route && !art.ribbon && !art.effort ? ribbonZones(a) : undefined,
     route, ...art,
     ...extra,

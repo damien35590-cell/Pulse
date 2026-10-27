@@ -3,12 +3,13 @@
  * - Endurance : les PersonalRecord déjà calculés à l'import (5 km, 10 km, semi = meilleur effort DANS la sortie, pas sortie entière ;
  *   plus longue sortie, plus gros D+). Jamais de record pour un E-bike (lib/pipeline/post-import.ts).
  * - Vélo : en plus, meilleure puissance moyenne sur 20 min (ActivityStream.curve).
- * - Muscu : par exercice (et par variante Lafay : B1 et B2 ne se comparent pas) : meilleur total de répétitions sur une séance,
- *   ou, pour un exercice chargé, la série la plus lourde.
+ * - Muscu : par exercice (et par variante Lafay : B1 et B2 ne se comparent pas) : la meilleure série en répétitions (le total de la séance en précision),
+ *   pour un exercice chargé la série la plus lourde, pour un exercice au chrono (gainage, planche) la plus longue tenue, en secondes (« 1 min 30 »).
  */
 import { dayKey } from "../dates";
 import { fmtClock, fmtKm, fmtNum } from "../format";
 import { doneSets, groupKey, sumReps, variantOf, type StrengthRow } from "./strength";
+import { catalogFor, resolveName } from "../workout/catalog";
 
 export type RecordSport = "WORKOUT" | "RUN" | "RIDE" | "HIKE";
 /** Ordre des onglets : celui des quatre sports de l'app (lib/sports.ts → MY_SPORTS). */
@@ -73,6 +74,19 @@ const recordKey = (name: string) => `${groupKey(name)}|${variantOf(name) ?? ""}`
 const latestFirst = (a: StrengthRow, b: StrengthRow) => +b.startedAt - +a.startedAt;
 const MAX_STRENGTH_ROWS = 12;
 
+/** Exercice au chrono : l'unité du catalogue (mode « time ») ; hors catalogue, le nom (gainage, planche, tenue…). Les « reps » enregistrées sont alors des secondes. */
+export function isTimedExercise(name: string): boolean {
+  const { code, variant } = resolveName(name);
+  const e = catalogFor(code, variant);
+  return e ? e.mode === "time" : /gainage|planche|plank|tenue|isom[ée]tr/i.test(name);
+}
+
+/** 90 → « 1 min 30 », 120 → « 2 min », 45 → « 45 s ». */
+export function fmtHold(s: number): string {
+  const t = Math.round(s), m = Math.floor(t / 60), r = t % 60;
+  return m === 0 ? `${r} s` : r === 0 ? `${m} min` : `${m} min ${String(r).padStart(2, "0")}`;
+}
+
 export function strengthRecords(rows: StrengthRow[], tz: string): RecordRow[] {
   const groups = new Map<string, StrengthRow[]>();
   for (const r of [...rows].sort(latestFirst)) {
@@ -97,13 +111,18 @@ export function strengthRecords(rows: StrengthRow[], tz: string): RecordRow[] {
     }
     const loaded = sets.filter(({ s }) => (s.loadKg ?? 0) > 0);
     let row: RecordRow | null = null;
-    if (loaded.length) {
+    if (isTimedExercise(name)) {
+      // Chrono : la plus longue tenue sur une série (secondes), jamais des répétitions.
+      const [id, top] = [...perSession].reduce((b, x) => (x[1].best > b[1].best ? x : b));
+      if (top.best > 0) row = { key: k, label, value: fmtHold(top.best), unit: "", day: fmtDay(top.at, tz), sub: null, activityId: id };
+    } else if (loaded.length) {
       // Exercice chargé (haltères, barre, lesté) : la série la plus lourde, à charge égale la plus longue
       const top = loaded.reduce((b, x) => (x.s.loadKg! > b.s.loadKg! || (x.s.loadKg === b.s.loadKg && x.s.reps > b.s.reps) ? x : b));
       row = { key: k, label, value: fmtNum(top.s.loadKg!, 1), unit: `kg × ${top.s.reps}`, day: fmtDay(top.r.startedAt, tz), sub: null, activityId: top.r.activityId };
     } else {
-      const [id, top] = [...perSession].reduce((b, x) => (x[1].total > b[1].total ? x : b));
-      if (top.total > 0) row = { key: k, label, value: String(top.total), unit: "reps", day: fmtDay(top.at, tz), sub: `${top.best} max en une série`, activityId: id };
+      // Répétitions : titre = la meilleure série ; précision = total de la séance où elle a été faite (à égalité, la plus fournie).
+      const [id, top] = [...perSession].reduce((b, x) => (x[1].best > b[1].best || (x[1].best === b[1].best && x[1].total > b[1].total) ? x : b));
+      if (top.best > 0) row = { key: k, label, value: String(top.best), unit: "reps", day: fmtDay(top.at, tz), sub: `${top.total} reps sur la séance`, activityId: id };
     }
     if (row) out.push({ row, last: +list[0].startedAt });
   }

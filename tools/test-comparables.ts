@@ -91,4 +91,8 @@ assert.deepEqual(insightLine({ pace: null, chips: ["2ᵉ sortie de la semaine"] 
 assert.equal(insightLine({ pace: null, chips: [] }, "Allure en baisse de 4 % sur la moyenne des 30 derniers jours."), null, "ancienne comparaison écartée");
 assert.equal(insightLine({ pace: null, chips: [] }, "120 m de D+ de plus que ta moyenne."), null);
 assert.deepEqual(insightLine({ pace: null, chips: [] }, "Série en cours : 4 jours consécutifs d'activité."), { text: "Série en cours : 4 jours consécutifs d'activité.", tone: "neutral" });
+// Écart d'allure neutre : aucune ligne (rien de notable) ; avec une pastille vraie, c'est elle qui parle
+const neutral = { ...ins, tone: "neutral" as const, text: "Dans ta moyenne habituelle" };
+assert.equal(insightLine({ pace: neutral, chips: [] }), null);
+assert.deepEqual(insightLine({ pace: neutral, chips: ["Record sur 5 km"] }), { text: "Record sur 5 km", tone: "neutral" });
 console.log("phrase du fil : ok");

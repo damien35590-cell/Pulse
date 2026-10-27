@@ -24,6 +24,10 @@ export const SPARK = 4;
 
 export type ExerciseState = LoopState;
 export type ProgressRow = {
+  /** Clé de l'exercice (échelle Lafay), la même que ExerciseProgress.key : relie la carte à l'analyse. */
+  key: string;
+  /** Séries prévues au programme. */
+  sets: number;
   /** « B2 », ou les initiales d'un exercice hors Lafay. */
   code: string;
   name: string;
@@ -65,11 +69,12 @@ const initials = (name: string) => name.split(/[\s-]+/).filter((w) => w.length >
 
 function rowOf(e: DraftExercise, p: ExerciseProgress | undefined, rows: StrengthRow[]): ProgressRow {
   // État et cible de boucle : lafayView, comme la séance proposée par « Démarrer » (même historique, même résultat).
-  const { state, loop } = isLafayCode(e.code) ? lafayView(rows) : { state: p ? loopState(p.points) : ("new" as const), loop: null };
+  const { state, loop } = isLafayCode(e.code) ? lafayView(rows, e.sets) : { state: p ? loopState(p.points) : ("new" as const), loop: null };
   const totals = p ? p.repsPerSession.slice(-SPARK) : [];
   // Tendance : au moins 2 séances ; avec une seule, on ne montre que le dernier total.
   const spark = totals.length >= 2 ? totals : [];
   return {
+    key: historyKey(e.code, e.variant), sets: e.sets,
     code: isLafayCode(e.code) ? (e.variant ?? e.code) : initials(e.name), name: upperFirst(nameOnly(e.name)),
     target: `${e.sets} × ${e.reps}`, state, stall: state === "stall1" ? "1/2" : state === "stall2" ? "2/2" : null, loop,
     spark, last: totals.length ? totals[totals.length - 1] : null,

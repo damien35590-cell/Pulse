@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-records.ts
 import assert from "node:assert/strict";
-import { buildSportRecords, strengthRecords } from "../lib/analytics/records";
+import { buildSportRecords, fmtHold, strengthRecords } from "../lib/analytics/records";
 import type { StrengthRow } from "../lib/analytics/strength";
 
 const tz = "Europe/Paris";
@@ -8,7 +8,7 @@ const d = (iso: string) => new Date(iso + "T08:00:00Z");
 const row = (activityId: string, day: string, name: string, sets: number, reps: number, done: number[], loadKg: number | null = null): StrengthRow =>
   ({ activityId, startedAt: d(day), name, sets, reps, loadKg, setsDetail: done.map((r) => ({ reps: r, loadKg, done: true })) });
 
-// ── Muscu : B1 et B2 ont chacun leur record, le meilleur TOTAL de la variante gagne
+// ── Muscu : B1 et B2 ont chacun leur record, la meilleure SÉRIE de la variante gagne, le total de la séance en précision
 const rows = [
   row("a1", "2026-10-05", "B1 - dips", 6, 8, [8, 8, 8, 8, 8, 8]),     // 48
   row("a2", "2026-10-12", "B2 - dips", 6, 8, [8, 8, 8, 8, 6, 5]),     // 43
@@ -19,11 +19,18 @@ const rows = [
 ];
 const s = strengthRecords(rows, tz);
 const b2 = s.find((r) => r.label.includes("B2"))!, b1 = s.find((r) => r.label.includes("B1"))!;
-assert.equal(b2.value, "49"); assert.equal(b2.unit, "reps"); assert.equal(b2.activityId, "a3"); assert.equal(b2.sub, "9 max en une série");
-assert.equal(b1.value, "48", "B1 ne se mélange pas avec B2");
+assert.equal(b2.value, "9"); assert.equal(b2.unit, "reps"); assert.equal(b2.activityId, "a3"); assert.equal(b2.sub, "49 reps sur la séance");
+assert.equal(b1.value, "8", "B1 ne se mélange pas avec B2"); assert.equal(b1.sub, "48 reps sur la séance");
 const row1 = s.find((r) => r.label === "Rowing haltère")!;
 assert.equal(row1.value, "22"); assert.equal(row1.unit, "kg × 10"); assert.equal(row1.activityId, "a3");
 assert.equal(s.length, 3);
+
+// Exercice au chrono (catalogue : mode « time », ou nom : gainage / planche) : record en secondes, jamais en reps.
+const held = strengthRecords([row("h1", "2026-10-01", "Gainage", 3, 60, [60, 45, 40]), row("h2", "2026-10-08", "Gainage", 3, 60, [90, 60, 50]), row("h3", "2026-10-09", "Planche", 1, 120, [120])], tz);
+const gainage = held.find((r) => r.label === "Gainage")!;
+assert.deepEqual([gainage.value, gainage.unit, gainage.activityId, gainage.sub], ["1 min 30", "", "h2", null]);
+assert.equal(held.find((r) => r.label === "Planche")!.value, "2 min");
+assert.equal(fmtHold(45), "45 s"); assert.equal(fmtHold(60), "1 min"); assert.equal(fmtHold(65), "1 min 05");
 
 // Séries non faites ou échauffement : ignorés ; un exercice sans aucune série faite n'a pas de record
 assert.deepEqual(strengthRecords([{ ...row("x", "2026-10-01", "Pompes", 3, 10, []), setsDetail: [{ reps: 10, loadKg: null, done: false }] }], tz), []);

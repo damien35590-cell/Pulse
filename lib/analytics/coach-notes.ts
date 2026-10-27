@@ -9,7 +9,7 @@ import { fitnessSeries } from "../fitness";
 import { estimateLoad } from "../load";
 import { isCommute } from "../routes/estimate";
 import { fmtClock, fmtPaceS } from "../format";
-import type { StrengthAnalysis } from "./strength";
+import { MIN_SESSIONS, type StrengthAnalysis } from "./strength";
 
 export type CoachTone = "good" | "warn" | "bad" | "info";
 export type CoachNote = { id: string; tone: CoachTone; title: string; body: string; action?: { label: string; href: string } };
@@ -33,6 +33,19 @@ const fr = (n: number, d = 0) => n.toLocaleString("fr-FR", { maximumFractionDigi
 const hours = (s: number) => { const m = Math.round(s / 60); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`; };
 const plural = (n: number, w: string) => `${fr(n, n % 1 ? 1 : 0)} ${w}${n >= 2 ? "s" : ""}`;
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+
+/**
+ * Variation du temps d'entraînement : période choisie contre la précédente de même durée, en moyenne par jour (la période en cours n'est pas finie).
+ * Source UNIQUE de la tuile « Temps » de la page Analyse et de la ligne du coach : même période (frame), même calcul (rateChange).
+ * `acts` = les activités à compter (déjà filtrées par sport) ; `prevCount` = nombre d'activités de la période précédente.
+ */
+export function timeChange(acts: { startedAt: Date; movingTimeS: number }[], p: CoachPeriod): { cur: number; prev: number; prevCount: number; pct: number | null } {
+  const f = frame(p), within = (a: { startedAt: Date }, from: string, to: string) => { const k = dayKey(a.startedAt, p.tz); return k >= from && k <= to; };
+  const usable = acts.filter((a) => +a.startedAt <= +p.now);
+  const cur = usable.filter((a) => within(a, f.startKey, f.endKey)), prev = usable.filter((a) => within(a, f.prevStart, f.prevEnd));
+  const sum = (l: { movingTimeS: number }[]) => l.reduce((s, a) => s + a.movingTimeS, 0);
+  return { cur: sum(cur), prev: sum(prev), prevCount: prev.length, pct: rateChange(sum(cur), f.span, sum(prev), f.prevSpan) };
+}
 
 /** Les plus importants d'abord (alerte, vigilance, progrès, info), dans l'ordre des règles à importance égale. */
 export function rankNotes(notes: CoachNote[], max = MAX_NOTES): CoachNote[] {
@@ -139,7 +152,7 @@ export function overviewNotes(input: { acts: CoachAct[]; period: CoachPeriod; pl
   }
 
   // 5. Volume d'entraînement par rapport à la période précédente, à durée égale
-  const pct = prev.length >= 2 ? rateChange(time(cur), f.span, time(prev), f.prevSpan) : null;
+  const tc = timeChange(training, p), pct = tc.prevCount >= 2 ? tc.pct : null;
   if (pct != null && cur.length) {
     const vs = `${hours(time(cur))} contre ${hours(time(prev))} sur les ${p.weeks} semaines précédentes${f.span < f.prevSpan ? ", à durée égale" : ""}`;
     if (pct >= 15) notes.push({ id: "volume", tone: "good", title: `+${pct} % de temps d'entraînement`, body: `${vs}.` });
@@ -214,6 +227,11 @@ export function runNotes(input: { acts: CoachAct[]; period: CoachPeriod; goal?: 
 export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeriod; plans?: PlanAdherence[]; perWeek?: number | null }): CoachNote[] {
   const { data, period: p, plans = [] } = input;
   if (data.empty) return rankNotes(planNotes(plans.filter((x) => x.sport === "WORKOUT")));
+  // Moins de 3 séances sur la période : aucune affirmation sur la progression ni sur l'équilibre haut / bas, une seule ligne.
+  if (data.summary.sessions < MIN_SESSIONS) {
+    const few: CoachNote = { id: "few", tone: "info", title: `Pas assez de séances pour juger la progression (${data.summary.sessions} / ${MIN_SESSIONS}).`, body: "" };
+    return [few, ...planNotes(plans.filter((x) => x.sport === "WORKOUT"))].slice(0, MAX_NOTES);
+  }
   const f = frame(p), notes: CoachNote[] = [];
 
   // 1. Progression Lafay par exercice

@@ -6,6 +6,8 @@ import { dayKey, shiftDay, weekKeys } from "@/lib/dates";
 import { fillMissingDates, groupByWeek } from "@/lib/fill-dates";
 import { climbCompare } from "@/lib/insights/landmarks";
 import { SPORTS, MY_SPORTS } from "@/lib/sports";
+import { activityStyle } from "@/lib/activity-style";
+import { getStrengthProgram } from "@/lib/data/strength-program";
 import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
 import { BUILT_IN } from "@/lib/workout/builtin";
@@ -16,7 +18,7 @@ import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
 import { getHikingAnalysis } from "@/lib/analytics/hiking";
 import { parsePeriod, periodParams } from "@/lib/analysis/period";
-import { overviewNotes, rankNotes, runNotes, sessionsPerWeek, strengthNotes, type CoachNote } from "@/lib/analytics/coach-notes";
+import { overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
 import { lastDebrief } from "@/lib/coach/store";
 import { PeriodPicker } from "@/components/analysis/period-picker";
@@ -36,8 +38,6 @@ const MAX_NOTES = 3;
 const CALENDAR_WEEKS = 26;
 /** Courbes de la progression muscu : les 6 exercices du programme Haut / Bas tiennent tous. */
 const MAX_LADDERS = 6;
-// Un token par sport, distincts même en gris (noms de classes complets pour Tailwind) : Musculation marque, Running encre, Vélo encre douce, Rando encre sourde
-const SPLIT = [{ stroke: "stroke-brand", bg: "bg-brand" }, { stroke: "stroke-ink", bg: "bg-ink" }, { stroke: "stroke-ink-soft", bg: "bg-ink-soft" }, { stroke: "stroke-ink-mute", bg: "bg-ink-mute" }] as const;
 // Exercice du catalogue (code Lafay ou fiche SuperPhysique) ; un exercice saisi librement n'a pas de courbe de progression (il reste dans l'historique et les comptes)
 const inCatalogue = (key: string, name: string) => key.startsWith("lafay:") || !!catalogFor(name, null);
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -71,7 +71,8 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const noun = S === "WORKOUT" || S === "all" ? "séance" : "sortie";
 
   const qs = (o: Record<string, string>) => `/analysis?${new URLSearchParams({ ...periodParams(period), s: S, ...o })}`;
-  const chip = (on: boolean) => cn("inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-medium", on ? "bg-brand text-brand-ink" : "bg-surface-2");
+  // Filtre actif : encre (comme les filtres d'Activités) ; le Volt reste à l'action principale.
+  const chip = (on: boolean) => cn("inline-flex h-12 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.97]", on ? "bg-ink text-bg" : "bg-surface-2 text-ink-soft");
 
   // Coach IA : dernier debrief enregistré pour cet onglet et cette période (aucun appel à l'IA au chargement). Pas d'IA pour le vélo ni la rando.
   const aiScope = S === "all" || S === "RUN" || S === "WORKOUT" ? S : null;
@@ -87,12 +88,15 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const perWeekOf = (l: { startedAt: Date }[]) => sessionsPerWeek(l, coachPeriod) ?? l.length / W;
   const perWeek = perWeekOf(cur);
 
+  // Muscu : les séries du programme (modèles haut / bas) servent à la cible affichée, comme sur la page Programme.
+  const program = S === "WORKOUT" ? await getStrengthProgram(uid, now) : null;
+  const setsByKey = new Map(program?.groups.flatMap((g) => g.rows).map((r) => [r.key, r.sets]) ?? []);
   const [adv, runGoal, plans, ai, strength, cycling, hiking] = await Promise.all([
     getAdvanced(uid, TZ),
     S === "RUN" ? getRunGoal(uid) : null,
     S === "RUN" || S === "WORKOUT" || S === "all" ? getPlanAdherence(uid, period.startKey, period.endKey, todayKey, planSport) : [],
     aiScope && cur.length > 0 ? aiProps() : null,
-    S === "WORKOUT" ? getStrengthAnalysis(uid, TZ, W, now) : null,
+    S === "WORKOUT" ? getStrengthAnalysis(uid, TZ, W, now, (k) => setsByKey.get(k)) : null,
     S === "RIDE" ? getCyclingAnalysis(uid, TZ, W, now) : null,
     S === "HIKE" ? getHikingAnalysis(uid, TZ, W, now) : null,
   ]);
@@ -109,8 +113,10 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   // 1. Chiffres clés
   const delta = (c: number, p: number) => (p > 0 ? Math.round(((c - p) / p) * 100) : null);
-  const tile = (label: string, c: number, p: number, value: string, unit?: string, extra?: string) => {
-    const d = delta(c, p);
+  // Cumuls (distance, temps, D+, séances) : variation par jour sur la période, comme le coach (timeChange / rateChange). Moyennes : variation brute.
+  const spanF = frame(coachPeriod);
+  const tile = (label: string, c: number, p: number, value: string, unit?: string, extra?: string, additive = true) => {
+    const d = !additive ? delta(c, p) : label === "Temps" ? timeChange(acts.filter(hit), coachPeriod).pct : rateChange(c, spanF.span, p, spanF.prevSpan);
     return (
       <div key={label} className={cn(ui.card, "p-4")}>
         <dl><Metric label={label} value={value} unit={unit} size="lg" hint={(d != null || extra) && <>{d != null && <Delta tone={d >= 0 ? "good" : "neutral"}>{d > 0 ? "+" : ""}{d} %</Delta>}{extra && <span className={d != null ? "ml-1.5" : undefined}>{extra}</span>}</>} /></dl>
@@ -130,7 +136,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     : [
         sorties,
         tile("Temps", timeS(cur), timeS(prev), fmtDuration(timeS(cur))),
-        tile("Durée moyenne", cur.length ? timeS(cur) / cur.length : 0, prev.length ? timeS(prev) / prev.length : 0, cur.length ? fmtDuration(timeS(cur) / cur.length) : "–"),
+        tile("Durée moyenne", cur.length ? timeS(cur) / cur.length : 0, prev.length ? timeS(prev) / prev.length : 0, cur.length ? fmtDuration(timeS(cur) / cur.length) : "–", undefined, undefined, false),
         <div key="days" className={cn(ui.card, "p-4")}><dl><Metric label="Jours actifs" value={activeDays} unit={`/ ${W * 7}`} size="lg" /></dl></div>,
       ];
 
@@ -167,7 +173,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
   // Répartition du temps (filtre « Tous » seulement)
   const tt = timeS(inPeriod) || 1;
-  const shares = MY_SPORTS.map((k, i) => ({ k, pct: (timeS(inPeriod.filter((a) => a.type === k)) / tt) * 100, ...SPLIT[i] }));
+  const shares = MY_SPORTS.map((k) => ({ k, pct: (timeS(inPeriod.filter((a) => a.type === k)) / tt) * 100, stroke: activityStyle(k).stroke, bg: activityStyle(k).dot }));
   let off = 0;
 
   // 4. Profil : sorties par semaine de chaque discipline sur la période

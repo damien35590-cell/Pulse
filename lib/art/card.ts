@@ -22,6 +22,7 @@ export type CardArt = {
 
 export type ArtActivity = {
   type: string;
+  title?: string | null;
   source?: string | null;
   /** Une trace GPS exploitable existe (la vignette de carte s'affichera). */
   hasRoute: boolean;
@@ -35,6 +36,9 @@ export type ArtActivity = {
   plannedSession?: { kind: string; title: string } | null;
   exercises?: SetExercise[];
 };
+
+/** Sortie virtuelle (MyWhoosh, Zwift…) : le profil de puissance y oscille par nature, ce n'est pas une séance structurée. */
+export const isVirtual = (a: Pick<ArtActivity, "source" | "title">) => a.source === "mywhoosh" || /virtuel|virtual/i.test(a.title ?? "");
 
 export function cardArt(a: ArtActivity): CardArt {
   if (a.type === "WORKOUT") {
@@ -52,7 +56,8 @@ export function cardArt(a: ArtActivity): CardArt {
   if (manual) return {};
   const key = a.plannedSession && EFFORT_KINDS.includes(a.plannedSession.kind) ? a.plannedSession : null;
   if (key) return { effort: { segments: ribbon, label: shortTitle(key.title) } };
-  if (a.isInterval ?? (a.zoneRibbonSource === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(ribbon)) return { effort: { segments: ribbon } };
+  // Vélo virtuel : jamais d'EffortStrip déduit du ruban, la carte (tracé de la sortie) reste. Seuls un choix manuel ou une séance clé du programme l'imposent.
+  if (!(a.type === "RIDE" && isVirtual(a)) && (a.isInterval ?? (a.zoneRibbonSource === "pace" ? hasPaceIntervalStructure : hasIntervalStructure)(ribbon))) return { effort: { segments: ribbon } };
   if (a.hasRoute || (a.type === "RIDE" && a.source === "mywhoosh")) return { ribbon };
   return {};
 }

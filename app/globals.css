@@ -21,8 +21,8 @@
        Jamais derrière un chiffre, jamais dans une séance en direct, jamais de Volt. Les zones y reprennent z1–z6. */
     --art-run-bg: 18 35 63; --art-run-fg: 90 169 255; --art-gym-bg: 42 24 16; --art-gym-fg: 255 138 61;
     --art-ink: 245 245 247; --art-ink-soft-run: 201 216 240; --art-ink-soft-gym: 243 217 200;
-    /* Bandes de visuel du fil (SetBars, EffortStrip) : suivent le thème. Sombre : valeurs d'origine des bandes (art-gym / art-run). */
-    --viz-strength-bg: 42 24 16; --viz-strength-bar: 255 138 61; --viz-strength-bar-dim: 149 81 39; --viz-strength-ink: 243 217 200; --viz-strength-code: 255 138 61; --viz-target: 245 245 247;
+    /* Bandes de visuel du fil (SetBars, EffortStrip) : suivent le thème. Muscu : indigo act-strength (barres, code), comme la pastille du type d'activité. */
+    --viz-strength-bg: 30 30 34; --viz-strength-bar: 142 146 255; --viz-strength-bar-dim: 85 88 150; --viz-strength-ink: 161 161 170; --viz-strength-code: 142 146 255; --viz-target: 245 245 247;
     --viz-ride-bg: 18 35 63; --viz-ride-ink: 245 245 247;
     --sport-ride: var(--brand); --sport-swim: var(--brand);
     --sport-hike: var(--brand); --sport-workout: var(--brand); --sport-other: var(--brand);
@@ -52,7 +52,7 @@
     --act-ride-soft: color-mix(in oklch, rgb(var(--act-ride)) 14%, transparent); --act-hike-soft: color-mix(in oklch, rgb(var(--act-hike)) 14%, transparent);
     --act-other-soft: color-mix(in oklch, rgb(var(--act-other)) 14%, transparent);
     /* Bandes de visuel du fil (SetBars, EffortStrip) : fond = surface-2 (même famille que la carte), liseré en haut posé par le composant ; plus de bloc sombre ni de teinte. */
-    --viz-strength-bg: 240 240 245; --viz-strength-bar: 201 76 18; --viz-strength-bar-dim: 208 108 62; --viz-strength-ink: 124 45 12; --viz-strength-code: 154 52 8; --viz-target: 124 45 12;
+    --viz-strength-bg: 240 240 245; --viz-strength-bar: 84 87 224; --viz-strength-bar-dim: 112 115 230; --viz-strength-ink: 99 99 110; --viz-strength-code: 84 87 224; --viz-target: 36 36 40;
     --viz-ride-bg: 240 240 245; --viz-ride-ink: 36 36 40;
     /* Zones en clair : assombries pour ≥ 3,2:1 sur surface et sur viz-ride-bg (= surface-2) (z3 émeraude, z4 ocre : ni Volt, ni orange). */
     --z1: 122 122 136; --z2: 47 111 238; --z3: 5 150 105; --z4: 160 112 4; --z5: 229 57 57; --z6: 130 70 240;
@@ -74,7 +74,7 @@
       --act-ride-soft: color-mix(in oklch, rgb(var(--act-ride)) 14%, transparent); --act-hike-soft: color-mix(in oklch, rgb(var(--act-hike)) 14%, transparent);
       --act-other-soft: color-mix(in oklch, rgb(var(--act-other)) 14%, transparent);
       /* Bandes de visuel du fil (SetBars, EffortStrip) : fond = surface-2 (même famille que la carte), liseré en haut posé par le composant ; plus de bloc sombre ni de teinte. */
-      --viz-strength-bg: 240 240 245; --viz-strength-bar: 201 76 18; --viz-strength-bar-dim: 208 108 62; --viz-strength-ink: 124 45 12; --viz-strength-code: 154 52 8; --viz-target: 124 45 12;
+      --viz-strength-bg: 240 240 245; --viz-strength-bar: 84 87 224; --viz-strength-bar-dim: 112 115 230; --viz-strength-ink: 99 99 110; --viz-strength-code: 84 87 224; --viz-target: 36 36 40;
       --viz-ride-bg: 240 240 245; --viz-ride-ink: 36 36 40;
       /* Zones en clair : assombries pour ≥ 3,2:1 sur surface et sur viz-ride-bg (= surface-2) (z3 émeraude, z4 ocre : ni Volt, ni orange). */
       --z1: 122 122 136; --z2: 47 111 238; --z3: 5 150 105; --z4: 160 112 4; --z5: 229 57 57; --z6: 130 70 240;

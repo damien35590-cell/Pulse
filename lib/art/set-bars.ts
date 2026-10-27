@@ -33,12 +33,13 @@ function doneReps(e: SetExercise): number[] {
   return e.sets > 0 && e.reps > 0 ? Array.from({ length: e.sets }, () => e.reps) : [];
 }
 
-/** « B2 - dips » → « B2 » ; « Développé couché » → « DC » (initiales des mots de plus de 2 lettres, 3 au plus). */
+/** « B2 - dips » → « B2 » ; hors Lafay, un nom lisible de 10 caractères au plus (« Développé… »), jamais des initiales. */
+export const LABEL_MAX = 10;
 export function exerciseCode(name: string): string {
   const { code, variant } = resolveName(name);
   if (/^[A-Z]$/.test(code)) return variant ?? code;
-  const initials = name.replace(/\(.*?\)/g, " ").split(/[\s-]+/).filter((w) => w.length > 2).slice(0, 3).map((w) => w[0].toUpperCase()).join("");
-  return initials || name.trim().slice(0, 3).toUpperCase();
+  const clean = name.replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim() || name.trim();
+  return clean.length <= LABEL_MAX ? clean : `${clean.slice(0, LABEL_MAX - 1).trimEnd()}…`;
 }
 
 export function setGroups(exercises: SetExercise[]): SetGroup[] {

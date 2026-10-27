@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-coach-notes.ts
 import assert from "node:assert/strict";
-import { frame, overviewNotes, planNotes, rankNotes, rateChange, runNotes, strengthNotes, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
+import { frame, overviewNotes, timeChange, planNotes, rankNotes, rateChange, runNotes, strengthNotes, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
 import type { StrengthAnalysis } from "../lib/analytics/strength";
 
 const tz = "Europe/Paris", now = new Date("2026-10-23T10:00:00Z"); // vendredi
@@ -108,5 +108,22 @@ s = strengthNotes({ data: sa({ regularity: { perWeek: 1.2, target: [2, 3], upper
 assert.equal(byId(s, "freq")?.tone, "warn");
 assert.equal(byId(s, "balance")?.title, "Le bas du corps est en retrait");
 assert.deepEqual(strengthNotes({ data: sa({ empty: true }), period }), []);
+
+// Moins de 3 séances sur la période : une seule ligne, aucune affirmation par exercice ni sur l'équilibre haut / bas
+const few = strengthNotes({ data: sa({ summary: { sessions: 2, sets: 20, reps: 200, tonnage: null }, exercises: [ex("Dips B2", "stall2", "repars"), ex("Pompes", "progress")], regularity: { perWeek: 2.5, target: [2, 3], upperPct: 90, lowerPct: 10 } }), period });
+assert.deepEqual(few.map((x) => x.title), ["Pas assez de séances pour juger la progression (2 / 3)."]);
+assert.ok(!ids(strengthNotes({ data: sa({ summary: { sessions: 3, sets: 30, reps: 300, tonnage: null }, exercises: [ex("Pompes", "progress")] }), period })).includes("few"), "à 3 séances, le coach juge");
+
+// Temps : la tuile « Temps » de l'Analyse et la ligne « % de temps » du coach sortent du MÊME calcul (timeChange), sur la même période
+const mk: CoachAct[] = [];
+for (let w = 0; w < 8; w++) {
+  const mon = Date.UTC(2026, 7, 31 + 7 * w);
+  for (const [i, min] of [[0, 40], [2, 60 + (w >= 4 ? 40 : 0)], [5, 50]]) mk.push(act(w % 2 ? "RUN" : "WORKOUT", new Date(mon + (i as number) * 864e5).toISOString().slice(0, 10), min as number));
+}
+const used = mk.filter((a) => +a.startedAt <= +now);
+const tc = timeChange(used, period);
+assert.equal(tc.pct, rateChange(tc.cur, frame(period).span, tc.prev, frame(period).prevSpan), "même formule que le coach");
+const vol = byId(overviewNotes({ acts: mk, period }), "volume");
+assert.ok(vol && vol.title.includes(String(Math.abs(tc.pct!))), `coach « ${vol?.title} » = tuile ${tc.pct} %`);
 
 console.log("coach-notes : OK");

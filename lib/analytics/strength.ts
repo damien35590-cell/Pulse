@@ -8,13 +8,16 @@ import { dayKey, shiftDay, weekKeys } from "../dates";
 import { exerciseKey, type SetDetail } from "../exercises";
 import { lafayCode, musclesOf, UPPER_GROUPS } from "../muscles";
 import { isVariantCode, ladderKey, nextInLadder } from "../workout/catalog";
+import { lafayView } from "../workout/lafay";
 
 export type StrengthRow = { activityId: string; startedAt: Date; name: string; sets: number; reps: number; loadKg: number | null; setsDetail: SetDetail[] | null };
+/** En dessous, pas assez de séances sur la période pour juger une progression ou un équilibre haut / bas. */
+export const MIN_SESSIONS = 3;
 export type StrengthStatus = "progress" | "stall1" | "stall2" | "evolve";
 export type ExerciseProgress = {
   key: string; name: string;
   variant: string | null;          // « B2 », « B » (forme finale) pour un code Lafay à échelle, sinon null
-  level: string;                   // « 6×12 » : séries × répétitions visées à la dernière séance
+  level: string;                   // « 6 × 11 » : cible de la prochaine séance (lib/workout/lafay.ts, la même que « Démarrer » et la page Programme)
   status: StrengthStatus;          // progrès / blocage 1 (une séance sans progrès) / blocage 2 (deux de suite ou plus) / à faire évoluer (plafond atteint)
   sessions: number;
   repsPerSession: number[];        // du plus ancien au plus récent
@@ -100,7 +103,8 @@ export function advice(e: Entry, name: string): { hint: string; next: string | n
   return { hint: next ? `passe à ${next} à ${e.sets}×${restart}` : `repars à ${e.sets}×${restart} sur ${e.variant ?? "le même exercice"}`, next, restart };
 }
 
-export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: string, now = new Date()): StrengthAnalysis {
+/** `setsOf` : séries prévues d'un exercice (clé de groupe → séries du programme) ; à défaut, celles de sa dernière séance. */
+export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: string, now = new Date(), setsOf?: (key: string) => number | undefined): StrengthAnalysis {
   const mon = weekKeys(now, tz)[0], first = shiftDay(mon, -7 * (weeks - 1));
   const weekOf = (d: Date) => Math.floor((Date.parse(dayKey(d, tz)) - Date.parse(first)) / (7 * 864e5)); // < 0 avant la période
   const inPeriod = rows.filter((r) => weekOf(r.startedAt) >= 0 && doneSets(r).length > 0);
@@ -126,16 +130,18 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
   const exercises: ExerciseProgress[] = [];
   for (const [key, list] of by) {
     if (!list.some((r) => weekOf(r.startedAt) >= 0 && doneSets(r).length > 0)) continue;
-    const ents = entriesOf(list), cur = ents[0] ?? { variant: null, total: 0, n: list[0].reps, sets: list[0].sets, met: false };
-    const stalls = stallsOf(ents), last = list[0], evolve = cur.n >= capOf(last.name);
-    const adv = stalls >= 2 || evolve ? advice(cur, last.name) : null;
+    // États, cible et conseil : lib/workout/lafay.ts (lafayView), la même règle que la séance proposée et la page Programme.
+    const last = list[0], v = lafayView(list, setsOf?.(key)), t = v.target;
+    if (!t) continue;
+    const evolve = t.change === "evolve" || (t.change === "repeat" && t.hint === "saute plus haut");
+    const reset = t.change === "evolve" || t.change === "restart";
     const perSession = new Map<string, { day: string; reps: number; variant: string | null }>();
     for (const r of [...list].reverse()) if (weekOf(r.startedAt) >= 0) { const o = perSession.get(r.activityId); perSession.set(r.activityId, { day: dayKey(r.startedAt, tz), reps: (o?.reps ?? 0) + sumReps(doneSets(r)), variant: variantOf(r.name) }); }
     exercises.push({
-      key, name: last.name.trim(), variant: cur.variant, level: `${cur.sets}×${cur.n}`,
-      status: evolve ? "evolve" : stalls === 0 ? "progress" : stalls === 1 ? "stall1" : "stall2",
+      key, name: last.name.trim(), variant: variantOf(last.name), level: `${t.sets} × ${t.reps}`,
+      status: evolve ? "evolve" : v.state === "stall2" ? "stall2" : v.state === "stall1" ? "stall1" : "progress",
       sessions: perSession.size, repsPerSession: [...perSession.values()].map((x) => x.reps), points: [...perSession.values()], lastDay: dayKey(last.startedAt, tz),
-      hint: adv?.hint ?? null, nextVariant: adv?.next ?? null, restartTarget: adv?.restart ?? null,
+      hint: evolve || v.state === "stall2" ? t.hint : null, nextVariant: t.change === "evolve" ? t.variant : null, restartTarget: reset ? t.reps : null,
     });
   }
   exercises.sort((a, b) => b.lastDay.localeCompare(a.lastDay));
@@ -155,13 +161,13 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
   return {
     empty: inPeriod.length === 0, summary,
     weekly: weekly.map((w) => ({ weekStart: w.weekStart, reps: w.reps, sets: w.sets, sessions: w.ids.size })),
-    exercises, regularity, insights: insightsOf(rows, exercises, weekOf, weeks, tz),
+    exercises, regularity, insights: insightsOf(rows, exercises, weekOf, weeks, tz, summary.sessions >= MIN_SESSIONS),
     prev: inPrev.length ? { sessions: new Set(inPrev.map((r) => r.activityId)).size, reps: inPrev.reduce((s, r) => s + sumReps(doneSets(r)), 0) } : null,
   };
 }
 
 /** 2 à 3 phrases tirées des données ; une phrase manque quand les données ne la permettent pas. */
-function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: (d: Date) => number, weeks: number, tz: string): string[] {
+function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: (d: Date) => number, weeks: number, tz: string, judge: boolean): string[] {
   const out: string[] = [];
   // Plus forte hausse de répétitions : 4 dernières semaines contre les 4 précédentes (au moins 20 reps avant, pour ne pas fêter 2 → 6)
   const cur = new Map<string, number>(), prev = new Map<string, number>(), names = new Map<string, string>();
@@ -172,10 +178,10 @@ function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: 
     target.set(k, (target.get(k) ?? 0) + sumReps(doneSets(r))); names.set(k, r.name.trim());
   }
   const up = [...cur].map(([k, c]) => ({ k, c, p: prev.get(k) ?? 0 })).filter((x) => x.p >= 20 && x.c > x.p).sort((a, b) => b.c / b.p - a.c / a.p)[0];
-  if (up) out.push(`${exerciseLabel(up.k, names.get(up.k)!)} : +${pct(up.c - up.p, up.p)} % de répétitions sur 4 semaines (${up.p} → ${up.c}).`);
+  if (up && judge) out.push(`${exerciseLabel(up.k, names.get(up.k)!)} : +${pct(up.c - up.p, up.p)} % de répétitions sur 4 semaines (${up.p} → ${up.c}).`);
 
   const stuck = exercises.find((e) => e.status === "stall2");
-  if (stuck) {
+  if (stuck && judge) {
     const n = `${stuck.name}${stuck.variant && !stuck.name.toUpperCase().startsWith(stuck.variant) ? ` (${stuck.variant})` : ""}`;
     out.push(`${n} est bloqué depuis 2 séances : ${stuck.hint}.`);
   }
@@ -192,7 +198,7 @@ function insightsOf(rows: StrengthRow[], exercises: ExerciseProgress[], weekOf: 
 }
 const exerciseLabel = (k: string, name: string) => (k.startsWith("lafay:") ? name.trim().replace(/\s*[-–:.].*$/, "").toUpperCase() : name);
 
-export async function getStrengthAnalysis(userId: string, tz: string, weeks: number, now = new Date()): Promise<StrengthAnalysis> {
+export async function getStrengthAnalysis(userId: string, tz: string, weeks: number, now = new Date(), setsOf?: (key: string) => number | undefined): Promise<StrengthAnalysis> {
   // Deux périodes (comparaison avec la précédente), et au moins 8 semaines : la comparaison « 4 semaines contre 4 semaines » en a besoin
   const since = new Date(Date.parse(shiftDay(weekKeys(now, tz)[0], -7 * (Math.max(2 * weeks, 8) - 1))) - 864e5);
   const found = await prisma.workoutExercise.findMany({
@@ -203,5 +209,5 @@ export async function getStrengthAnalysis(userId: string, tz: string, weeks: num
     activityId: e.activityId, startedAt: e.activity.startedAt, name: e.name, sets: e.sets, reps: e.reps, loadKg: e.loadKg,
     setsDetail: Array.isArray(e.setsDetail) ? (e.setsDetail as unknown as SetDetail[]) : null,
   }));
-  return buildStrengthAnalysis(rows, weeks, tz, now);
+  return buildStrengthAnalysis(rows, weeks, tz, now, setsOf);
 }

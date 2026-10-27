@@ -20,6 +20,13 @@ const DISCIPLINES = [
   { k: "WORKOUT", tab: SPORT_SHORT("WORKOUT"), name: "musculation", empty: "Aucune séance de musculation sur 90 jours.", unit: "séance" },
 ] as const;
 type Key = (typeof DISCIPLINES)[number]["k"];
+/** Coupe un libellé d'axe en lignes de 13 caractères au plus (aux espaces) : « Résistance / musculaire ». */
+function wrap(label: string, max = 13): string[] {
+  const lines: string[] = [];
+  for (const w of label.split(" ")) { const last = lines[lines.length - 1]; if (last && `${last} ${w}`.length <= max) lines[lines.length - 1] = `${last} ${w}`; else lines.push(w); }
+  return lines;
+}
+type TickProps = { x?: number; y?: number; cx?: number; payload?: { value: string } };
 const MIN_AXES = 3; // sous 3 axes, un radar n'est plus un polygone
 
 /**
@@ -53,9 +60,12 @@ export function ProfileCard({ profiles, sport, perWeek }: { profiles: Record<Key
               {shown.length >= MIN_AXES ? (
                 <div className="h-64" role="img" aria-label={`Profil ${cur.name}`}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={shown} outerRadius="68%">
+                    <RadarChart data={shown} outerRadius="58%" margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
                       <PolarGrid stroke={c.inkMute} strokeOpacity={0.35} />
-                      <PolarAngleAxis dataKey="axis" tick={tick} />
+                      <PolarAngleAxis dataKey="axis" tick={(p: TickProps) => {
+                        const x = p.x ?? 0, anchor = Math.abs(x - (p.cx ?? x)) < 8 ? "middle" : x > (p.cx ?? x) ? "start" : "end", lines = wrap(p.payload?.value ?? "");
+                        return <text x={x} y={(p.y ?? 0) - (lines.length - 1) * 6} textAnchor={anchor} fontSize={tick.fontSize} fill={tick.fill}>{lines.map((l, i) => <tspan key={i} x={x} dy={i ? 13 : 0}>{l}</tspan>)}</text>;
+                      }} />
                       <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                       <Radar dataKey="value" stroke={c.brandText} strokeWidth={2.5} fill={c.brand} fillOpacity={0.28} isAnimationActive={false} />
                     </RadarChart>

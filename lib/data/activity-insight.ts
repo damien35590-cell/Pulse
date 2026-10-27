@@ -2,9 +2,9 @@ import type { ActivityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { dayKey, weekKeys } from "@/lib/dates";
 import { classContext, contextChips, paceInsight, sessionClass, WINDOW_DAYS, type Candidate, type InsightLine, type PaceInsight, type SessionClass } from "@/lib/activity/comparables";
-import { doneSets, entriesOf, groupKey, stallsOf, sumReps, type StrengthRow } from "@/lib/analytics/strength";
+import { doneSets, groupKey, sumReps, type StrengthRow } from "@/lib/analytics/strength";
 import type { SetDetail } from "@/lib/exercises";
-import { applyLafayProgress } from "@/lib/workout/lafay";
+import { lafayView } from "@/lib/workout/lafay";
 import { catalogFor, resolveName } from "@/lib/workout/catalog";
 import { exerciseCode } from "@/lib/art/set-bars";
 
@@ -55,8 +55,8 @@ export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): Ins
 
   for (const key of new Set(mine.map((r) => groupKey(r.name)))) {
     const rows = upTo.filter((r) => groupKey(r.name) === key).sort((a, b) => +b.startedAt - +a.startedAt);
-    const change = applyLafayProgress(rows)?.change;
-    if ((change === "evolve" || change === "restart") && stallsOf(entriesOf(rows)) >= 2) return { text: `Blocage sur ${exerciseCode(rows[0].name)} : 2ᵉ séance`, tone: "warn" };
+    // Même règle que la page Programme et « Démarrer » : lafayView (lib/workout/lafay.ts).
+    if (lafayView(rows).state === "stall2") return { text: `Blocage sur ${exerciseCode(rows[0].name)} : 2ᵉ séance`, tone: "warn" };
   }
 
   const half = halfOf(t.kind, mine.map((r) => r.name));
@@ -67,12 +67,12 @@ export function strengthLine(t: StrengthTarget, history: StrengthHistory[]): Ins
     .sort((a, b) => +b[0].startedAt - +a[0].startedAt)[0];
   // Seuls les exercices des deux séances sont comparés (échelle Lafay ou nom normalisé) : sinon une séance plus longue « gagne » d'office.
   const shared = prev ? new Set(mine.map((r) => groupKey(r.name)).filter((k) => prev.some((r) => groupKey(r.name) === k))) : new Set<string>();
-  if (!prev || !shared.size) return { text: `${total(mine)} reps au total`, tone: "neutral" };
+  if (!prev || !shared.size) return null; // rien à comparer : pas de ligne
   const onShared = (rows: StrengthRow[]) => total(rows.filter((r) => shared.has(groupKey(r.name))));
   const cur = onShared(mine), d = cur - onShared(prev);
   if (d > 0) return { text: `Total en hausse : ${cur} reps (+${d})`, tone: "good" };
   if (d < 0) return { text: `Total en baisse : ${cur} reps (−${-d})`, tone: "warn" };
-  return { text: `Égal à la dernière séance (${cur} reps)`, tone: "neutral" };
+  return null; // égal à la dernière séance : rien de notable
 }
 
 /** Rang de l'activité dans sa semaine, parmi les sorties du même sport. */

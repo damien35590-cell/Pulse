@@ -172,7 +172,10 @@ assert.equal(shortTitle("Une très longue séance sans répétitions"), undefine
 // SetBars : une barre par série faite, échauffement exclu, 4 groupes au plus, ordre de la séance.
 assert.equal(exerciseCode("B2 - dips"), "B2");
 assert.equal(exerciseCode("F - squat sauté"), "F");
-assert.equal(exerciseCode("Développé couché"), "DC");
+assert.equal(exerciseCode("Développé couché"), "Développé…", "nom lisible tronqué, jamais d'initiales");
+assert.equal(exerciseCode("Squat"), "Squat");
+assert.equal(exerciseCode("Soulevé de terre (barre)"), "Soulevé d…");
+assert.ok(exerciseCode("Tirage vertical large").length <= 10);
 const lift = setGroups([
   { name: "B2 - dips", sets: 6, reps: 9, setsDetail: [{ reps: 5, done: true, isWarmup: true }, { reps: 9, done: true }, { reps: 9, done: true }, { reps: 8, done: true }, { reps: 7, done: false }, { reps: 9, done: true }] },
   { name: "A3 - pompes", sets: 3, reps: 12 }, // sans détail : le prévu est supposé fait
@@ -225,4 +228,13 @@ assert.equal(effectiveSessionType({ isInterval: true }), "interval");
 assert.equal(effectiveSessionType({ isInterval: false }), "easy");
 assert.equal(effectiveSessionType({ isInterval: true, sessionType: "race" }), "race");
 assert.equal(effectiveSessionType({ sessionType: "bogus" }), "easy");
+// Vélo virtuel (MyWhoosh, « Vélo virtuel ») : la carte reste même quand le profil de puissance oscille ; un choix manuel « fractionné » l'impose toujours.
+{
+  const osc = Array.from({ length: 20 }, (_, i) => ({ z: (i % 2 ? 5 : 2) as 2 | 5, f: 0.05 }));
+  const ride = { type: "RIDE", hasRoute: true, zoneRibbon: osc, zoneRibbonSource: "power" };
+  assert.ok(cardArt({ ...ride, title: "Sortie vélo" }).effort, "sortie réelle à intervalles : EffortStrip");
+  assert.deepEqual(Object.keys(cardArt({ ...ride, title: "Vélo virtuel", source: "fit" })), ["ribbon"], "vélo virtuel : carte + ruban");
+  assert.deepEqual(Object.keys(cardArt({ ...ride, title: "Tour", source: "mywhoosh" })), ["ribbon"]);
+  assert.ok(cardArt({ ...ride, title: "Vélo virtuel", sessionType: "interval" }).effort, "choix manuel : EffortStrip");
+}
 console.log("art du fil : ok");
