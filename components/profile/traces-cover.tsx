@@ -21,7 +21,7 @@ export function TracesCover({ art, totals }: { art: TracesArt; totals: Totals })
         {art.count > 0 ? (
           <svg role="img" aria-label={`${art.count} trace${art.count > 1 ? "s" : ""} de tes sorties en plein air, superposées`} viewBox={`0 0 ${TRACES_W} ${TRACES_H}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full">
             <g fill="none" strokeLinecap="round" strokeLinejoin="round" className="stroke-art-run-fg">
-              <g strokeWidth={1} opacity={0.2}>
+              <g strokeWidth={1} opacity={0.09}>
                 {art.paths.map((d, i) => <path key={i} d={d} vectorEffect="non-scaling-stroke" />)}
               </g>
               {art.hero && <path d={art.hero.d} strokeWidth={2} vectorEffect="non-scaling-stroke" />}

@@ -22,7 +22,7 @@ import { getPrefs } from "@/lib/notify/prefs";
 import { prisma } from "@/lib/prisma";
 import { level, rank, xpOf } from "@/lib/xp";
 import { getCountdown } from "@/lib/races/time";
-import { isSoftActivity } from "@/lib/sports";
+import { isTrainingActivity } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
@@ -47,8 +47,8 @@ export default async function ProfilePage() {
   const { acts } = await loadBadgeStats(userId, TZ);
   const records = await getRecordsBySport(userId, TZ);
   const lvl = level(acts.reduce((t, a) => t + xpOf(a), 0));
-  // Totaux tous sports, activités douces (vélotaf, marche) exclues : ce sont les mêmes que la liste des Activités
-  const train = acts.filter((a) => !isSoftActivity(a));
+  // Totaux : même règle que le compteur des Activités (isTrainingActivity)
+  const train = acts.filter(isTrainingActivity);
   const st = { km: train.reduce((t, a) => t + a.distanceM, 0) / 1000, count: train.length, elevation: train.reduce((t, a) => t + a.elevationGainM, 0), hours: train.reduce((t, a) => t + a.movingTimeS, 0) / 3600 };
 
   const seuils = `${thresholdLabel("FTP", zones.ftp, "W", zones.ftpManual)} · ${thresholdLabel("FC max", zones.hrMax, "bpm", zones.hrManual)}`;

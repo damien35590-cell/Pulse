@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Mountain, Route } from "lucide-react";
+import { ChevronRight, Dumbbell, Mountain, Route, Zap } from "lucide-react";
 import { Segmented } from "@/components/ui/segmented";
 import { tap } from "@/lib/haptics";
 import { activityStyle } from "@/lib/activity-style";
@@ -12,12 +12,12 @@ import type { RecordRow, RecordSport, RecordsBySport } from "@/lib/analytics/rec
 
 const STORAGE_KEY = "pulse:records-sport";
 
-/** Pastille d'une ligne running : le code de la distance (5K, 10K, 21,1), sinon un pictogramme (plus longue sortie, plus gros D+). */
-function RunTile({ row }: { row: RecordRow }) {
-  const run = activityStyle("RUN");
+/** Pastille de chaque ligne, aux couleurs du sport : le code (5K, 10K, 21,1 ; code Lafay) s'il y en a un, sinon un pictogramme. */
+function RecordTile({ row, sport }: { row: RecordRow; sport: RecordSport }) {
+  const st = activityStyle(sport === "WORKOUT" ? "WORKOUT" : sport);
   return (
-    <span aria-hidden className={cn("grid size-12 shrink-0 place-items-center rounded-tile [&>svg]:size-5", run.soft, run.fg)}>
-      {row.code ? <b className="font-num text-metric-sm tabular-nums">{row.code}</b> : row.key.endsWith("BEST_ELEVATION") ? <Mountain /> : <Route />}
+    <span aria-hidden className={cn("grid size-12 shrink-0 place-items-center rounded-tile [&>svg]:size-5", st.soft, st.fg)}>
+      {row.code ? <b className="font-num text-metric-sm tabular-nums">{row.code}</b> : row.key.endsWith("BEST_ELEVATION") ? <Mountain /> : row.key.endsWith("POWER20") ? <Zap /> : sport === "WORKOUT" ? <Dumbbell /> : <Route />}
     </span>
   );
 }
@@ -56,7 +56,7 @@ export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; l
         {(limit ? current.rows.slice(0, limit) : current.rows).map((r) => {
           const body = (
             <>
-              {current.sport === "RUN" && <RunTile row={r} />}
+              <RecordTile row={r} sport={current.sport} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base text-ink">{r.label}</span>
                 <span className="block text-label uppercase text-ink-mute">{r.day}{r.sub ? ` · ${r.sub}` : ""}</span>

@@ -12,7 +12,7 @@ export const TRACES_W = 360;
 export const TRACES_H = 180;
 const PAD = 14;
 const POINTS = 32;      // points par trace : assez pour une forme reconnaissable, léger à transporter
-export const MAX_TRACES = 200;
+export const MAX_TRACES = 120;
 
 export type TraceInput = { id: string; polyline: string; startedAt: Date | string };
 export type TracesArt = {

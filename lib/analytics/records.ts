@@ -9,7 +9,7 @@
 import { dayKey } from "../dates";
 import { fmtClock, fmtKm, fmtNum } from "../format";
 import { doneSets, groupKey, sumReps, variantOf, type StrengthRow } from "./strength";
-import { catalogFor, resolveName } from "../workout/catalog";
+import { catalogFor, isLafayCode, resolveName } from "../workout/catalog";
 
 export type RecordSport = "WORKOUT" | "RUN" | "RIDE" | "HIKE";
 /** Ordre des onglets : Running, Muscu, Vélo, Rando. */
@@ -22,7 +22,7 @@ export type RecordRow = {
   unit: string;            // « km », « W », « reps »… (vide pour un chrono)
   day: string;             // « 12 oct. 2026 »
   sub: string | null;      // précision affichée après la date
-  code?: string;           // pastille d'une ligne running : « 5K », « 10K », « 21,1 »
+  code?: string;           // pastille : « 5K », « 10K », « 21,1 » (course) ; code Lafay (« B2 ») en muscu
   activityId: string | null;
 };
 export type SportRecords = { sport: RecordSport; rows: RecordRow[] };
@@ -125,6 +125,7 @@ export function strengthRecords(rows: StrengthRow[], tz: string): RecordRow[] {
       const [id, top] = [...perSession].reduce((b, x) => (x[1].best > b[1].best || (x[1].best === b[1].best && x[1].total > b[1].total) ? x : b));
       if (top.best > 0) row = { key: k, label, value: String(top.best), unit: "reps", day: fmtDay(top.at, tz), sub: `${top.total} reps sur la séance`, activityId: id };
     }
+    if (row) { const { code, variant } = resolveName(name); if (variant || isLafayCode(code)) row.code = variant ?? code; }
     if (row) out.push({ row, last: +list[0].startedAt });
   }
   return out.sort((a, b) => b.last - a.last).slice(0, MAX_STRENGTH_ROWS).map((x) => x.row);

@@ -65,4 +65,7 @@ assert.equal(sp(ride[0].day), "1 mai 2026");
 // Rien du tout : aucun onglet, pas d'onglet par défaut
 assert.deepEqual(buildSportRecords({ tz, prs: [], curves: [], strength: [] }), { sports: [], defaultSport: null });
 
+assert.equal(s.find((r) => r.label.includes("B2"))!.code, "B2", "muscu : code Lafay de la variante");
+assert.equal(s.find((r) => r.label === "Rowing haltère")!.code, undefined, "muscu : pas de code hors Lafay");
+
 console.log("records : tout est vert");

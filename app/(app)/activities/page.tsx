@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { cn, uniqueById } from "@/lib/utils";
 import { fmtDuration, fmtKm } from "@/lib/format";
 import { ui } from "@/lib/ui";
-import { SPORTS, SPORT_ORDER, isSoftActivity } from "@/lib/sports";
+import { SPORTS, SPORT_ORDER, isSoftActivity, isTrainingActivity } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
 import { ActivitySummary } from "@/components/dashboard/activity-summary";
 import { summaryData } from "@/lib/activity/summary";
@@ -68,7 +68,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
   if (byDate) {
     const all = await prisma.activity.findMany({ where, orderBy, select: LITE });
     total = all.length;
-    trainTotal = all.filter((a) => !isSoftActivity(a)).length;
+    trainTotal = all.filter(isTrainingActivity).length;
     for (const a of all) {
       const mk = monthKey(a.startedAt), y = mk.slice(0, 4);
       if (!years.has(y)) years.set(y, new Map());
@@ -84,7 +84,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
     hasMore = rows.length > n;
     flat = uniqueById(rows.slice(0, n)); // filet de sécurité : jamais deux cartes pour le même id
     total = count;
-    trainTotal = (await prisma.activity.findMany({ where, select: LITE })).filter((a) => !isSoftActivity(a)).length;
+    trainTotal = (await prisma.activity.findMany({ where, select: LITE })).filter(isTrainingActivity).length;
   }
   // Phrase de comparaison des cartes affichées (hors activités douces) : une passe pour toute la page, pas une requête par carte.
   const shown = (byDate ? [...full.values()] : flat).filter((a) => !isSoftActivity(a)).map((a) => a.id);

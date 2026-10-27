@@ -32,3 +32,10 @@ export const isSoft = (type: string) => (SOFT_TYPES as readonly string[]).includ
  */
 export const isSoftActivity = (a: { type: string; source?: string | null; dedupeKey?: string | null; title?: string | null }) =>
   isSoft(a.type) || (a.type === "RIDE" && (a.source === "google-fit" || !!a.dedupeKey?.startsWith("gfit-") || /v[ée]lotaf/i.test(a.title ?? "")));
+
+/**
+ * LA règle du « nombre de séances » (totaux de la page Vous, compteur des Activités) : les quatre sports de l'app, activités douces exclues.
+ * Natation et « autre » ne sont pas listés dans Activités : ils ne comptent pas non plus ailleurs.
+ */
+export const isTrainingActivity = (a: { type: string; source?: string | null; dedupeKey?: string | null; title?: string | null }) =>
+  (MY_SPORTS as readonly string[]).includes(a.type) && !isSoftActivity(a);
