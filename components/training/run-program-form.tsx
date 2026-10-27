@@ -11,7 +11,7 @@ const segBtn = (on: boolean) => cn("min-h-11 rounded-lg px-2 text-sm font-semibo
 const fr = (n: number) => String(n).replace(".", ",");
 
 /** Création de « Reprise & VMA ». `current` : dernière VMA connue (sinon 14,5 km/h estimée). */
-export function RunProgramForm({ current, replacing }: { current: { vmaKmh: number; label: string; estimated: boolean } | null; replacing?: boolean }) {
+export function RunProgramForm({ current, replacing, onDone }: { current: { vmaKmh: number; label: string; estimated: boolean } | null; replacing?: boolean; onDone?: () => void }) {
   const [n, setN] = useState<2 | 3>(3);
   const [estimated, setEstimated] = useState(current ? current.estimated : true);
   const [vma, setVma] = useState(fr(current?.vmaKmh ?? DEFAULT_VMA.vmaKmh));
@@ -24,7 +24,7 @@ export function RunProgramForm({ current, replacing }: { current: { vmaKmh: numb
   const submit = () => start(async () => {
     const r = await createRunProgramAction({ sessionsPerWeek: n, vmaKmh: v, estimated });
     if (!r.ok) { setErr(r.error); return; }
-    celebrate(); router.refresh();
+    celebrate(); onDone?.(); router.refresh();
   });
 
   return (

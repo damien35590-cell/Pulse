@@ -6,7 +6,7 @@ import { getRaceStartDate, raceDayKey, RACE_TZ } from "./time";
 
 /**
  * Rattache aux courses « Inscrit » des 7 derniers jours (aujourd'hui inclus) l'activité du jour J, puis les passe en « Terminée ».
- * N'écrase jamais un activityId déjà défini (même à la main). Renvoie le nombre de courses rattachées.
+ * N'écrase jamais un activityId déjà défini (même à la main). L'activité reçoit sessionType « race » si elle n'en a pas (jamais un choix manuel). Renvoie le nombre de courses rattachées.
  */
 export async function matchRaceActivities(userId: string, now: Date = new Date()): Promise<number> {
   const today = dayKey(now, RACE_TZ);
@@ -30,7 +30,11 @@ export async function matchRaceActivities(userId: string, now: Date = new Date()
     if (!best) continue;
     try {
       const res = await prisma.raceEvent.updateMany({ where: { id: race.id, userId, activityId: null }, data: { activityId: best.id, status: "COMPLETED" } });
-      if (res.count) { used.add(best.id); linked++; }
+      if (res.count) {
+        used.add(best.id); linked++;
+        // L'activité du jour J est une compétition, sauf choix manuel déjà fait (sessionType non nul : jamais écrasé).
+        await prisma.activity.updateMany({ where: { id: best.id, userId, sessionType: null }, data: { sessionType: "race" } });
+      }
     } catch (e) { console.error("[races] rattachement impossible", race.id, e); }
   }
   if (linked) { try { revalidatePath("/events"); revalidatePath("/"); } catch { /* hors contexte Next : sans effet */ } }

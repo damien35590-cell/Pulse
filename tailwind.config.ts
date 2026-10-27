@@ -64,6 +64,9 @@ const config: Config = {
         "art-label": ["2.75rem", { lineHeight: "1", letterSpacing: "-0.01em", fontWeight: "800" }],
         "art-code": ["1.125rem", { lineHeight: "1.2", fontWeight: "700" }],
         "art-total": ["0.875rem", { lineHeight: "1.2", fontWeight: "600" }],
+        // Couvertures de la page Programme : distance de l'objectif (course), nom de la demi-séance (affiche muscu).
+        "art-hero": ["5.5rem", { lineHeight: "1", letterSpacing: "-0.02em", fontWeight: "800" }],
+        "art-poster": ["3.25rem", { lineHeight: "0.95", letterSpacing: "-0.01em", fontWeight: "800" }],
       },
       spacing: {
         "safe-top": "env(safe-area-inset-top)",

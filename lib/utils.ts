@@ -15,7 +15,7 @@ const twMerge = extendTailwindMerge({
   extend: {
     theme: { spacing: ["safe-top", "safe-bottom", "nav"] },
     classGroups: {
-      "font-size": [{ text: ["label", "metric-sm", "metric-md", "metric-lg", "metric-xl", "metric-hero", "art-label", "art-code", "art-total"] }],
+      "font-size": [{ text: ["label", "metric-sm", "metric-md", "metric-lg", "metric-xl", "metric-hero", "art-label", "art-code", "art-total", "art-hero", "art-poster"] }],
       rounded: [{ rounded: ["tile", "card", "sheet"] }],
       "rounded-t": [{ "rounded-t": ["sheet"] }],
       "rounded-b": [{ "rounded-b": ["card"] }],

@@ -6,7 +6,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AGE_BANDS } from "@/lib/bench";
 import { METRICS, PERIODS } from "@/lib/goals";
-import { buildPlan, PLAN_GOALS, type PlanSport } from "@/lib/plan";
 import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
@@ -64,23 +63,6 @@ export async function saveProfile(fd: FormData) {
   revalidatePath("/bench");
 }
 
-export async function generatePlan(fd: FormData) {
-  const userId = await uid(), sport = String(fd.get("sport")) as PlanSport;
-  const goalIdx = Number(fd.get("goalIdx")), weeks = Number(fd.get("weeks")), days = Number(fd.get("days"));
-  if (!MY.includes(sport) || ![4, 8, 12].includes(weeks) || !(days >= 2 && days <= 5) || !(goalIdx >= 0 && goalIdx < PLAN_GOALS[sport].length)) return;
-  const agg = await prisma.activity.aggregate({ where: { userId, type: sport as ActivityType, startedAt: { gte: new Date(Date.now() - 28 * 864e5) } }, _sum: { distanceM: true } });
-  const plan = buildPlan({ sport, goalIdx, weeks, days, baseWeeklyKm: (agg._sum.distanceM ?? 0) / 4000 });
-  await prisma.$transaction([prisma.trainingPlan.deleteMany({ where: { userId } }), prisma.trainingPlan.create({ data: { userId, sport: sport as ActivityType, goalLabel: plan.goalLabel, weeks, days: plan.days, data: plan as object, done: [] } })]);
-  revalidatePath("/plan");
-}
-export async function toggleSession(planId: string, key: string) {
-  const userId = await uid(), p = await prisma.trainingPlan.findFirst({ where: { id: planId, userId } });
-  if (!p) return;
-  await prisma.trainingPlan.update({ where: { id: p.id }, data: { done: p.done.includes(key) ? p.done.filter((k) => k !== key) : [...p.done, key] } });
-  revalidatePath("/plan");
-}
-export async function deletePlan() { const userId = await uid(); await prisma.trainingPlan.deleteMany({ where: { userId } }); revalidatePath("/plan"); }
-
 // ───────── Programmes v2 : running « Reprise & VMA » (mode flexible) ─────────
 type Res = { ok: true } | { ok: false; error: string };
 const programPaths = () => { revalidatePath("/"); revalidatePath("/plan"); };
@@ -137,6 +119,33 @@ export async function toggleProgramPause(id: string): Promise<Res> {
   const userId = await uid(), p = await prisma.program.findFirst({ where: { id, userId, status: { in: ["ACTIVE", "PAUSED"] } }, select: { status: true } });
   if (!p) return { ok: false, error: "Programme introuvable." };
   await prisma.program.update({ where: { id }, data: p.status === "ACTIVE" ? { status: "PAUSED", pausedAt: new Date() } : { status: "ACTIVE", pausedAt: null } });
+  programPaths();
+  return { ok: true };
+}
+
+/**
+ * Interrupteur « Envoi sur Garmin » : actif = programme actif, séances des 14 prochains jours dans Intervals.icu (→ montre), mises à jour chaque nuit ;
+ * éteint = programme en pause (même effet que l'ancien bouton « Mettre en pause » : plus d'envoi, les séances déjà envoyées sont retirées).
+ * Le changement d'état est fait même si Intervals.icu échoue : `warning` dit alors ce qui n'est pas parti.
+ */
+export async function setGarminSync(id: string, on: boolean): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
+  const userId = await uid(), p = await prisma.program.findFirst({ where: { id, userId, status: { in: ["ACTIVE", "PAUSED"] } }, select: { status: true } });
+  if (!p) return { ok: false, error: "Programme introuvable." };
+  if ((p.status === "ACTIVE") !== on) await prisma.program.update({ where: { id }, data: on ? { status: "ACTIVE", pausedAt: null } : { status: "PAUSED", pausedAt: new Date() } });
+  programPaths();
+  try { await syncProgramToIntervals(userId); }
+  catch (e) { return { ok: true, warning: e instanceof Error ? e.message : "Envoi impossible." }; }
+  return { ok: true };
+}
+
+/**
+ * « Supprimer ce programme » : le programme RUN en cours disparaît de la page et de l'accueil (statut ABANDONED, comme lorsqu'on en recommence un).
+ * Les sorties enregistrées et leurs liens avec les séances restent dans l'historique. Les séances déjà envoyées sur Garmin sont retirées (au mieux : la synchro de nuit rattrape).
+ */
+export async function deleteRunProgram(id: string): Promise<Res> {
+  const userId = await uid(), r = await prisma.program.updateMany({ where: { id, userId, sport: "RUN", status: { in: ["ACTIVE", "PAUSED"] } }, data: { status: "ABANDONED" } });
+  if (!r.count) return { ok: false, error: "Programme introuvable." };
+  try { await syncProgramToIntervals(userId); } catch { /* clé absente ou Intervals injoignable : la synchro de nuit retirera les séances */ }
   programPaths();
   return { ok: true };
 }

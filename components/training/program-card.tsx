@@ -7,10 +7,6 @@ import { ui } from "@/lib/ui";
 import { PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
 import { SessionCarousel } from "./session-carousel";
 
-/** « Bloc 1 · Semaine 2/4 — Base » */
-export const weekLabel = (p: RunProgramView) =>
-  `Bloc ${p.current.block} · Semaine ${p.current.weekInBlock}/${p.blockWeeks} — ${p.current.phaseName}${p.current.isRecovery ? " · allégée" : ""}`;
-
 /** « Bloc 1 · Semaine 2/4 · Reprise & VMA » : pied de la carte d'accueil, le nom du programme y tient sans tronquer le libellé du haut. */
 const blockLabel = (p: RunProgramView) =>
   `Bloc ${p.current.block} · Semaine ${p.current.weekInBlock}/${p.blockWeeks} · ${p.name}${p.current.isRecovery ? " · allégée" : ""}`;
@@ -29,23 +25,6 @@ export function WeekDots({ sessions }: { sessions: SessionView[] }) {
             s.status === "COMPLETED" ? "bg-brand" : s.status === "SKIPPED" ? "bg-line" : s.isNext ? "border-2 border-brand" : "border-2 border-line")} />
       ))}
     </ol>
-  );
-}
-
-export function NextSession({ s, paused }: { s: SessionView; paused?: boolean }) {
-  return (
-    <div className="space-y-3 rounded-xl bg-surface-2 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Prochaine séance</p>
-        {s.isKeySession && <KeyBadge />}
-      </div>
-      <div>
-        <p className="font-display text-xl font-bold leading-tight">{s.title}</p>
-        <p className="mt-1 text-sm">{s.summary}</p>
-        <p className="mt-1 text-sm text-ink-soft">≈ {fmtDuration(s.durationS)}</p>
-      </div>
-      {!paused && <SessionActions id={s.id} />}
-    </div>
   );
 }
 

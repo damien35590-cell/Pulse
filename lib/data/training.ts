@@ -9,6 +9,8 @@ import { estimateRun, resolveSteps, summarizeRun } from "@/lib/training/resolve"
 import { DEFAULT_VMA, pickVma, type CurrentVma } from "@/lib/training/vma";
 import { getStoredVma, onThresholdsChange } from "@/lib/data/zone-ribbon";
 import { RUN_BASE_VMA, blockOf, weekInBlock } from "@/lib/training/catalog/run-base-vma";
+import { planRibbon } from "@/lib/art/plan-ribbon";
+import type { RibbonSegment } from "@/lib/art/zone-ribbon";
 
 const TZ = "Europe/Paris";
 /** Programme « vivant » : actif ou en pause. Un seul par sport. */
@@ -137,6 +139,8 @@ export type SessionView = {
   id: string; weekNumber: number; orderInWeek: number; kind: SessionKind; title: string; description: string | null; summary: string;
   durationS: number; isKeySession: boolean; status: SessionStatus; date: string; isNext: boolean; complianceScore: number | null;
   activityId: string | null; steps: ReturnType<typeof resolveSteps>;
+  /** Forme prévue de la séance (vignette de la page Programme) : zones d'allure des étapes, d'après la VMA du moment. */
+  ribbon: RibbonSegment[];
 };
 export type WeekView = { number: number; block: number; weekInBlock: number; phaseName: string; isRecovery: boolean; note: string | null; startDate: string; sessions: SessionView[] };
 export type RunProgramView = {
@@ -167,12 +171,12 @@ export async function getRunProgram(userId: string, now = new Date()): Promise<R
   const flat = p.weeks.flatMap((w) => w.sessions.map((s) => ({ s, w })));
   const nextId = flat.find(({ s }) => s.status === "PLANNED")?.s.id ?? null;
   const view = (s: (typeof flat)[number]["s"], weekNumber: number): SessionView => {
-    const st = s.structure as RunWorkoutStructure | null;
+    const st = s.structure as RunWorkoutStructure | null, steps = st ? resolveSteps(st, vmaKmh) : [];
     return {
       id: s.id, weekNumber, orderInWeek: s.orderInWeek, kind: s.kind, title: s.title, description: s.description, isKeySession: s.isKeySession,
       summary: st ? summarizeRun(st, vmaKmh) : "", durationS: st ? estimateRun(st, vmaKmh).durationS : s.plannedDurationS ?? 0,
       status: s.status, date: s.date.toISOString().slice(0, 10), isNext: s.id === nextId, complianceScore: s.complianceScore,
-      activityId: s.completedActivityId, steps: st ? resolveSteps(st, vmaKmh) : [],
+      activityId: s.completedActivityId, steps, ribbon: planRibbon(steps, vmaKmh),
     };
   };
   const phaseOf = new Map(p.phases.map((ph) => [ph.id, ph]));
@@ -202,4 +206,21 @@ export async function getRunProgram(userId: string, now = new Date()): Promise<R
     pendingTest: test ? { sessionId: test.id } : null,
     intervalsSyncedAt: syncedAt ? new Date(syncedAt).toISOString() : null,
   };
+}
+
+// ───────── Objectif affiché sur la couverture de la page Programme ─────────
+export type CoverGoal = { km: number; timeS: number | null };
+
+/** Objectif course : l'objectif actif le plus proche (TrainingGoal), sinon la prochaine course inscrite avec une distance. Null sans l'un ni l'autre : la couverture n'invente rien. */
+export async function getCoverGoal(userId: string, now = new Date()): Promise<CoverGoal | null> {
+  const g = await prisma.trainingGoal.findFirst({
+    where: { userId, sport: "RUN", status: "ACTIVE", distanceM: { gt: 0 } }, orderBy: [{ targetDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    select: { distanceM: true, targetTimeS: true },
+  });
+  if (g?.distanceM) return { km: g.distanceM / 1000, timeS: g.targetTimeS };
+  const r = await prisma.raceEvent.findFirst({
+    where: { userId, sport: "RUN", status: "REGISTERED", targetDistance: { gt: 0 }, date: { gte: new Date(+now - 864e5) } }, orderBy: { date: "asc" },
+    select: { targetDistance: true, goalTimeS: true },
+  });
+  return r?.targetDistance ? { km: r.targetDistance, timeS: r.goalTimeS } : null;
 }

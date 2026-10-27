@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Pause, Play, SkipForward, Watch } from "lucide-react";
-import { completePlannedSession, saveVmaTest, sendProgramToIntervals, skipPlannedSession, toggleProgramPause, updateVma } from "@/app/actions";
+import { Check, Pause, Play, SkipForward } from "lucide-react";
+import { completePlannedSession, saveVmaTest, skipPlannedSession, toggleProgramPause, updateVma } from "@/app/actions";
 import { celebrate, tap } from "@/lib/haptics";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -57,26 +57,6 @@ export function PauseToggle({ id, paused, full }: { id: string; paused: boolean;
   );
 }
 
-const syncedLabel = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(new Date(iso));
-
-/** « Envoyer sur Garmin » : les séances des 14 prochains jours partent dans le calendrier Intervals.icu, puis sur la montre. */
-export function SendToGarmin({ syncedAt, paused }: { syncedAt: string | null; paused: boolean }) {
-  const { pending, err, run } = useAction();
-  return (
-    <div className="space-y-2">
-      <button disabled={pending || paused} onClick={() => { tap(); run(() => sendProgramToIntervals()); }} className={cn(ui.btnSecondary, "w-full")}>
-        <Watch className="h-5 w-5" aria-hidden />{pending ? "Envoi…" : syncedAt ? "Renvoyer sur Garmin" : "Envoyer sur Garmin"}
-      </button>
-      <p className="text-xs text-ink-mute" aria-live="polite">
-        {paused ? "Programme en pause : reprends-le pour envoyer les séances."
-          : syncedAt ? `Envoyé le ${syncedLabel(syncedAt)} · 14 prochains jours, mis à jour chaque nuit`
-          : "Les séances des 14 prochains jours vont dans Intervals.icu, puis sur ta montre."}
-      </p>
-      {err && <p role="alert" className="text-sm font-semibold text-bad">{err}</p>}
-    </div>
-  );
-}
-
 /** Après le demi-Cooper : distance en 6 minutes → VMA. Les allures de toutes les séances suivantes suivent. */
 export function VmaTestPrompt({ sessionId }: { sessionId: string }) {
   const { pending, err, run } = useAction();
@@ -96,24 +76,31 @@ export function VmaTestPrompt({ sessionId }: { sessionId: string }) {
   );
 }
 
-/** « Mettre à jour ma VMA » : valeur connue (test récent, course…). */
-export function VmaUpdate({ current }: { current: number }) {
+/** Ligne VMA de la couverture : « VMA 15 km/h · test » + « Mettre à jour » (saisie d'une valeur connue : test récent, course…). */
+export function VmaRow({ vmaKmh, label }: { vmaKmh: number; label: string }) {
   const { pending, err, run } = useAction();
   const [open, setOpen] = useState(false);
-  const [v, setV] = useState(String(current).replace(".", ","));
-  if (!open) return <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Mettre à jour ma VMA</button>;
+  const [v, setV] = useState(String(vmaKmh).replace(".", ","));
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => updateVma(parseFloat(v.replace(",", "."))), () => setOpen(false)); }} className="mt-2 space-y-2">
-      <div className="flex gap-2">
-        <label className="relative flex-1">
-          <span className="sr-only">VMA en km/h</span>
-          <input value={v} onChange={(e) => setV(e.target.value)} inputMode="decimal" autoFocus className={cn(input, "pr-14")} />
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft">km/h</span>
-        </label>
-        <button disabled={pending} className={cn(btn, "shrink-0 bg-brand px-4 text-brand-ink")}>{pending ? "…" : "Enregistrer"}</button>
+    <div>
+      <div className="flex min-h-11 items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-sm text-ink-soft">VMA <b className="font-num text-base font-semibold tabular-nums text-ink">{fmtNum(vmaKmh)} km/h</b> · {label}</p>
+        {!open && <button type="button" onClick={() => { tap(); setOpen(true); }} className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand">Mettre à jour</button>}
       </div>
-      <button type="button" onClick={() => setOpen(false)} className="min-h-11 text-sm text-ink-soft">Annuler</button>
-      {err && <p role="alert" className="text-sm font-semibold">{err}</p>}
-    </form>
+      {open && (
+        <form onSubmit={(e) => { e.preventDefault(); run(() => updateVma(parseFloat(v.replace(",", "."))), () => setOpen(false)); }} className="space-y-2 pb-1">
+          <div className="flex gap-2">
+            <label className="relative flex-1">
+              <span className="sr-only">VMA en km/h</span>
+              <input value={v} onChange={(e) => setV(e.target.value)} inputMode="decimal" autoFocus className={cn(input, "pr-14")} />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-soft">km/h</span>
+            </label>
+            <button disabled={pending} className={cn(btn, "shrink-0 bg-surface-3 px-4 text-ink")}>{pending ? "…" : "Enregistrer"}</button>
+          </div>
+          <button type="button" onClick={() => setOpen(false)} className="min-h-11 text-sm text-ink-soft">Annuler</button>
+          {err && <p role="alert" className="text-sm font-semibold">{err}</p>}
+        </form>
+      )}
+    </div>
   );
 }

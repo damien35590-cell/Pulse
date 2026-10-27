@@ -45,7 +45,7 @@ export async function buildDraftFromTemplate(templateId: string, userId: string)
 }
 
 /** Séances de muscu récentes (la plus récente d'abord), avec leur type et leur total de répétitions. */
-async function recentSessions(userId: string, take: number): Promise<RecentSession[]> {
+export async function recentSessions(userId: string, take: number): Promise<RecentSession[]> {
   const list = await prisma.activity.findMany({
     where: { userId, type: "WORKOUT", exercises: { some: {} } },
     orderBy: { startedAt: "desc" },
