@@ -33,7 +33,7 @@ const AUTO_TITLES: Record<string, string> = {
 };
 
 // Fonction pour rafraîchir le jeton Google s'il est expiré
-async function getValidAccessToken(account: any) {
+export async function getValidAccessToken(account: any) {
   if (!account.refresh_token) return account.access_token;
 
   try {

@@ -6,6 +6,8 @@ import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
 import { matchRaceActivities } from "@/lib/races/link";
 import { buildAllHabits } from "@/lib/habits/build";
+import { DriveAuthError, backupToDrive } from "@/lib/backup/drive-backup";
+import { sendToUser } from "@/lib/push/send";
 import { BACKFILL_CAP, backfillRibbons, refreshHrMaxEstimate } from "@/lib/data/zone-ribbon";
 
 export const maxDuration = 60;
@@ -72,9 +74,23 @@ export async function GET(req: Request) {
       catch (e) { console.error("[cron] habitudes", e); habits = { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     }
 
+    // Sauvegarde de la muscu vers Google Drive : en dernier, à part, sans jamais faire échouer les synchros.
+    let backup: { ok: boolean; date?: string; error?: string };
+    try {
+      const b = await backupToDrive(user.id);
+      console.log(`[cron] sauvegarde muscu ${b.date} : ${b.counts.activities} séances, ${b.deleted} ancien(s) fichier(s) supprimé(s)`);
+      backup = { ok: true, date: b.date };
+    } catch (e) {
+      console.error("[cron] sauvegarde muscu", e);
+      backup = { ok: false, error: e instanceof Error ? e.message : String(e) };
+      const body = e instanceof DriveAuthError ? "Sauvegarde muscu échouée : reconnecte Google" : "Sauvegarde muscu échouée : réessaie depuis Vous › Réglages";
+      await sendToUser(user.id, { title: "Pulse", body, url: "/vous", tag: "backup" }, { ttl: 6 * 3600, urgency: "normal" })
+        .catch((err) => console.error("[cron] notification de sauvegarde", err));
+    }
+
     const failed = intervals.status === "rejected" || googleFit.status === "rejected" || calendar.status === "rejected";
     return NextResponse.json(
-      { intervals: report(intervals), googleFit: report(googleFit), calendar: report(calendar), races, ribbons, habits },
+      { intervals: report(intervals), googleFit: report(googleFit), calendar: report(calendar), races, ribbons, habits, backup },
       { status: failed ? 502 : 200 }
     );
   } catch (e) {

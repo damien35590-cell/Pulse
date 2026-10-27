@@ -10,6 +10,8 @@ import { EditProfile } from "@/components/profile/edit-profile";
 import { RecordsTabs } from "@/components/profile/records-tabs";
 import { NotificationsRow } from "@/components/profile/notifications-row";
 import { ThemePicker } from "@/components/profile/theme-picker";
+import { BackupRow } from "@/components/profile/backup-row";
+import { getLastBackupAt } from "@/lib/backup/drive-backup";
 import { InstallRow } from "@/components/profile/install-row";
 import { SignOut } from "@/components/profile/sign-out";
 import { getGear } from "@/lib/data/gear";
@@ -36,11 +38,11 @@ export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const [me, gear, raceRows, zones, equipment, notifyPrefs, traces] = await Promise.all([
+  const [me, gear, raceRows, zones, equipment, notifyPrefs, traces, lastBackup] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, image: true, email: true } }),
     getGear(userId),
     prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 }),
-    getZones(userId), getEquipment(userId), getPrefs(userId), getTracesArt(userId),
+    getZones(userId), getEquipment(userId), getPrefs(userId), getTracesArt(userId), getLastBackupAt(userId),
   ]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
@@ -76,6 +78,7 @@ export default async function ProfilePage() {
         <div className={card}>
           <SettingsRow icon={<Dumbbell aria-hidden />} title="Matériel de muscu" href="/vous/materiel-muscu" value={`${equipment.filter((e) => e !== "aucun").length} sur ${Object.keys(EQUIPMENT_LABELS).length}`} />
           <NotificationsRow prefs={notifyPrefs} />
+          <BackupRow lastBackupAt={lastBackup?.toISOString() ?? null} />
           <ThemePicker />
           <SettingsRow icon={<UserRound aria-hidden />} title="Compte" value={me?.email ?? s.user.email ?? "Non renseigné"} trailing={<span aria-hidden />} />
           <InstallRow />

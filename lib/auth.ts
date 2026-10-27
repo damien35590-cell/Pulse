@@ -32,7 +32,7 @@ export const authOptions: NextAuthOptions = {
             authorization: {
               params: {
                 scope:
-                  "openid profile email https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.location.read",
+                  "openid profile email https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.location.read https://www.googleapis.com/auth/drive.file",
                 prompt: "consent",
                 access_type: "offline",
                 response_type: "code",
@@ -42,6 +42,22 @@ export const authOptions: NextAuthOptions = {
         ]
       : []),
   ],
+  events: {
+    // NextAuth ne met pas à jour un compte déjà lié : sans ceci, se reconnecter à Google ne rapporterait ni le nouveau droit (Drive) ni le nouveau jeton de renouvellement.
+    async signIn({ account }) {
+      if (account?.provider !== "google" || !account.access_token) return;
+      await prisma.account.updateMany({
+        where: { provider: "google", providerAccountId: account.providerAccountId },
+        data: {
+          access_token: account.access_token,
+          expires_at: account.expires_at ?? null,
+          scope: account.scope ?? null,
+          id_token: account.id_token ?? null,
+          ...(account.refresh_token && { refresh_token: account.refresh_token }),
+        },
+      }).catch((e) => console.error("[auth] mise à jour du compte Google", e));
+    },
+  },
   callbacks: {
     signIn({ user }) { const allowed = process.env.ALLOWED_EMAIL?.trim().toLowerCase(); return !!allowed && user.email?.toLowerCase() === allowed; },
     jwt({ token, user, account }) {
