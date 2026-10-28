@@ -20,7 +20,7 @@
  */
 import type { ActivityType } from "@prisma/client";
 import { prisma } from "../lib/prisma";
-import { groupFragments, MERGE_GAP_MS } from "../lib/sync/google-fit-merge";
+import { groupFragments, MERGE_GAP_MS, MIN_WALK_M } from "../lib/sync/google-fit-merge";
 import { mergeSplitActivity, processActivity } from "../lib/pipeline/post-import";
 
 const apply = process.argv.includes("--apply");
@@ -39,7 +39,8 @@ async function main() {
     orderBy: { startedAt: "asc" },
     select: { id: true, userId: true, type: true, title: true, dedupeKey: true, mergedSourceIds: true, startedAt: true, movingTimeS: true, elapsedTimeS: true, distanceM: true },
   });
-  const groups = groupFragments(acts);
+  // Même règle que la synchro : pas d'« autre », et une marche ne compte qu'à partir de 300 m une fois recollée (sinon, c'est du bruit : tools/supprimer-marches-gfit.ts).
+  const groups = groupFragments(acts).filter((g) => g[0].type !== "OTHER" && (g[0].type !== "WALK" || g.reduce((s, a) => s + a.distanceM, 0) >= MIN_WALK_M));
   console.log(`${apply ? "Recollage" : "Simulation (rien n'est écrit ; --apply pour recoller)"} : ${groups.length} sortie(s) en plusieurs morceaux (écart < ${MERGE_GAP_MS / 60000} min) sur ${acts.length} activités Google Fit.`);
 
   let done = 0;

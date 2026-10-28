@@ -11,7 +11,13 @@ export type MatchActivity = {
   id: string; isInterval?: boolean | null; sessionType?: string | null; zoneRibbon?: unknown;
   distanceM?: number | null; movingTimeS?: number | null; vmaKmh?: number | null;
 };
-export type MatchSession = { id: string; kind: SessionKind; isKeySession: boolean; rejectedActivityIds?: string[] | null };
+export type MatchSession = { id: string; kind: SessionKind; isKeySession: boolean; rejectedActivityIds?: string[] | null; plannedDurationS?: number | null };
+
+/** Une sortie ne valide la sortie longue que si elle en fait au moins 90 % de la durée prévue. */
+export const LONG_SHARE = 0.9;
+/** Assez longue pour la séance ? Seule la sortie longue a un plancher (90 % de sa durée prévue, quand elle est connue). */
+export const longEnough = (s: Pick<MatchSession, "kind" | "plannedDurationS">, a: MatchActivity) =>
+  s.kind !== "LONG_RUN" || !s.plannedDurationS || (a.movingTimeS ?? 0) >= LONG_SHARE * s.plannedDurationS;
 
 /** Part du temps passée en Z4 ou plus à partir de laquelle une sortie compte comme intense. */
 export const HARD_ZONE_SHARE = 0.1;
@@ -47,6 +53,7 @@ export function activityIntensity(a: MatchActivity): Intensity {
 /** La sortie peut-elle valider cette séance ? (Une paire détachée est refusée avant tout.) */
 export function fits(s: MatchSession, a: MatchActivity, intensity = activityIntensity(a)): boolean {
   if (s.rejectedActivityIds?.includes(a.id)) return false;
+  if (!longEnough(s, a)) return false;
   return isDemanding(s) ? intensity === "hard" : true;
 }
 
@@ -74,10 +81,7 @@ export function runShape(a: MatchActivity, intensity: Intensity, week: WeekCandi
   if (a.sessionType === "long") return "long";
   const t = a.movingTimeS ?? 0;
   const longS = week.find((s) => s.kind === "LONG_RUN" && s.plannedDurationS)?.plannedDurationS;
-  const easy = week.filter((s) => sessionShape(s) === "easy" && s.plannedDurationS).map((s) => s.plannedDurationS!);
-  const easyS = easy.length ? easy.reduce((x, y) => x + y, 0) / easy.length : null;
-  if (longS && easyS && longS > easyS) return t >= (longS + easyS) / 2 ? "long" : "easy";
-  if (longS) return t >= longS * 0.75 ? "long" : "easy";
+  if (longS) return t >= longS * LONG_SHARE ? "long" : "easy";
   return t >= LONG_RUN_S ? "long" : "easy";
 }
 
@@ -87,7 +91,11 @@ export function runShape(a: MatchActivity, intensity: Intensity, week: WeekCandi
  * intense, cf. fits). Null si aucune ne convient (on retombe alors sur la file, pickSession).
  */
 export function pickInWeek<T extends WeekCandidate>(week: T[], a: MatchActivity, day: string): T | null {
-  const intensity = activityIntensity(a), ok = week.filter((s) => fits(s, a, intensity));
+  const intensity = activityIntensity(a), fitting = week.filter((s) => fits(s, a, intensity));
+  // Un footing de semaine ne consomme pas la sortie longue : elle n'est prise qu'un samedi / dimanche, ou quand plus aucun footing n'attend.
+  const weekend = [0, 6].includes(new Date(`${day}T12:00:00Z`).getUTCDay());
+  const footingLeft = fitting.some((s) => sessionShape(s) === "easy");
+  const ok = fitting.filter((s) => s.kind !== "LONG_RUN" || weekend || !footingLeft);
   if (!ok.length) return null;
   const shape = runShape(a, intensity, week), off = (s: T) => Number(sessionShape(s) !== shape);
   const gap = (s: T) => Math.abs(Date.parse(`${s.date}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 864e5;
