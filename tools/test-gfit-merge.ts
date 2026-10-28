@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-gfit-merge.ts
 import assert from "node:assert/strict";
-import { groupFragments, groupPieces, mergedSpan } from "../lib/sync/google-fit-merge";
+import { groupFragments, groupPieces, leftoverGroups, mergedSpan, planSession, type Existing } from "../lib/sync/google-fit-merge";
 import { isSoftActivity, isTrainingActivity } from "../lib/sports";
 
 const MIN = 60_000, t0 = Date.parse("2026-10-27T10:30:00Z");
@@ -40,5 +40,32 @@ assert.equal(groups[0].length, 2);
 assert.equal(isTrainingActivity({ type: "RUN", source: "google-fit", dedupeKey: "gfit-seg-8-1", title: "Course à pied" }), true);
 assert.equal(isSoftActivity({ type: "EBIKE", source: "google-fit", dedupeKey: "gfit-seg-1-1", title: "Vélotaf" }), true);
 assert.equal(isSoftActivity({ type: "WALK", source: "google-fit", dedupeKey: "gfit-seg-7-1", title: "Marche" }), true);
+
+// ── Sessions d'abord : le 27/10, une course de 40 min (session 12:35 → 13:16) que les segments découpent en marche / course / course / marche ──
+{
+  const at = (h: number, m: number, sec = 0) => Date.parse("2026-10-27T00:00:00+01:00") + ((h * 60 + m) * 60 + sec) * 1000;
+  const run = { id: "sess-1", startMs: at(12, 35, 10), endMs: at(13, 15, 39) };
+  const segs = [
+    { type: 7, startMs: at(12, 36, 4), endMs: at(12, 46, 57) }, { type: 8, startMs: at(12, 49, 50), endMs: at(13, 0, 46) },
+    { type: 8, startMs: at(13, 0, 46), endMs: at(13, 8, 16) }, { type: 7, startMs: at(13, 8, 17), endMs: at(13, 16, 23) },
+    { type: 1, startMs: at(17, 30), endMs: at(17, 45) }, { type: 1, startMs: at(17, 48), endMs: at(18, 0) }, { type: 7, startMs: at(18, 5), endMs: at(18, 20) },
+  ].map((x, i) => ({ ...x, id: `seg-${i}` }));
+  // Les segments qui recouvrent la session, quel que soit leur type, disparaissent ; le reste est recollé par type.
+  const left = leftoverGroups(segs, [run]);
+  assert.deepEqual(left.map((g) => g.map((x) => x.id)), [["seg-4", "seg-5"], ["seg-6"]], "session + segments mêlés → une seule sortie ; hors session : vélotaf recollé, marche à part");
+  assert.deepEqual(leftoverGroups(segs, []).map((g) => g.map((x) => x.id)), [["seg-0"], ["seg-1", "seg-2"], ["seg-3"], ["seg-4", "seg-5"], ["seg-6"]], "sans session : recollés par type, écart < 10 min");
+
+  // Avant le rattrapage : 4 activités nées des segments recouvrent la session → à reconstruire (la synchro n'y touche pas).
+  const segActs: Existing[] = segs.slice(0, 4).map((x) => ({ id: x.id, dedupeKey: `gfit-${x.id}`, mergedSourceIds: [], startMs: x.startMs, endMs: x.endMs }));
+  const before = planSession(run, segActs);
+  assert.equal(before.status, "replace");
+  assert.deepEqual(before.replaces, ["seg-0", "seg-1", "seg-2", "seg-3"]);
+  // Après : seule l'activité de la session reste → une nouvelle synchro ne crée rien.
+  const after = planSession(run, [{ id: "a1", dedupeKey: "gfit-sess-1", mergedSourceIds: [], startMs: run.startMs, endMs: run.endMs }]);
+  assert.equal(after.status, "exists");
+  assert.equal(after.ownId, "a1");
+  // Un vélotaf (segments) qui ne recouvre pas la session n'est pas concerné.
+  assert.equal(planSession(run, [{ id: "v", dedupeKey: "gfit-seg-1-1", mergedSourceIds: [], startMs: at(17, 30), endMs: at(18, 0) }]).status, "create");
+}
 
 console.log("google fit, morceaux recollés : ok");

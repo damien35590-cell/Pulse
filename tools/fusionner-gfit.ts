@@ -10,6 +10,8 @@
  * les totaux sont refaits sur toute la sortie, les ids des morceaux vont dans mergedSourceIds (la synchro ne les réimporte plus),
  * puis le traitement d'import est rejoué (charge, records, programme, anecdote).
  *
+ * À lancer APRÈS tools/reconstruire-gfit.ts : les sorties couvertes par une session Google Fit doivent d'abord être reconstruites depuis elle.
+ *
  * Base : DIRECT_URL du .env, donc la branche Neon de dev. Pour la prod (voir CLAUDE.md), sans garder son adresse sur le disque :
  *   vercel env pull .env.production.local --environment=production
  *   node --env-file=.env.production.local --import tsx tools/fusionner-gfit.ts

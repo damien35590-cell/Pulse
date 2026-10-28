@@ -48,3 +48,33 @@ export function groupFragments<A extends { userId: string; type: string; started
   }
   return out.sort((x, y) => +x[0].startedAt - +y[0].startedAt);
 }
+
+/**
+ * Sessions d'abord : une session Google Fit (ce que l'appli Fit affiche, « Course à pied du midi ») fait foi. Les segments bruts d'activité,
+ * que Fit réétiquette minute par minute (course / marche / inconnu), ne servent que pour le temps qu'aucune session ne couvre
+ * (vélotaf et marches détectés automatiquement).
+ */
+export type FitSession = { id: string; startMs: number; endMs: number };
+export const overlaps = (a: { startMs: number; endMs: number }, b: { startMs: number; endMs: number }) => a.startMs < b.endMs && a.endMs > b.startMs;
+
+/** Segments hors de toute session, quel que soit leur type, puis recollés par type (écart < 10 min). */
+export function leftoverGroups<T extends Piece>(segments: T[], sessions: FitSession[]): T[][] {
+  return groupPieces(segments.filter((s) => !sessions.some((x) => overlaps(s, x))));
+}
+
+/** Activité Google Fit déjà en base : clé d'import, morceaux recollés, période. */
+export type Existing = { id: string; dedupeKey: string | null; mergedSourceIds: string[]; startMs: number; endMs: number };
+export const isSegmentActivity = (e: Pick<Existing, "dedupeKey">) => !!e.dedupeKey?.startsWith("gfit-seg-");
+
+/**
+ * Ce qu'il faut faire d'une session face à la base :
+ * - « exists » : l'activité de la session est là (clé gfit-<id> ou id dans mergedSourceIds), rien ne la recouvre ;
+ * - « create » : à créer ;
+ * - « replace » : des activités nées de segments recouvrent sa période : à reconstruire depuis la session (tools/reconstruire-gfit.ts),
+ *   la synchro n'y touche pas (elle ne supprime jamais rien d'elle-même).
+ */
+export function planSession(s: FitSession, existing: Existing[]): { status: "exists" | "create" | "replace"; ownId: string | null; replaces: string[] } {
+  const own = existing.find((e) => e.dedupeKey === `gfit-${s.id}` || e.mergedSourceIds.includes(s.id)) ?? null;
+  const replaces = existing.filter((e) => e !== own && isSegmentActivity(e) && overlaps(e, s)).map((e) => e.id);
+  return { status: replaces.length ? "replace" : own ? "exists" : "create", ownId: own?.id ?? null, replaces };
+}

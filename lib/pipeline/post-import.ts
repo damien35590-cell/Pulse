@@ -126,6 +126,20 @@ export async function mergeSplitActivity(ids: string[], sourceIds: string[]): Pr
   return first.id;
 }
 
+/**
+ * Verse dans `keepId` ce que portent les activités `dropIds` (ressenti, notes, matériel, séance du programme, records, photos…) puis les supprime.
+ * Les totaux de `keepId` ne bougent pas (sauf champ vide chez lui) : c'est elle qui fait foi (session Google Fit, lib/sync/google-fit.ts).
+ * À suivre de processActivity(keepId).
+ */
+export async function absorbActivities(keepId: string, dropIds: string[]) {
+  for (const id of dropIds) {
+    if (id === keepId) continue;
+    const [keep, drop] = await Promise.all([loadFull(keepId), loadFull(id)]);
+    if (!keep) return;
+    if (drop) await mergeInto(keep, drop);
+  }
+}
+
 /** Étape a : fusionne les doublons. Renvoie l'id de l'activité conservée (celle-ci ou une autre plus riche) et les ids supprimés. */
 async function dedupe(id: string) {
   let keep = await loadFull(id);

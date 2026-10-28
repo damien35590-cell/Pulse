@@ -10,3 +10,6 @@ public/fallback-*.js
 tsconfig.tsbuildinfo
 .env*.local
 tools/backups/
+
+.vercel
+.env*
