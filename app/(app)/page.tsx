@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flag, HeartPulse, Upload } from "lucide-react";
+import { Flag, HeartPulse } from "lucide-react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDashboard } from "@/lib/data/dashboard";
@@ -53,10 +53,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <TopBar
-        title={today}
-        actions={<Link href="/import" aria-label="Importer un fichier" className={ui.iconBtn}><Upload className="size-5" aria-hidden /></Link>}
-      />
+      <TopBar title={today} />
       <div className="space-y-8">
         {d.empty ? (
           <section className={cn(ui.card, "p-6")}>
