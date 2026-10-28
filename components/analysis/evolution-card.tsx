@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Area, AreaChart, Bar, BarChart, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Metric } from "@/components/ui/metric";
 import { Section } from "@/components/ui/section";
@@ -17,6 +17,8 @@ type Mode = "progression" | "volume" | "form" | "pace" | "power" | "zones";
 export type WeekPoint = { label: string; value: number };
 
 type Props = {
+  /** Chiffres clés de la période, au-dessus du graphique (séances, temps, jours actifs). */
+  summary?: ReactNode;
   /** Volume par semaine : km (sports d'endurance), heures (Tous) ou séances (musculation). */
   weekly: WeekPoint[]; unit: "km" | "h" | "séances";
   /** Nom du volume dans la bascule : « Distance », « Durée », « Séances ». */
@@ -39,8 +41,9 @@ const fmtPace = (p: number) => fmtPaceS(p * 60);
  * Bloc « Évolution » : un seul graphique, dont les options dépendent du filtre. Tous : Durée | Forme. Running : Distance | Allure.
  * Vélo : Distance | Puissance | Zones. Musculation : Progression | Séances. Rando : Distance. « Maintenant » en marque, référence en gris.
  * L'option affichée en premier est ouverte par défaut (changer de filtre remonte un nouveau composant : `key` côté page).
+ * `summary` : chiffres clés en tête de carte ; le graphique du volume n'y répète ni le temps total ni les séances par semaine.
  */
-export function EvolutionCard({ weekly, unit, volumeLabel, pace, power, form, zones, progression }: Props) {
+export function EvolutionCard({ summary, weekly, unit, volumeLabel, pace, power, form, zones, progression }: Props) {
   const options = ([
     progression?.length ? { value: "progression", label: "Progression" } : null,
     { value: "volume", label: volumeLabel },
@@ -54,6 +57,7 @@ export function EvolutionCard({ weekly, unit, volumeLabel, pace, power, form, zo
   return (
     <Section title="Évolution">
       <div className={cn(ui.card, "space-y-4 p-4")}>
+        {summary}
         {options.length > 1 && <Segmented options={options} value={cur} onChange={setMode} />}
         {cur === "progression" && <ProgressionChart ladders={progression!} />}
         {cur === "volume" && <WeeklyBars data={weekly} unit={unit} name={volumeLabel} />}
@@ -80,10 +84,13 @@ function WeeklyBars({ data, unit, name }: { data: WeekPoint[]; unit: "km" | "h" 
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <dl className="grid grid-cols-2 gap-4">
-        <Metric label="Total" value={fmtNum(total, 1)} unit={unit} size="md" />
-        <Metric label="Par semaine" value={fmtNum(avg, 1)} unit={unit} size="md" />
-      </dl>
+      {/* Le temps total et les séances sont déjà dans les chiffres clés (les séances par semaine, dans Régularité) : pas de doublon. */}
+      {unit !== "séances" && (
+        <dl className="grid grid-cols-2 gap-4">
+          {unit === "km" && <Metric label="Total" value={fmtNum(total, 1)} unit={unit} size="md" />}
+          <Metric label="Par semaine" value={fmtNum(avg, 1)} unit={unit} size="md" />
+        </dl>
+      )}
     </div>
   );
 }

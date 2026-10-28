@@ -32,8 +32,8 @@ type Props = {
   habits: { RUN: HabitSummary; RIDE: HabitSummary };
   run: { paceSKm: number; samples: number };
   ride: { speedKmh: number; samples: number };
-  /** Recherche pré-remplie (lien du coach du jour) : remplace la dernière recherche gardée. */
-  preset?: { sport: Sport; minutes: number; session?: RunSession } | null;
+  /** Recherche pré-remplie (lien de la carte du jour) : remplace la dernière recherche gardée. `startAt` : meilleur créneau (ms), devient l'heure de départ. */
+  preset?: { sport: Sport; minutes: number; session?: RunSession; startAt?: number } | null;
   /** Sections de la page affichées sous les résultats, avant l'espace réservé au bouton du bas. */
   children?: React.ReactNode;
 };
@@ -120,6 +120,13 @@ export function RoutePlanner({ home: initialHome, run, ride, habits, preset, chi
     if (preset) {
       setSport(preset.sport); setMinutes(preset.minutes); setCustom(!(PRESETS as readonly number[]).includes(preset.minutes));
       setSession(preset.session ?? "normal"); setFromPlan(!!preset.session && preset.session !== "normal");
+      // Meilleur créneau plus tard : il devient l'heure de départ (le bandeau météo du bas suit). Dans la demi-heure : « Maintenant ».
+      if (preset.startAt && preset.startAt > Date.now() + 30 * 6e4) {
+        const at = new Date(preset.startAt), today = new Date();
+        const p2 = (n: number) => String(n).padStart(2, "0");
+        setPick({ day: at.toDateString() === today.toDateString() ? "today" : "tomorrow", time: `${p2(at.getHours())}:${p2(at.getMinutes())}` });
+        setWhen("pick");
+      }
       return;
     }
     const s = load();

@@ -40,3 +40,19 @@ export function zone(form: number) {
   if (form > -30) return { label: "Optimal", tip: "Tu progresses : cette fatigue est productive." };
   return { label: "Risque élevé", tip: "Fatigue très forte : prévois du repos." };
 }
+
+/** Hausse de fitness sur 7 jours au-delà de laquelle le rythme est trop rapide (même seuil que le coach de l'Analyse). */
+export const FAST_CTL_GAIN = 8;
+/** Baisse de fitness sur 7 jours en deçà de laquelle on parle de perte (au-dessus : stable). */
+export const CTL_LOSS = 3;
+
+/**
+ * Couleur de l'écart de fitness sur 7 jours (tuile Forme) : ce que le changement veut dire pour toi, accordé à l'état de forme affiché.
+ * Hausse = progrès, sauf trop rapide ou en « Risque élevé » (à surveiller). Légère baisse = stable. Baisse nette = à surveiller,
+ * sauf quand tu es frais ou en transition : c'est le prix normal de la récupération. Jamais rouge : une baisse de fitness n'est pas une alerte.
+ */
+export function formDeltaTone(delta: number, form: number): "good" | "warn" | "neutral" {
+  if (delta > 0) return delta > FAST_CTL_GAIN || form <= -30 ? "warn" : "good";
+  if (delta > -CTL_LOSS) return "neutral";
+  return form > 5 ? "neutral" : "warn";
+}

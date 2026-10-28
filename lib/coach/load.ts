@@ -6,13 +6,28 @@ import { isSoftActivity } from "@/lib/sports";
 import { buildProfile, estimateMinutes, HISTORY_DAYS, isCommute } from "@/lib/routes/estimate";
 import { loadHabitIndex } from "@/lib/habits/build";
 import { classicTitle, dist, proj } from "@/lib/habits/grid";
-import { aggregate, getForecast } from "@/lib/weather/open-meteo";
+import { aggregate, getForecast, type RideWeather } from "@/lib/weather/open-meteo";
 import type { RunProgramView } from "@/lib/data/training";
-import { bestSlot, coachToday, EASY_RUN_MIN, liftHalf, type CoachInput, type CoachPlan } from "./today";
+import { bestSlot, coachToday, EASY_RUN_MIN, liftHalf, type CoachInput, type CoachPlan, type CoachSlot } from "./today";
 
 /** Un classique « tient » dans la séance à ±12 % et part à moins de 600 m de chez toi. */
 const CLASSIC_FIT = 0.12;
 const CLASSIC_NEAR_M = 600;
+
+/**
+ * Meilleur créneau pour une sortie de `minutes` depuis le domicile (même calcul que le coach du jour), avec la météo de ce créneau.
+ * null sans domicile ou sans prévision. Affiché en tête de « Prépare ta sortie ».
+ */
+export async function getBestSlot(userId: string, minutes: number, now = new Date()): Promise<{ slot: CoachSlot; weather: RideWeather; tz: string } | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true, homeLat: true, homeLng: true } });
+  if (user?.homeLat == null || user.homeLng == null) return null;
+  const tz = user.timezone ?? "Europe/Paris";
+  const raw = await getForecast(user.homeLat, user.homeLng);
+  if (!raw) return null;
+  const slot = bestSlot((t) => aggregate(raw, t, minutes, +now), +now, minutes, tz);
+  const weather = slot && aggregate(raw, slot.at, minutes, +now);
+  return slot && weather ? { slot, weather, tz } : null;
+}
 
 export async function getCoach(userId: string, run: RunProgramView | null, now = new Date()): Promise<CoachPlan> {
   return coachToday(await loadCoachInput(userId, run, now));

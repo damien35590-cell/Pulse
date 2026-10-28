@@ -140,7 +140,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
     <article>
       <ActivityHero
         id={a.id}
-        title={displayTitle({ title: a.title, plannedSession: planned })}
+        title={displayTitle({ title: a.title, titleEdited: a.titleEdited, plannedSession: planned })}
         points={points}
         gain={a.elevationGainM > 0 ? a.elevationGainM : undefined}
         elevationColor={sportFg}

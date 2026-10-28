@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   try {
     const a = await prisma.activity.create({
       data: {
-        userId: uid, clientId, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
+        userId: uid, clientId, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), titleEdited: b.titleEdited === true, notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
         avgHr: hr?.avg, maxHr: hr?.max, hrSeries: hr ? (hrSamples as unknown as Prisma.InputJsonValue) : undefined,
         distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined,

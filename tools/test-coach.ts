@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-coach.ts
 import assert from "node:assert/strict";
-import { bestSlot, coachToday, fitsFreeTime, liftHalf, slotText, type CoachInput } from "../lib/coach/today";
+import { bestSlot, coachToday, fitsFreeTime, liftHalf, sessionCondition, slotText, type CoachInput } from "../lib/coach/today";
 import type { RideWeather } from "../lib/weather/open-meteo";
 
 const tz = "Europe/Paris";
@@ -93,5 +93,24 @@ assert.equal(slotText(lunch, tz, now).split(" · ")[0], "12 h 30");
 // Séance longue (70 min) : pas le midi, le soir.
 const evening = bestSlot(() => w(5, 11, Date.parse("2026-10-21T17:30:00Z")), now, 70, tz)!;
 assert.ok(new Date(evening.at).getUTCHours() + 2 >= 19, `créneau du soir (${slotText(evening, tz, now)})`);
+
+// ── Carte du jour de l'accueil : champs séparés, météo réduite à un pictogramme ──
+assert.deepEqual(r.run, { steps: run.summary, late: 0, tired: false, condition: null, routeHref: "/itineraires?sport=RUN&minutes=50&session=intervals" }, "séance du jour : étapes et lien de « Prépare ta sortie »");
+const late2 = coachToday({ ...base, runNext: { ...run, date: "2026-10-19" } });
+assert.equal(late2.run?.late, 2, "deux jours de retard");
+assert.equal(coachToday({ ...base, form: { value: -25, label: "Optimal" }, runNext: run }).run?.tired, true, "séance clé et fatigue marquée");
+assert.equal(lift.run, undefined, "muscu : pas de champ course");
+const easy = coachToday({ ...base, lastRunAt: now - 4 * day, slot: { ...slot, night: true } });
+assert.equal(easy.run?.routeHref, "/itineraires?sport=RUN&minutes=40&session=easy");
+assert.equal(easy.run?.condition, "night", "footing hors programme : pictogramme aussi");
+// Pictogramme : nuit > forte pluie > chaleur ; rien quand ça ne change rien, ou si le créneau est demain.
+assert.equal(sessionCondition(null, now, tz), null);
+assert.equal(sessionCondition(slot, now, tz), null, "11 °C, sec, de jour : aucun pictogramme");
+assert.equal(sessionCondition({ ...slot, night: true, rainPct: 80 }, now, tz), "night", "la frontale d'abord");
+assert.equal(sessionCondition({ ...slot, rainPct: 60 }, now, tz), "rain");
+assert.equal(sessionCondition({ ...slot, rainPct: 59 }, now, tz), null, "averses possibles : pas une forte pluie");
+assert.equal(sessionCondition({ ...slot, feels: 26 }, now, tz), "heat");
+assert.equal(sessionCondition({ ...slot, feels: 25 }, now, tz), null, "25 °C pile : pas encore de chaleur");
+assert.equal(sessionCondition({ ...slot, at: slot.at + day, night: true }, now, tz), null, "créneau de demain : rien aujourd'hui");
 
 console.log("test-coach : OK");

@@ -167,6 +167,7 @@ model Activity {
   userId         String
   type           ActivityType
   title          String
+  titleEdited    Boolean      @default(false) // titre saisi par toi (renommage, saisie manuelle) : il prime toujours sur le nom de la séance du programme (lib/activity/title.ts)
   notes          String?
   feeling        Feeling?
   startedAt      DateTime

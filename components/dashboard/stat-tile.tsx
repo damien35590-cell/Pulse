@@ -15,7 +15,8 @@ type Props = {
   tone?: "default" | "brand";
   unit?: string;
   sub: string;
-  delta?: { text: string; good: boolean };
+  /** `tone` prime sur `good` : couleur selon ce que l'écart veut dire (ex. tuile Forme, `formDeltaTone`). */
+  delta?: { text: string; good?: boolean; tone?: "good" | "warn" | "bad" | "neutral" };
   spark?: number[];
   /** 0 → 1 : barre de progression vers un objectif. */
   progress?: number;
@@ -34,7 +35,7 @@ export function StatTile({ icon: Icon, label, title, value, tone = "default", un
       <p className={cn("flex items-baseline gap-1.5", title ? "mt-1" : "mt-2")}>
         <span className={cn("font-num text-metric-lg tabular-nums", tone === "brand" ? "text-brand" : "text-ink")}>{value}</span>
         {unit && <span className="text-sm font-medium text-ink-soft">{unit}</span>}
-        {delta && <Delta good={delta.good}>{delta.text}</Delta>}
+        {delta && <Delta good={delta.good} tone={delta.tone}>{delta.text}</Delta>}
       </p>
       {spark && <Sparkline values={spark} className="mt-2 text-brand" />}
       {progress != null && (

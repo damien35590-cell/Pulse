@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { loadBadgeStats } from "@/lib/data/badges";
 import { getTracesArt } from "@/lib/data/traces";
 import { TracesCover } from "@/components/profile/traces-cover";
+import { TopBar } from "@/components/layout/top-bar";
 import { Section } from "@/components/ui/section";
 import { SettingsRow } from "@/components/ui/settings-row";
 import { EditProfile } from "@/components/profile/edit-profile";
@@ -57,7 +58,10 @@ export default async function ProfilePage() {
   const seuils = `${thresholdLabel("FTP", zones.ftp, "W", zones.ftpManual)} · ${thresholdLabel("FC max", zones.hrMax, "bpm", zones.hrManual)}`;
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* Plus d'onglet « Vous » : on y arrive depuis l'avatar de l'accueil, le retour y ramène. */}
+      <TopBar title="Vous" back="/" backLabel="Accueil" large={false} />
+      <div className="space-y-6">
       <EditProfile name={me?.name ?? s.user.email?.split("@")[0] ?? "Vous"} image={me?.image ?? null} level={`Niveau ${lvl.n} · ${rank(lvl.n)}`} />
 
       <TracesCover art={traces} totals={st} />
@@ -88,6 +92,7 @@ export default async function ProfilePage() {
       </Section>
 
       <SignOut />
-    </div>
+      </div>
+    </>
   );
 }

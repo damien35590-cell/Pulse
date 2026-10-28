@@ -53,6 +53,8 @@ export async function PATCH(
       data: {
         type: type as ActivityType | undefined,
         title: title as string | undefined,
+        // Renommé à la main : ce titre prime désormais sur le nom de la séance du programme (lib/activity/title.ts).
+        titleEdited: title !== undefined ? true : undefined,
         feeling: feeling !== undefined ? (feeling as Feeling | null) : undefined,
         rpe: rpe as number | null | undefined,
         notes: finalNotes !== undefined ? (finalNotes === null ? null : String(finalNotes)) : undefined,

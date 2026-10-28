@@ -4,6 +4,7 @@
  */
 import { SPORT_LABEL } from "@/lib/sports";
 import type { RideWeather } from "@/lib/weather/open-meteo";
+import { HEAT_FEELS_C, RAIN_ALERT_PCT } from "@/lib/weather/rules";
 import { sessionFromProgram, type RunSession } from "../routes/session-fit";
 
 export type Half = "upper" | "lower";
@@ -39,7 +40,15 @@ export type CoachPlan = {
   /** « Demain : séance bas du corps + abdos » */
   next?: string;
   tone: "go" | "easy" | "rest";
+  /**
+   * Course du jour, en champs séparés pour la carte de l'accueil (`lines` garde la version longue des notifications) :
+   * la météo détaillée et la boucle vivent dans « Prépare ta sortie » (`routeHref`), la carte n'affiche qu'un pictogramme (`condition`).
+   */
+  run?: { steps: string; late: number; tired: boolean; condition: SessionCondition | null; routeHref: string };
 };
+
+/** Ce qui change la façon de préparer la sortie : finir de nuit (frontale), forte pluie, chaleur. */
+export type SessionCondition = "night" | "rain" | "heat";
 
 /** Réglages. */
 export const LIFT_EVERY_DAYS = 2; // Lafay : 2 à 3 séances par semaine, en alternance
@@ -119,6 +128,23 @@ export function slotText(s: CoachSlot, tz: string, now: number) {
   return [`${day}${hhmm(s.at, tz)}`, `${s.feels} °C ressentis`, rain, `vent ${s.windKmh} km/h`, s.night && "finit de nuit : frontale"].filter(Boolean).join(" · ");
 }
 
+/**
+ * Pictogramme de la carte du jour (seuils des alertes météo des Itinéraires) : seulement si le meilleur créneau est aujourd'hui et que les conditions changent la préparation.
+ * Nuit d'abord (sécurité : frontale), puis forte pluie, puis chaleur. null sinon : la carte n'affiche rien.
+ */
+export function sessionCondition(s: CoachSlot | null, now: number, tz: string): SessionCondition | null {
+  if (!s || dayKey(s.at, tz) !== dayKey(now, tz)) return null;
+  if (s.night) return "night";
+  if (s.rainPct >= RAIN_ALERT_PCT) return "rain";
+  if (s.feels > HEAT_FEELS_C) return "heat";
+  return null;
+}
+
+/** « Prévue hier : fais-la aujourd'hui, le programme suit. » (séance du programme en retard). */
+export const lateLine = (late: number) => `Prévue ${late === 1 ? "hier" : `il y a ${late} jours`} : fais-la aujourd'hui, le programme suit.`;
+/** Conseil quand la fatigue est marquée un jour de séance clé. */
+export const TIRED_LINE = "Fatigue marquée : vise le bas des allures, ou décale à demain.";
+
 /** Lien vers les Itinéraires, avec le type de séance quand on le connaît (boucle avec ligne droite, points d'eau, plat). */
 export const routeHref = (minutes: number, session?: RunSession | null) =>
   `/itineraires?sport=RUN&minutes=${Math.max(15, Math.round(minutes / 5) * 5)}${session && session !== "normal" ? `&session=${session}` : ""}`;
@@ -159,11 +185,13 @@ export function coachToday(i: CoachInput): CoachPlan {
     const lines = [r.summary || runLine(r)];
     if (i.slot) lines.push(`Meilleur créneau : ${slotText(i.slot, i.tz, i.now)}`);
     if (i.classic) lines.push(`${i.classic.title} tient pile (${i.classic.minutes} min)`);
-    if (tired && r.isKey) lines.push("Fatigue marquée : vise le bas des allures, ou décale à demain.");
-    if (late > 0) lines.push(`Prévue ${late === 1 ? "hier" : `il y a ${late} jours`} : fais-la aujourd'hui, le programme suit.`);
+    if (tired && r.isKey) lines.push(TIRED_LINE);
+    if (late > 0) lines.push(lateLine(late));
+    const href = routeHref(r.minutes, sessionFromProgram(r));
     return {
       kind: "run", tag: r.isKey ? "Séance clé" : SPORT_LABEL("RUN"), title: r.title, lines,
-      primary: { label: `Trouver une boucle de ${r.minutes} min`, href: routeHref(r.minutes, sessionFromProgram(r)) },
+      run: { steps: r.summary || runLine(r), late: Math.max(0, late), tired: tired && r.isKey, condition: sessionCondition(i.slot, i.now, i.tz), routeHref: href },
+      primary: { label: `Trouver une boucle de ${r.minutes} min`, href },
       secondary: { label: "Voir le programme", href: "/plan" },
       next: liftDue ? `Demain : muscu ${lift.title.toLowerCase()}` : undefined, tone: tired ? "easy" : "go",
     };
@@ -185,9 +213,11 @@ export function coachToday(i: CoachInput): CoachPlan {
     const lines = [`${sinceRun === Infinity ? "Pas de course récente" : `${sinceRun} jours sans courir`} : footing facile, en aisance respiratoire.`];
     if (i.slot) lines.push(`Meilleur créneau : ${slotText(i.slot, i.tz, i.now)}`);
     if (i.classic) lines.push(`${i.classic.title} tient pile (${i.classic.minutes} min)`);
+    const href = routeHref(EASY_RUN_MIN, "easy");
     return {
       kind: "run", tag: "Footing", title: `Footing facile · ${EASY_RUN_MIN} min`, lines,
-      primary: { label: `Trouver une boucle de ${EASY_RUN_MIN} min`, href: routeHref(EASY_RUN_MIN, "easy") }, tone: "easy",
+      run: { steps: lines[0], late: 0, tired: false, condition: sessionCondition(i.slot, i.now, i.tz), routeHref: href },
+      primary: { label: `Trouver une boucle de ${EASY_RUN_MIN} min`, href }, tone: "easy",
     };
   }
 

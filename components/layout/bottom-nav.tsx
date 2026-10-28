@@ -3,21 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, BarChart3, Home, Plus, User } from "lucide-react";
+import { BarChart3, CalendarDays, Home, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 import { PlusSheet } from "@/components/record/plus-sheet";
+import { PulseLine } from "@/components/ui/icons/pulse-line";
 
+// « Vous » n'est pas un onglet : il s'ouvre depuis l'avatar de l'accueil (qui porte aussi les badges à valider).
 const items = [
   { href: "/", label: "Accueil", icon: Home },
-  { href: "/activities", label: "Activités", icon: Activity },
+  { href: "/plan", label: "Programme", icon: CalendarDays },
   { href: "/record", label: "Ajouter", icon: Plus, record: true }, // ouvre la feuille « + » (PlusSheet)
+  { href: "/activities", label: "Activités", icon: PulseLine },
   { href: "/analysis", label: "Analyse", icon: BarChart3 },
-  { href: "/vous", label: "Vous", icon: User },
 ] as const;
 
 /** Barre du bas façon Material You : pastille derrière l'icône active, fond translucide, safe area du Pixel incluse. */
-export function BottomNav({ pendingBadges = 0 }: { pendingBadges?: number }) {
+export function BottomNav() {
   const pathname = usePathname();
   const [plus, setPlus] = useState(false);
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -31,7 +33,6 @@ export function BottomNav({ pendingBadges = 0 }: { pendingBadges?: number }) {
         <ul className="mx-auto grid h-16 max-w-md grid-cols-5">
           {items.map((item) => {
             const { href, label, icon: Icon } = item, active = isActive(href), record = "record" in item;
-            const count = href === "/vous" ? pendingBadges : 0;
             if (record) return (
               <li key={href}>
                 <button
@@ -55,21 +56,15 @@ export function BottomNav({ pendingBadges = 0 }: { pendingBadges?: number }) {
                   prefetch={true}
                   onPointerDown={() => tap(6)}
                   aria-current={active ? "page" : undefined}
-                  aria-label={count > 0 ? `${label}, ${count} badge${count > 1 ? "s" : ""} à valider` : undefined}
                   className="group flex h-full touch-manipulation flex-col items-center justify-center gap-1"
                 >
                   <span
                     className={cn(
-                      "relative grid h-8 w-14 place-items-center rounded-full transition-colors duration-200",
+                      "grid h-8 w-14 place-items-center rounded-full transition-colors duration-200",
                       active ? "bg-brand/15 text-brand" : "text-ink-mute group-active:bg-surface-2",
                     )}
                   >
                     <Icon className="size-[22px] transition-transform duration-150 group-active:scale-90" strokeWidth={active ? 2.4 : 2} aria-hidden />
-                    {count > 0 && (
-                      <span aria-hidden className="absolute -right-0.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 font-num text-xs font-semibold leading-none tabular-nums text-brand-ink">
-                        {count > 99 ? "99+" : count}
-                      </span>
-                    )}
                   </span>
                   <span className={cn("text-[11px] leading-none", active ? "font-semibold text-ink" : "font-medium text-ink-mute")}>{label}</span>
                 </Link>

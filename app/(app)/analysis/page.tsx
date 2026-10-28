@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { dayKey, shiftDay, weekKeys } from "@/lib/dates";
@@ -7,6 +8,7 @@ import { fillMissingDates, groupByWeek } from "@/lib/fill-dates";
 import { climbCompare } from "@/lib/insights/landmarks";
 import { SPORTS, MY_SPORTS } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
+import { isVirtual } from "@/lib/art/card";
 import { getStrengthProgram } from "@/lib/data/strength-program";
 import { isCommute } from "@/lib/routes/estimate";
 import { fmtDuration, fmtNum } from "@/lib/format";
@@ -18,7 +20,7 @@ import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
 import { getHikingAnalysis } from "@/lib/analytics/hiking";
 import { parsePeriod, periodParams, weeksLabel } from "@/lib/analysis/period";
-import { MAX_NOTES, overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
+import { MAX_NOTES, exceptionalPrevious, overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
 import { lastDebrief } from "@/lib/coach/store";
 import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
@@ -45,9 +47,12 @@ const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR"
 const dow = (k: string) => (new Date(k + "T00:00:00Z").getUTCDay() + 6) % 7;
 type Sp = { w?: string; to?: string; s?: string };
 const sum = <T,>(l: T[], f: (x: T) => number) => l.reduce((s, x) => s + f(x), 0);
+/** Vélo d'intérieur (MyWhoosh, sortie virtuelle, ou sans trace GPS : même règle que l'import) : « Home trainer » dans la répartition. */
+const isTrainer = (a: { type: string; source: string; title: string; startLat: number | null }) => a.type === "RIDE" && (isVirtual(a) || a.startLat == null);
 
 /**
- * Analyse. Blocs : chiffres clés → Coach → Évolution → (Répartition du temps, « Tous » seulement) → Profil → À retenir → Régularité.
+ * Analyse, dans cet ordre et rien d'autre par défaut : Coach (2 commentaires, coach IA et question en actions secondaires)
+ * → Évolution (3 chiffres clés au-dessus du graphique) → Par sport → « Plus de détails » replié (profil, à retenir, régularité, muscles).
  * Même page pour tous les filtres ; chaque bloc s'adapte au sport. Activités douces (vélotaf, Google Fit, marche) exclues de tous les calculs.
  */
 export default async function AnalysisPage({ searchParams }: { searchParams: Sp }) {
@@ -59,7 +64,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const coachPeriod = { weeks: W, tz: TZ, now, current: period.current };
   const acts = (await prisma.activity.findMany({
     where: { userId: uid, startedAt: { gte: new Date(+now - Math.max((Math.max(2 * W, CALENDAR_WEEKS) * 7 + 14), FITNESS_HISTORY_DAYS) * 864e5), lte: now } }, orderBy: { startedAt: "asc" },
-    select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true },
+    select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, elevationGainM: true, startLat: true },
   })).filter((a) => !isCommute(a)); // activités douces : hors de toutes les statistiques
 
   const mon = weekKeys(now, TZ)[0], today = dayKey(now, TZ);
@@ -113,36 +118,29 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
     MAX_NOTES,
   );
 
-  // 1. Chiffres clés
-  const delta = (c: number, p: number) => (p > 0 ? Math.round(((c - p) / p) * 100) : null);
-  // Cumuls (distance, temps, D+, séances) : variation par jour sur la période, comme le coach (timeChange / rateChange). Moyennes : variation brute.
-  const spanF = frame(coachPeriod);
-  const tile = (label: string, c: number, p: number, value: string, unit?: string, extra?: string, additive = true) => {
-    const d = !additive ? delta(c, p) : label === "Temps" ? timeChange(acts.filter(hit), coachPeriod).pct : rateChange(c, spanF.span, p, spanF.prevSpan);
-    return (
-      <div key={label} className={cn(ui.card, "p-4")}>
-        <dl><Metric label={label} value={value} unit={unit} size="lg" hint={(d != null || extra) && <>{d != null && <Delta tone={d >= 0 ? "good" : "neutral"}>{d > 0 ? "+" : ""}{d} %</Delta>}{extra && <span className={d != null ? "ml-1.5" : undefined}>{extra}</span>}</>} /></dl>
-      </div>
-    );
-  };
-  const timeS = (l: { movingTimeS: number }[]) => sum(l, (a) => a.movingTimeS);
-  const activeDays = new Set(cur.map((a) => dayKey(a.startedAt, TZ))).size;
-  const sorties = tile(noun === "séance" ? "Séances" : "Sorties", cur.length, prev.length, String(cur.length), undefined, `${fmtNum(perWeek, 1)} / sem.`);
-  const kpis = endurance
-    ? [
-        tile("Distance", sum(cur, (a) => a.distanceM), sum(prev, (a) => a.distanceM), fmtNum(sum(cur, (a) => a.distanceM) / 1000, 1), "km"),
-        tile("Temps", timeS(cur), timeS(prev), fmtDuration(timeS(cur))),
-        tile("Dénivelé +", sum(cur, (a) => a.elevationGainM), sum(prev, (a) => a.elevationGainM), fmtNum(sum(cur, (a) => a.elevationGainM), 0), "m"),
-        sorties,
-      ]
-    : [
-        sorties,
-        tile("Temps", timeS(cur), timeS(prev), fmtDuration(timeS(cur))),
-        tile("Durée moyenne", cur.length ? timeS(cur) / cur.length : 0, prev.length ? timeS(prev) / prev.length : 0, cur.length ? fmtDuration(timeS(cur) / cur.length) : "–", undefined, undefined, false),
-        <div key="days" className={cn(ui.card, "p-4")}><dl><Metric label="Jours actifs" value={activeDays} unit={`/ ${W * 7}`} size="lg" /></dl></div>,
-      ];
+  // 1. Chiffres clés de l'Évolution : séances, temps, jours actifs, chacun une fois.
+  // Variation par jour sur la période contre la précédente, comme le coach (timeChange / rateChange), seulement avec au moins 2 activités de référence.
+  // Période précédente hors norme (séjour, stage : `exceptionalPrevious`, même détection que le coach) : le temps se compare au volume hebdomadaire
+  // habituel, les autres chiffres n'ont pas d'écart (jamais de « −81 % » qui ne dit rien).
+  const spanF = frame(coachPeriod), timeS = (l: { movingTimeS: number }[]) => sum(l, (a) => a.movingTimeS);
+  const meaningful = prev.length >= 2 && cur.length > 0;
+  const odd = meaningful ? exceptionalPrevious(acts.filter(hit), coachPeriod) : null;
+  const daysOf = (l: { startedAt: Date }[]) => new Set(l.map((a) => dayKey(a.startedAt, TZ))).size;
+  const activeDays = daysOf(cur);
+  const change = (pct: number | null, suffix?: string) =>
+    pct == null ? undefined : <><Delta tone={pct >= 0 ? "good" : "neutral"}>{pct > 0 ? "+" : ""}{pct} %</Delta>{suffix && <span className="ml-1.5">{suffix}</span>}</>;
+  const timeDelta = !meaningful ? undefined
+    : odd ? change(Math.round(((timeS(cur) / spanF.span) * 7 / odd.typicalS - 1) * 100), "vs habituel")
+    : change(timeChange(acts.filter(hit), coachPeriod).pct);
+  const keyNumbers = (
+    <dl className="grid grid-cols-3 gap-3">
+      <Metric label={noun === "séance" ? "Séances" : "Sorties"} value={cur.length} size="md" hint={meaningful && !odd ? change(rateChange(cur.length, spanF.span, prev.length, spanF.prevSpan)) : undefined} />
+      <Metric label="Temps" value={fmtDuration(timeS(cur))} size="md" hint={timeDelta} />
+      <Metric label="Jours actifs" value={activeDays} unit={`/ ${W * 7}`} size="md" hint={meaningful && !odd ? change(rateChange(activeDays, spanF.span, daysOf(prev), spanF.prevSpan)) : undefined} />
+    </dl>
+  );
 
-  // 3. Évolution : volume par semaine (jours sans activité à 0 : l'axe X reste continu), allure (course), puissance (vélo)
+  // 2. Évolution : volume par semaine (jours sans activité à 0 : l'axe X reste continu), allure (course), puissance (vélo)
   const daily = fillMissingDates(acts.filter(hit), shiftDay(mon, -7 * (W - 1)), today, TZ);
   const weeks = groupByWeek(daily);
   // Unité du volume : km (endurance), séances par semaine (musculation), heures (Tous)
@@ -173,22 +171,25 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
           return { key: e.key, name: ce ? `${ce.code ?? code} · ${ce.name}` : l?.label ?? e.name, variant: code, level: e.level, lastDay: e.lastDay, hint: e.hint, points: e.points }; })
     : null;
 
-  // Répartition du temps (filtre « Tous » seulement)
-  const tt = timeS(inPeriod) || 1;
-  const shares = MY_SPORTS.map((k) => ({ k, pct: (timeS(inPeriod.filter((a) => a.type === k)) / tt) * 100, stroke: activityStyle(k).stroke, bg: activityStyle(k).dot }));
+  // 3. Par sport : temps de la période par sport (vélo d'intérieur à part, « Home trainer »), seulement ceux qui ont du temps ; masqué s'il n'y en a qu'un.
+  const tt = timeS(cur) || 1;
+  const split = [
+    ...MY_SPORTS.map((k) => ({ k, s: k as string, label: SPORTS[k].label, l: cur.filter((a) => a.type === k && !isTrainer(a)), faded: false })),
+    { k: "TRAINER", s: "RIDE", label: "Home trainer", l: cur.filter(isTrainer), faded: true },
+  ].map((x) => ({ ...x, pct: (timeS(x.l) / tt) * 100, time: timeS(x.l), style: activityStyle(x.s) })).filter((x) => x.time > 0).sort((a, b) => b.time - a.time);
   let off = 0;
 
-  // 4. Profil : sorties par semaine de chaque discipline sur la période
+  // Plus de détails — Profil : sorties par semaine de chaque discipline sur la période
   const perWeekByType = Object.fromEntries(MY_SPORTS.map((k) => [k, perWeekOf(inPeriod.filter((a) => a.type === k))])) as Record<(typeof MY_SPORTS)[number], number>;
 
-  // 5. À retenir
+  // Plus de détails — À retenir (sans les jours actifs, déjà dans les chiffres clés)
   const bestWeek = Math.max(0, ...weeks.map((w) => (endurance ? w.distance : w.time / 3600))), longest = Math.max(0, ...cur.map((a) => (endurance ? a.distanceM / 1000 : a.movingTimeS)));
   const activeWeeks = weeks.filter((w) => w.time > 0).length, dPlus = sum(cur, (a) => a.elevationGainM);
   const records = endurance
-    ? [["Meilleure semaine", `${fmtNum(bestWeek, 1)} km`], ["Plus longue sortie", `${fmtNum(longest, 1)} km`], ["Dénivelé en repères", climbCompare(dPlus, mon)?.short ?? `${fmtNum(dPlus, 0)} m`], ["Jours actifs", `${activeDays}/${W * 7}`]]
-    : [["Meilleure semaine", `${fmtNum(bestWeek, 1)} h`], ["Plus longue séance", fmtDuration(longest)], ["Semaines actives", `${activeWeeks}/${W}`], ["Jours actifs", `${activeDays}/${W * 7}`]];
+    ? [["Meilleure semaine", `${fmtNum(bestWeek, 1)} km`], ["Plus longue sortie", `${fmtNum(longest, 1)} km`], ["Dénivelé en repères", climbCompare(dPlus, mon)?.short ?? `${fmtNum(dPlus, 0)} m`], ["Semaines actives", `${activeWeeks}/${W}`]]
+    : [["Meilleure semaine", `${fmtNum(bestWeek, 1)} h`], ["Plus longue séance", fmtDuration(longest)], ["Semaines actives", `${activeWeeks}/${W}`], ["Durée moyenne", cur.length ? fmtDuration(timeS(cur) / cur.length) : "–"]];
 
-  // 6. Régularité : calendrier de 26 semaines (minutes par jour) et sorties par jour de la semaine
+  // Plus de détails — Régularité : calendrier de 26 semaines (minutes par jour) et sorties par jour de la semaine
   const minutes = new Map<string, number>();
   for (const a of acts.filter(hit)) { const key = `${ago(a.startedAt)}-${dow(dayKey(a.startedAt, TZ))}`; minutes.set(key, (minutes.get(key) ?? 0) + a.movingTimeS / 60); }
   const cells: DayCell[] = Array.from({ length: CALENDAR_WEEKS * 7 }, (_, i) => {
@@ -198,16 +199,14 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
   const weekdays = [0, 1, 2, 3, 4, 5, 6].map((r) => cur.filter((a) => dow(dayKey(a.startedAt, TZ)) === r).length);
 
   return (
-    <div>
+    <>
       <TopBar title="Analyse" />
       <PeriodPicker weeks={W} current={period.current} endKey={period.endKey} startKey={period.startKey} preset={period.preset} today={todayKey} />
       <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4">
         {[["all", "Tous"], ...sports.map((k) => [k, SPORTS[k].label])].map(([k, l]) => <Link key={k} href={qs({ s: k })} className={chip(S === k)}>{l}</Link>)}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">{kpis}</div>
-
-      <div className="mt-8 space-y-8">
+      <div className="mt-6 space-y-8">
         <CoachCard notes={notes} ai={ai} />
 
         {cur.length === 0 ? (
@@ -218,20 +217,21 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
           </div>
         ) : (
           <>
-            <EvolutionCard key={S} weekly={weekly} unit={unit} volumeLabel={volumeLabel} pace={pace} power={S === "RIDE" ? { record: adv.record, recent: adv.last30 } : null} form={form} zones={zones} progression={progression} />
+            <EvolutionCard key={S} summary={keyNumbers} weekly={weekly} unit={unit} volumeLabel={volumeLabel} pace={pace} power={S === "RIDE" ? { record: adv.record, recent: adv.last30 } : null} form={form} zones={zones} progression={progression} />
 
-            {S === "all" && (
-              <Section title="Répartition du temps">
+            {split.length > 1 && (
+              <Section title="Par sport">
                 <div className={cn(ui.card, "flex items-center gap-4 p-4")}>
-                  <svg viewBox="0 0 42 42" className="size-32 shrink-0 -rotate-90" role="img" aria-label="Répartition du temps par sport">
+                  <svg viewBox="0 0 42 42" className="size-28 shrink-0 -rotate-90" role="img" aria-label="Répartition du temps par sport">
                     <circle cx="21" cy="21" r="15.915" fill="none" className="stroke-surface-2" strokeWidth="6" />
-                    {shares.map((s) => { const o = off; off += s.pct; return s.pct ? <circle key={s.k} cx="21" cy="21" r="15.915" fill="none" className={s.stroke} strokeWidth="6" strokeDasharray={`${Math.max(s.pct - 0.8, 0.1).toFixed(2)} ${(100 - Math.max(s.pct - 0.8, 0.1)).toFixed(2)}`} strokeDashoffset={-o.toFixed(2)} /> : null; })}
+                    {split.map((s) => { const o = off; off += s.pct; return <circle key={s.k} cx="21" cy="21" r="15.915" fill="none" className={cn(s.style.stroke, s.faded && "opacity-50")} strokeWidth="6" strokeDasharray={`${Math.max(s.pct - 0.8, 0.1).toFixed(2)} ${(100 - Math.max(s.pct - 0.8, 0.1)).toFixed(2)}`} strokeDashoffset={-o.toFixed(2)} />; })}
                   </svg>
-                  <ul className="flex-1">
-                    {shares.map((s) => (
+                  <ul className="min-w-0 flex-1">
+                    {split.map((s) => (
                       <li key={s.k}>
-                        <Link href={qs({ s: s.k })} className="flex min-h-12 items-center gap-2.5">
-                          <i className={cn("size-3 rounded-sm", s.bg)} aria-hidden /><span className="flex-1">{SPORTS[s.k].label}</span>
+                        <Link href={qs({ s: s.s })} className="flex min-h-12 items-center gap-2.5">
+                          <i className={cn("size-3 shrink-0 rounded-sm", s.style.dot, s.faded && "opacity-50")} aria-hidden />
+                          <span className="min-w-0 flex-1 truncate">{s.label}</span>
                           <b className="font-num text-metric-sm tabular-nums">{Math.round(s.pct)} %</b>
                         </Link>
                       </li>
@@ -241,24 +241,33 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
               </Section>
             )}
 
-            {strength && (
-              <Section title="Muscles sollicités">
-                <div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={strength.muscles} hasData={strength.summary.sessions > 0} span={weeksLabel(W)} /></div>
-              </Section>
-            )}
+            {/* Le reste, replié par défaut : la page se lit en trois blocs. */}
+            <details className="group">
+              <summary className={cn(ui.card, "flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 [&::-webkit-details-marker]:hidden")}>
+                <span className="text-[15px] font-semibold text-ink">Plus de détails</span>
+                <ChevronDown className="size-5 shrink-0 text-ink-mute transition-transform duration-150 group-open:rotate-180" aria-hidden />
+              </summary>
+              <div className="mt-8 space-y-8">
+                <ProfileCard profiles={adv.profiles} sport={S} perWeek={perWeekByType} />
 
-            <ProfileCard profiles={adv.profiles} sport={S} perWeek={perWeekByType} />
+                <Section title="À retenir">
+                  <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-card bg-line">
+                    {records.map(([l, v]) => <Metric key={l} label={l} value={v} size="md" className="bg-surface px-4 py-3" />)}
+                  </dl>
+                </Section>
 
-            <Section title="À retenir">
-              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-card bg-line">
-                {records.map(([l, v]) => <Metric key={l} label={l} value={v} size="md" className="bg-surface px-4 py-3" />)}
-              </dl>
-            </Section>
+                <RegularityCard cells={cells} weekdays={weekdays} perWeek={perWeek} noun={noun} />
 
-            <RegularityCard cells={cells} weekdays={weekdays} perWeek={perWeek} noun={noun} />
+                {strength && (
+                  <Section title="Muscles sollicités">
+                    <div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={strength.muscles} hasData={strength.summary.sessions > 0} span={weeksLabel(W)} /></div>
+                  </Section>
+                )}
+              </div>
+            </details>
           </>
         )}
       </div>
-    </div>
+    </>
   );
 }

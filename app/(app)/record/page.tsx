@@ -71,7 +71,7 @@ export default function RecordPage() {
     const hour = new Date(f.when).getHours();
     const title = f.title.trim() || `${SPORTS[type].label} ${hour < 12 ? "du matin" : hour < 18 ? "de l’après-midi" : "du soir"}`;
     const r = await fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      type, title, startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, rpe, notes: f.notes || null, exercises, gearIds: gearId ? [gearId] : [] }) });
+      type, title, titleEdited: !!f.title.trim(), startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, rpe, notes: f.notes || null, exercises, gearIds: gearId ? [gearId] : [] }) });
     setBusy(false);
     if (!r.ok) return setErr("Impossible d’enregistrer. Vérifie ta connexion et réessaie.");
     const j = await r.json(); setRes({ story: j.story, record: j.record, id: j.id, gearAlerts: j.gearAlerts });

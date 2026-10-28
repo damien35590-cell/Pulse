@@ -15,20 +15,23 @@ const when = (iso: string) => new Date(iso).toLocaleString("fr-FR", { day: "nume
  * Analyse du coach IA (Claude) pour l'onglet et la période affichés : bilan, 2 à 4 points, une consigne pour la semaine.
  * Contenu de la carte « Coach » (components/analysis/coach-card.tsx), sans carte ni titre propres.
  * Générée à la demande puis enregistrée : la rouvrir ne coûte rien ; « Actualiser » ne rappelle l'IA que si les chiffres ont changé.
+ * Repliée par défaut (action secondaire sous les commentaires) : un debrief déjà enregistré s'affiche au toucher, sans rappeler l'IA.
  */
 export function AiDebrief({ params, initial, configured }: { params: { w: string; to?: string; s: string }; initial: DebriefView | null; configured: boolean }) {
   const [view, setView] = useState(initial), [error, setError] = useState<string | null>(null), [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
   const run = (force = false) => {
-    tap(8); setError(null);
+    tap(8); setError(null); setOpen(true);
     start(async () => {
       const r = await generateDebrief({ ...params, force });
       if (r.ok) setView(r.view); else setError(r.error);
     });
   };
+  const show = () => { if (view) { tap(8); setOpen(true); } else run(false); };
 
   return (
     <div>
-      {view ? (
+      {view && open ? (
         <div className={cn("space-y-4 transition-opacity", pending && "opacity-50")} aria-busy={pending}>
           <div className="flex items-start justify-between gap-3">
             <p className="font-semibold leading-snug text-ink">{view.debrief.verdict}</p>
@@ -51,12 +54,11 @@ export function AiDebrief({ params, initial, configured }: { params: { w: string
           <p className="text-xs text-ink-mute">{modelName(view.model)} · {when(view.at)}</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <p className="text-sm text-ink-soft">Le coach lit tes chiffres de la période et les interprète selon Lafay, SuperPhysique et Campus Coach, puis te donne une consigne pour la semaine.</p>
-          <button type="button" onClick={() => run(false)} disabled={pending || !configured} className={cn(ui.btnSecondary, "w-full bg-surface-2")}>
+        <div className="space-y-2">
+          <button type="button" onClick={show} disabled={pending || (!configured && !view)} className={cn(ui.btnSecondary, "w-full bg-surface-2")}>
             {pending ? <><Loader2 className="size-5 animate-spin" aria-hidden />Le coach analyse…</> : <><Sparkles className="size-5 text-brand" aria-hidden />Analyser avec le coach IA</>}
           </button>
-          {!configured && <p className="text-xs text-ink-mute">Pour l'activer : ajoute la clé ANTHROPIC_API_KEY dans Vercel (Settings &gt; Environment Variables), puis redéploie.</p>}
+          {!configured && !view && <p className="text-xs text-ink-mute">Pour l'activer : ajoute la clé ANTHROPIC_API_KEY dans Vercel (Settings &gt; Environment Variables), puis redéploie.</p>}
         </div>
       )}
       {error && <p role="alert" className="mt-3 text-sm text-bad">{error}</p>}

@@ -15,7 +15,7 @@ export type SummaryActivity = {
   id: string; type: string; title: string; story: string | null; startedAt: Date; distanceM: number; movingTimeS: number; elevationGainM: number; polyline: string | null;
   avgHr?: number | null; avgPower?: number | null; exercises?: ({ sets: number; reps: number; loadKg: number | null } & Partial<SetExercise>)[];
   /** Art (lib/art/card.ts) : tous facultatifs, sans eux la carte reste celle d'avant. */
-  source?: string | null; zoneRibbon?: unknown; zoneRibbonSource?: string | null; isInterval?: boolean | null; sessionType?: string | null; plannedSession?: { kind: string; title: string } | null;
+  source?: string | null; zoneRibbon?: unknown; zoneRibbonSource?: string | null; isInterval?: boolean | null; sessionType?: string | null; plannedSession?: { kind: string; title: string } | null; titleEdited?: boolean | null;
 };
 export type Cell = { l: string; v: string; u?: string };
 
