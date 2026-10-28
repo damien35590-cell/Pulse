@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-session-match.ts
 import assert from "node:assert/strict";
-import { activityIntensity, fits, isDemanding, pickSession, type MatchSession } from "../lib/training/match";
+import { activityIntensity, fits, isDemanding, pickInWeek, pickSession, runShape, type MatchSession, type WeekCandidate } from "../lib/training/match";
 import { effectiveSessionType, sessionTypesFor, sessionTypeFor } from "../lib/art/session-type";
 
 const sess = (id: string, kind: MatchSession["kind"], isKeySession = false, rejectedActivityIds: string[] = []): MatchSession => ({ id, kind, isKeySession, rejectedActivityIds });
@@ -57,4 +57,21 @@ assert.equal(sessionTypeFor("RUN", "recovery"), null);
 assert.equal(effectiveSessionType({ type: "RIDE", isInterval: false }), "endurance");
 assert.equal(effectiveSessionType({ type: "RUN", isInterval: false }), "easy");
 assert.equal(effectiveSessionType({ type: "RIDE", sessionType: "recovery" }), "recovery");
+// ── Semaine : séance du jour, sinon la plus proche de même forme ──
+{
+  const w = (id: string, kind: MatchSession["kind"], date: string, order: number, min: number, key = false, rejected: string[] = []): WeekCandidate =>
+    ({ id, kind, isKeySession: key, rejectedActivityIds: rejected, date, orderInWeek: order, plannedDurationS: min * 60 });
+  const week = [w("vma", "INTERVALS_SHORT", "2026-10-27", 1, 45, true), w("foot", "EASY", "2026-10-29", 2, 40), w("long", "LONG_RUN", "2026-11-01", 3, 80)];
+  const run = (min: number, ribbon = easyRibbon, id = "r") => ({ id, zoneRibbon: ribbon, movingTimeS: min * 60, distanceM: min * 160 });
+  assert.equal(runShape(run(40), "easy", week), "easy");
+  assert.equal(runShape(run(75), "easy", week), "long", "plus près de la sortie longue que du footing");
+  assert.equal(pickInWeek(week, run(40), "2026-10-29")?.id, "foot", "séance prévue ce jour-là");
+  assert.equal(pickInWeek(week, run(40), "2026-10-28")?.id, "foot", "jour sans séance : footing le plus proche (la VMA ne convient pas)");
+  assert.equal(pickInWeek(week, run(85), "2026-10-28")?.id, "long", "sortie longue un autre jour → sortie longue de la semaine");
+  assert.equal(pickInWeek(week, run(45, hardRibbon), "2026-10-30")?.id, "vma", "sortie intense → séance clé, même plus loin");
+  assert.equal(pickInWeek(week, run(40), "2026-10-27")?.id, "foot", "séance du jour qui ne convient pas : on cherche ailleurs dans la semaine");
+  assert.equal(pickInWeek([w("vma", "INTERVALS_SHORT", "2026-10-27", 1, 45, true)], run(40), "2026-10-27"), null, "rien qui convienne : on laisse la file décider");
+  assert.equal(pickInWeek([w("foot", "EASY", "2026-10-29", 2, 40, false, ["r"])], run(40), "2026-10-29"), null, "paire détachée à la main : jamais reliée");
+}
+
 console.log("test-session-match : OK");

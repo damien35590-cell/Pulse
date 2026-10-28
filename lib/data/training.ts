@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import type { MetricSource, Prisma, SessionKind, SessionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { dayKey, weekKeys } from "@/lib/dates";
+import { dayKey, shiftDay, weekKeys } from "@/lib/dates";
 import type { RunGeneratorInput, RunWorkoutStructure } from "@/types/training";
 import { generateRunBaseVma, startMonday } from "@/lib/training/generate";
 import { estimateRun, resolveSteps, summarizeRun } from "@/lib/training/resolve";
 import { DEFAULT_VMA, pickVma, type CurrentVma } from "@/lib/training/vma";
 import { getStoredVma, onThresholdsChange } from "@/lib/data/zone-ribbon";
-import { pickSession } from "@/lib/training/match";
+import { pickInWeek, pickSession } from "@/lib/training/match";
 import { RUN_BASE_VMA, blockOf, weekInBlock } from "@/lib/training/catalog/run-base-vma";
 import { planRibbon } from "@/lib/art/plan-ribbon";
 import type { RibbonSegment } from "@/lib/art/zone-ribbon";
@@ -124,7 +124,8 @@ export async function detachActivity(userId: string, sessionId: string): Promise
 const compliance =(actualS: number, plannedS: number | null) => (plannedS ? Math.min(100, Math.round((actualS / plannedS) * 100)) : null);
 
 /**
- * Liaison automatique après l'import d'une sortie RUN : rattachée à la prochaine séance du programme RUN actif.
+ * Liaison automatique après l'import d'une sortie RUN : rattachée à une séance de sa semaine (celle du jour, sinon la plus proche de même forme),
+ * à défaut à la prochaine séance du programme RUN actif. Une liaison faite à la main n'est jamais remplacée (la sortie est déjà reliée).
  * Si une séance a été cochée « faite » à la main le même jour sans sortie, l'activité vient la compléter au lieu
  * de consommer la suivante. Une activité n'est jamais reliée deux fois (completedActivityId est unique).
  * Les sorties antérieures au jour d'activation du programme (import d'historique) ne sont pas reliées.
@@ -149,8 +150,16 @@ export async function linkActivityToPlannedSession(a: { id: string; userId: stri
   })).find((s) => s.completedAt && dayKey(s.completedAt, TZ) === key && !s.rejectedActivityIds.includes(a.id)); // cochée à la main : l'intensité ne la refuse pas
 
   // Deux essais : un import concurrent a pu prendre la même séance entre-temps.
+  // D'abord la semaine de la sortie (séance du jour, sinon la plus proche de même forme), puis la file du programme.
+  const week = await weekOfDay(p.id, key);
   for (let attempt = 0; attempt < 2; attempt++) {
-    const target = manual && attempt === 0 ? manual : pickSession(await queuePlanned(p.id), act);
+    const inWeek = week && !(manual && attempt === 0)
+      ? pickInWeek((await prisma.plannedSession.findMany({
+        where: { weekId: week.id, status: "PLANNED" },
+        select: { id: true, kind: true, isKeySession: true, rejectedActivityIds: true, plannedDurationS: true, date: true, orderInWeek: true },
+      })).map((s) => ({ ...s, date: s.date.toISOString().slice(0, 10) })), act, key)
+      : null;
+    const target = manual && attempt === 0 ? manual : inWeek ?? pickSession(await queuePlanned(p.id), act);
     if (!target) return null;
     try {
       const res = await prisma.plannedSession.updateMany({
@@ -161,6 +170,88 @@ export async function linkActivityToPlannedSession(a: { id: string; userId: stri
     } catch (e) { console.error("[training] liaison impossible", a.id, e); return null; }
   }
   return null;
+}
+
+// ───────── Liaison à la main ─────────
+/** Semaine du programme qui contient ce jour (AAAA-MM-JJ, Paris). */
+const weekOfDay = (programId: string, key: string) =>
+  prisma.programWeek.findFirst({ where: { programId, startDate: { lte: day(key), gt: new Date(+day(key) - 7 * 864e5) } }, select: { id: true, startDate: true } });
+
+export type WeekRun = { id: string; title: string; startedAt: string; distanceM: number; movingTimeS: number; linked: boolean };
+
+/**
+ * Feuille « Valider avec… » d'une séance : les sorties course de sa semaine (lundi → dimanche, Paris) qui ne valident encore aucune séance,
+ * plus celle qui valide déjà cette séance (linked). Null si la séance n'est pas à moi.
+ */
+export async function runsForSession(userId: string, sessionId: string) {
+  const s = await prisma.plannedSession.findFirst({ where: { id: sessionId, userId, sport: "RUN" }, select: { id: true, status: true, completedActivityId: true, week: { select: { startDate: true } } } });
+  if (!s) return null;
+  const from = s.week.startDate.toISOString().slice(0, 10), keys = new Set(Array.from({ length: 7 }, (_, i) => shiftDay(from, i)));
+  const runs = await prisma.activity.findMany({
+    where: {
+      userId, type: "RUN", startedAt: { gte: new Date(+day(from) - 864e5), lt: new Date(+day(from) + 8 * 864e5) },
+      OR: [{ plannedSession: { is: null } }, ...(s.completedActivityId ? [{ id: s.completedActivityId }] : [])],
+    },
+    orderBy: { startedAt: "asc" },
+    select: { id: true, title: true, startedAt: true, distanceM: true, movingTimeS: true },
+  });
+  return {
+    status: s.status, activityId: s.completedActivityId,
+    runs: runs.filter((r) => keys.has(dayKey(r.startedAt, TZ))).map((r): WeekRun => ({ ...r, startedAt: r.startedAt.toISOString(), linked: r.id === s.completedActivityId })),
+  };
+}
+
+/**
+ * Relie à la main une sortie course à une séance (n'importe laquelle du programme, faite ou non). Si la sortie validait une autre séance,
+ * celle-ci repasse à faire ; si la séance avait une autre sortie, elle est libérée. Les deux paires défaites sont mémorisées (rejectedActivityIds) :
+ * l'appariement automatique ne revient pas sur un choix fait à la main. Renvoie le programme, ou null.
+ */
+export async function linkActivityManually(userId: string, sessionId: string, activityId: string): Promise<string | null> {
+  const [s, a, other] = await Promise.all([
+    prisma.plannedSession.findFirst({ where: { id: sessionId, userId, sport: "RUN" }, select: { id: true, programId: true, completedActivityId: true, rejectedActivityIds: true, plannedDurationS: true } }),
+    prisma.activity.findFirst({ where: { id: activityId, userId, type: "RUN" }, select: { id: true, startedAt: true, movingTimeS: true } }),
+    prisma.plannedSession.findUnique({ where: { completedActivityId: activityId }, select: { id: true, programId: true, rejectedActivityIds: true } }),
+  ]);
+  if (!s || !a) return null;
+  if (s.completedActivityId === a.id) return s.programId;
+  await prisma.$transaction([
+    ...(other ? [prisma.plannedSession.update({
+      where: { id: other.id },
+      data: { status: "PLANNED", completedActivityId: null, completedAt: null, complianceScore: null, rejectedActivityIds: [...new Set([...other.rejectedActivityIds, a.id])] },
+    })] : []),
+    prisma.plannedSession.update({
+      where: { id: s.id },
+      data: {
+        status: "COMPLETED", completedActivityId: a.id, completedAt: a.startedAt, complianceScore: compliance(a.movingTimeS, s.plannedDurationS),
+        rejectedActivityIds: [...new Set([...s.rejectedActivityIds.filter((x) => x !== a.id), ...(s.completedActivityId ? [s.completedActivityId] : [])])],
+      },
+    }),
+  ]);
+  if (other && other.programId !== s.programId) await reopenIfNeeded(other.programId);
+  await finishIfDone(s.programId);
+  refresh();
+  return s.programId;
+}
+
+/** Séance cochée faite (ou passée) sans sortie : elle repasse à faire. Renvoie le programme, ou null. */
+export async function reopenSession(userId: string, sessionId: string): Promise<string | null> {
+  const s = await prisma.plannedSession.findFirst({ where: { id: sessionId, userId, completedActivityId: null, status: { in: ["COMPLETED", "SKIPPED"] } }, select: { id: true, programId: true } });
+  if (!s) return null;
+  await prisma.plannedSession.update({ where: { id: s.id }, data: { status: "PLANNED", completedAt: null, complianceScore: null } });
+  await reopenIfNeeded(s.programId);
+  refresh();
+  return s.programId;
+}
+
+export type LinkableSession = { id: string; title: string; date: string; isKeySession: boolean };
+/** Fiche d'une sortie course non reliée : séances encore à faire de sa semaine dans le programme running en cours. */
+export async function sessionsForRun(userId: string, a: { type: string; startedAt: Date }): Promise<LinkableSession[]> {
+  if (a.type !== "RUN") return [];
+  const p = await prisma.program.findFirst({ where: { userId, sport: "RUN", status: LIVE }, orderBy: { createdAt: "desc" }, select: { id: true } });
+  const w = p && (await weekOfDay(p.id, dayKey(a.startedAt, TZ)));
+  if (!w) return [];
+  const list = await prisma.plannedSession.findMany({ where: { weekId: w.id, status: "PLANNED" }, orderBy: { orderInWeek: "asc" }, select: { id: true, title: true, date: true, isKeySession: true } });
+  return list.map((x) => ({ ...x, date: x.date.toISOString().slice(0, 10) }));
 }
 
 // ───────── Lecture : carte Home et page programme ─────────

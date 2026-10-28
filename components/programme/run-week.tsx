@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { SessionList, doneIn, weekDay, type WeekInfo, type WeekSession } from "./week-rows";
 
 export const toWeekSession = (s: SessionView): WeekSession => ({
-  id: s.id, title: s.title, summary: s.summary, status: s.status, isKey: s.isKeySession, isNext: s.isNext, activityId: s.activityId, ribbon: s.ribbon,
+  id: s.id, title: s.title, summary: s.summary, date: s.date, status: s.status, isKey: s.isKeySession, isNext: s.isNext, activityId: s.activityId, ribbon: s.ribbon,
 });
 export const toWeekInfo = (w: RunProgramView["weeks"][number]): WeekInfo => ({
   number: w.number, startDate: w.startDate, isRecovery: w.isRecovery, note: w.note, sessions: w.sessions.map(toWeekSession),

@@ -55,3 +55,43 @@ export function pickSession<T extends MatchSession>(queue: T[], a: MatchActivity
   const intensity = activityIntensity(a);
   return queue.slice(0, LOOKAHEAD).find((s) => fits(s, a, intensity)) ?? null;
 }
+
+/** Séance candidate d'une semaine : jour prévu (AAAA-MM-JJ), rang, durée prévue. */
+export type WeekCandidate = MatchSession & { date: string; orderInWeek: number; plannedDurationS?: number | null };
+export type RunShape = "key" | "long" | "easy";
+/** Au-delà, sans repère dans la semaine, une sortie facile compte comme sortie longue. */
+export const LONG_RUN_S = 75 * 60;
+
+/** Forme d'une séance : clé (intense), sortie longue, ou footing. */
+export const sessionShape = (s: Pick<MatchSession, "kind" | "isKeySession">): RunShape => (isDemanding(s) ? "key" : s.kind === "LONG_RUN" ? "long" : "easy");
+
+/**
+ * Forme d'une sortie face à sa semaine : intense → clé ; sinon sortie longue ou footing d'après sa durée, comparée aux durées prévues
+ * (à mi-chemin entre footing et sortie longue de la semaine), à défaut 75 min. Un type « long » choisi à la main l'emporte.
+ */
+export function runShape(a: MatchActivity, intensity: Intensity, week: WeekCandidate[]): RunShape {
+  if (intensity === "hard") return "key";
+  if (a.sessionType === "long") return "long";
+  const t = a.movingTimeS ?? 0;
+  const longS = week.find((s) => s.kind === "LONG_RUN" && s.plannedDurationS)?.plannedDurationS;
+  const easy = week.filter((s) => sessionShape(s) === "easy" && s.plannedDurationS).map((s) => s.plannedDurationS!);
+  const easyS = easy.length ? easy.reduce((x, y) => x + y, 0) / easy.length : null;
+  if (longS && easyS && longS > easyS) return t >= (longS + easyS) / 2 ? "long" : "easy";
+  if (longS) return t >= longS * 0.75 ? "long" : "easy";
+  return t >= LONG_RUN_S ? "long" : "easy";
+}
+
+/**
+ * Séance de la semaine pour une sortie du jour `day` : celle prévue ce jour-là si elle convient ; sinon la plus proche en date parmi celles
+ * qui conviennent, celles de la même forme d'abord (sortie longue ↔ sortie longue, footing ↔ footing ; une séance clé seulement pour une sortie
+ * intense, cf. fits). Null si aucune ne convient (on retombe alors sur la file, pickSession).
+ */
+export function pickInWeek<T extends WeekCandidate>(week: T[], a: MatchActivity, day: string): T | null {
+  const intensity = activityIntensity(a), ok = week.filter((s) => fits(s, a, intensity));
+  if (!ok.length) return null;
+  const shape = runShape(a, intensity, week), off = (s: T) => Number(sessionShape(s) !== shape);
+  const gap = (s: T) => Math.abs(Date.parse(`${s.date}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 864e5;
+  const sameDay = ok.filter((s) => s.date === day);
+  const pool = sameDay.length ? sameDay : ok;
+  return [...pool].sort((x, y) => off(x) - off(y) || gap(x) - gap(y) || x.orderInWeek - y.orderInWeek)[0];
+}

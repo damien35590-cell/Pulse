@@ -38,6 +38,8 @@ import { isVirtual } from "@/lib/art/card";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
 import { SetsLine } from "@/components/workout/hard-mark";
+import { AttachRun } from "@/components/programme/session-sheet";
+import { sessionsForRun } from "@/lib/data/training";
 import { getGear } from "@/lib/data/gear";
 import { selectableGear } from "@/lib/gear";
 import { CompareActivity, type Comparable } from "@/components/activity/compare-activity";
@@ -86,6 +88,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
 
   // Séance du programme que cette sortie valide (bloc « Séance du programme », avec « Détacher cette sortie »).
   const planned = a.type === "RUN" ? await prisma.plannedSession.findFirst({ where: { completedActivityId: a.id, userId: s.user.id }, select: { id: true, title: true, description: true, isKeySession: true } }) : null;
+  // Sortie course qui ne valide aucune séance : séances encore à faire de sa semaine, pour la rattacher à la main.
+  const linkable = a.type === "RUN" && !planned ? await sessionsForRun(s.user.id, a) : [];
   const route = a.polyline ? decodePolyline(a.polyline) : [];
   const raw = (a.trackPoints as TP[] | null) ?? [];
   const t0 = raw[0]?.t ?? 0;
@@ -157,6 +161,14 @@ export default async function ActivityPage({ params }: { params: { id: string } 
                     <Link href="/plan" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Voir le programme</Link>
                     <DetachSession sessionId={planned.id} />
                   </div>
+                </div>
+              </Section>
+            )}
+            {linkable.length > 0 && (
+              <Section title="Séance du programme">
+                <div className={cn(ui.card, "p-4")}>
+                  <p className="text-sm text-ink-soft">Cette sortie ne valide aucune séance du programme.</p>
+                  <AttachRun activityId={a.id} sessions={linkable} />
                 </div>
               </Section>
             )}

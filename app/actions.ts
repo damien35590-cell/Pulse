@@ -10,7 +10,7 @@ import { importRaceFromUrl } from "@/lib/races/import";
 import { weeklyGoalKm } from "@/lib/races/prep";
 import type { RaceDraft } from "@/types/race";
 import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
-import { createRunProgram, detachActivity, finishIfDone, reopenIfNeeded, saveVmaMetric } from "@/lib/data/training";
+import { createRunProgram, detachActivity, finishIfDone, linkActivityManually, reopenIfNeeded, reopenSession, runsForSession, saveVmaMetric, type WeekRun } from "@/lib/data/training";
 import { revokeLostBadges } from "@/lib/data/badges";
 import { isSessionType } from "@/lib/art/session-type";
 import { getZones } from "@/lib/data/zones";
@@ -87,7 +87,7 @@ const ownSession = (userId: string, id: string) =>
 export async function completePlannedSession(id: string): Promise<Res> {
   const userId = await uid(), s = await ownSession(userId, id);
   if (!s) return { ok: false, error: "Séance introuvable." };
-  if (s.status !== "PLANNED") return { ok: true };
+  if (s.status === "COMPLETED") return { ok: true }; // une séance passée peut encore être faite
   await prisma.plannedSession.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
   await finishIfDone(s.programId);
   programPaths();
@@ -99,6 +99,28 @@ export async function detachPlannedSession(sessionId: string): Promise<Res> {
   const userId = await uid();
   if (!(await detachActivity(userId, sessionId))) return { ok: false, error: "Cette séance n'a pas de sortie liée." };
   programPaths(); revalidatePath("/activities", "layout");
+  return { ok: true };
+}
+
+/** Feuille « Valider avec… » : sorties course de la semaine de la séance encore libres (et celle qui la valide déjà). */
+export async function weekRunsForSession(sessionId: string): Promise<{ ok: true; runs: WeekRun[]; status: string; activityId: string | null } | { ok: false; error: string }> {
+  const userId = await uid(), r = await runsForSession(userId, sessionId);
+  return r ? { ok: true, ...r } : { ok: false, error: "Séance introuvable." };
+}
+
+/** Relie à la main une sortie course à une séance du programme (depuis la page Programme ou la fiche de la sortie). */
+export async function linkRunToSession(sessionId: string, activityId: string): Promise<Res> {
+  const userId = await uid();
+  if (!(await linkActivityManually(userId, sessionId, activityId))) return { ok: false, error: "Liaison impossible." };
+  programPaths(); revalidatePath("/activities", "layout");
+  return { ok: true };
+}
+
+/** Séance cochée faite (ou passée) sans sortie : elle repasse à faire. */
+export async function reopenPlannedSession(sessionId: string): Promise<Res> {
+  const userId = await uid();
+  if (!(await reopenSession(userId, sessionId))) return { ok: false, error: "Séance introuvable." };
+  programPaths();
   return { ok: true };
 }
 

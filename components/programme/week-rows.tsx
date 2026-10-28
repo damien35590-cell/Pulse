@@ -6,20 +6,25 @@ import { DetachSession } from "@/components/training/program-actions";
 import { KeyBadge } from "@/components/training/program-card";
 import type { RibbonSegment } from "@/lib/art/zone-ribbon";
 import { cn } from "@/lib/utils";
+import { SessionTap } from "./session-sheet";
 
 /** Ce que les lignes d'une semaine ont besoin de savoir d'une séance (léger : passe aussi à la feuille d'une semaine, côté client). */
-export type WeekSession = { id: string; title: string; summary: string; status: SessionStatus; isKey: boolean; isNext: boolean; activityId: string | null; ribbon: RibbonSegment[] };
+export type WeekSession = { id: string; title: string; summary: string; date: string; status: SessionStatus; isKey: boolean; isNext: boolean; activityId: string | null; ribbon: RibbonSegment[] };
 export type WeekInfo = { number: number; startDate: string; isRecovery: boolean; note: string | null; sessions: WeekSession[] };
 
 export const weekDay = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`));
 /** Séances de la semaine déjà traitées (faites). */
 export const doneIn = (w: { sessions: { status: SessionStatus }[] }) => w.sessions.filter((s) => s.status === "COMPLETED").length;
 
-/** Une ligne de séance : état, titre, ligne d'allure, « Voir la sortie » et « Détacher cette sortie » quand elle est faite, vignette de la forme prévue (52 × 32). */
+/**
+ * Une ligne de séance : état, titre, ligne d'allure, vignette de la forme prévue (52 × 32) ; toute la ligne ouvre « Valider avec… » (SessionTap),
+ * quel que soit le jour. Faite : « Voir la sortie » et « Détacher cette sortie » dessous.
+ */
 export function SessionRow({ s }: { s: WeekSession }) {
   const Icon = s.status === "COMPLETED" ? Check : s.status === "SKIPPED" ? SkipForward : Circle;
   return (
-    <li className={cn("flex min-h-14 items-center gap-3 py-3", s.status === "SKIPPED" && "opacity-60")}>
+    <li className={cn("py-3", s.status === "SKIPPED" && "opacity-60")}>
+      <SessionTap s={{ id: s.id, title: s.title, date: s.date, status: s.status, activityId: s.activityId }} className="flex min-h-14 w-full items-center gap-3">
       <span className={cn("grid size-6 shrink-0 place-items-center rounded-full", s.status === "COMPLETED" ? "bg-ink text-bg" : s.isNext ? "border-2 border-ink text-ink-soft" : "border-2 border-surface-3 text-ink-mute")}>
         <Icon className="size-3.5" aria-hidden />
       </span>
@@ -29,15 +34,16 @@ export function SessionRow({ s }: { s: WeekSession }) {
           {s.isKey && <KeyBadge />}
         </div>
         {s.summary && <p className="mt-0.5 truncate font-num text-sm tabular-nums text-ink-soft">{s.summary}</p>}
-        {s.status === "COMPLETED" && s.activityId && (
-          <div className="-mb-2 flex flex-wrap items-center gap-x-4">
-            <Link href={`/activities/${s.activityId}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Voir la sortie</Link>
-            <DetachSession sessionId={s.id} />
-          </div>
-        )}
         {s.status === "SKIPPED" && <p className="text-xs text-ink-mute">Passée</p>}
       </div>
       {s.ribbon.length > 0 && <EffortStrip mini segments={s.ribbon} />}
+      </SessionTap>
+      {s.status === "COMPLETED" && s.activityId && (
+        <div className="-mb-2 flex flex-wrap items-center gap-x-4 pl-9">
+          <Link href={`/activities/${s.activityId}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">Voir la sortie</Link>
+          <DetachSession sessionId={s.id} />
+        </div>
+      )}
     </li>
   );
 }
