@@ -38,9 +38,9 @@ await writeFile(out("app/icon.svg"), master);
 await writeFile(out("app/favicon.ico"), ico(await Promise.all([16, 32, 48].map(async (size) => ({ size, data: await png(master, size) })))));
 await writeFile(out("app/apple-icon.png"), await png(Buffer.from(fullBleed), 180));
 for (const s of [192, 512]) {
-  await writeFile(out(`public/icons/icon-${s}.png`), await png(master, s));
-  await writeFile(out(`public/icons/maskable-${s}.png`), await png(maskable, s));
+  await writeFile(out(`public/icons/icon-volt-${s}.png`), await png(master, s));
+  await writeFile(out(`public/icons/icon-volt-maskable-${s}.png`), await png(maskable, s));
 }
-await writeFile(out("public/icons/monochrome-512.png"), await png(mono, 512));
-await writeFile(out("public/icons/badge-96.png"), await png(mono, 96)); // badge des notifications (silhouette blanche)
+await writeFile(out("public/icons/icon-volt-monochrome-512.png"), await png(mono, 512));
+await writeFile(out("public/icons/badge-volt-96.png"), await png(mono, 96)); // badge des notifications (silhouette blanche)
 console.log("icons ok");

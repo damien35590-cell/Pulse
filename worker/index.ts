@@ -22,8 +22,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(d.title || "Pulse", {
       body: d.body ?? "",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/badge-96.png", // silhouette blanche sur fond transparent : Android la teinte dans la barre d'état
+      icon: "/icons/icon-volt-192.png",
+      badge: "/icons/badge-volt-96.png", // silhouette blanche sur fond transparent : Android la teinte dans la barre d'état
       tag: d.tag || undefined, // même étiquette : remplace la notification précédente au lieu d'empiler
       renotify: !!d.tag, // …tout en vibrant de nouveau
       lang: "fr",

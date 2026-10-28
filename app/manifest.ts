@@ -17,17 +17,17 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0A0A0C",
     categories: ["health", "fitness", "sports"],
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-volt-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-volt-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       // Android adapte l'icône à la forme du launcher Pixel (cercle / squircle)
-      { src: "/icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
-      { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/icon-volt-maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/icons/icon-volt-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       // icône thématique Android 13+
-      { src: "/icons/monochrome-512.png", sizes: "512x512", type: "image/png", purpose: "monochrome" },
+      { src: "/icons/icon-volt-monochrome-512.png", sizes: "512x512", type: "image/png", purpose: "monochrome" },
     ],
     shortcuts: [
-      { name: "Enregistrer", short_name: "Enregistrer", url: "/record", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "Mes activités", short_name: "Activités", url: "/activities", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Enregistrer", short_name: "Enregistrer", url: "/record", icons: [{ src: "/icons/icon-volt-192.png", sizes: "192x192" }] },
+      { name: "Mes activités", short_name: "Activités", url: "/activities", icons: [{ src: "/icons/icon-volt-192.png", sizes: "192x192" }] },
     ],
   };
 }
