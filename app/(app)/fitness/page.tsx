@@ -7,6 +7,7 @@ import { estimateLoad, LOAD_SOURCE_LABELS, LOAD_SOURCES, type LoadSource } from 
 import { dayKey, shiftDay } from "@/lib/dates";
 import { SPORT_ORDER, SPORTS } from "@/lib/sports";
 import { FitnessChart } from "@/components/fitness/fitness-chart";
+import { FormHelp } from "@/components/fitness/form-help";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Forme physique" };
@@ -70,7 +71,7 @@ export default async function FitnessPage() {
           <p className="text-xs leading-5 text-ink-soft"><b className="text-ink">Puissance</b> : capteur et FTP. <b className="text-ink">Cardio</b> : fréquence cardiaque et FC max. <b className="text-ink">Ressenti</b> : effort noté de 1 à 10 × durée. <b className="text-ink">Estimée</b> : durée et sport seulement. Notez l’effort de vos séances pour fiabiliser le score.</p>
         </> : <p className="text-sm text-ink-soft">Aucune séance ces 7 derniers jours.</p>}
       </section>
-      <section className="rounded-xl border border-line bg-surface p-4"><h2 className="mb-2 font-display text-lg font-bold">90 derniers jours</h2><FitnessChart data={data} /></section>
+      <section className="rounded-xl border border-line bg-surface p-4"><div className="mb-2 flex items-center gap-1"><h2 className="font-display text-lg font-bold">90 derniers jours</h2><FormHelp /></div><FitnessChart data={data} /></section>
       <section className="rounded-xl border border-line bg-surface p-4 text-sm leading-8 text-ink-soft">
         <h2 className="font-display text-lg font-bold text-ink">Zones de forme</h2>
         Au-dessus de +20 : <b className="text-ink">Transition</b><br />+5 à +20 : <b className="text-ink">Frais</b><br />−10 à +5 : <b className="text-ink">Zone neutre</b><br />−30 à −10 : <b className="text-ink">Optimal</b><br />Sous −30 : <b className="text-ink">Risque élevé</b>
