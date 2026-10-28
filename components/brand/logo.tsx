@@ -1,10 +1,14 @@
 import { cn } from "@/lib/utils";
 
-/** Marque Pulse : battement de cœur Volt sur fond noir. Même tracé que assets/brand/pulse-mark.svg. */
+/** Marque Pulse « live trace » : amorce atténuée, pic Volt, point de fin (position GPS en direct). Même tracé que assets/brand/pulse-mark.svg. */
 export function PulseMark({ size = 32, className }: { size?: number; className?: string }) {
   return (
     <svg viewBox="0 0 512 512" width={size} height={size} role="img" aria-label="Pulse" className={cn("shrink-0 rounded-[22.5%] bg-bg", className)}>
-      <path d="M96 272H184L220 184L268 352L308 152L340 272H416" fill="none" className="stroke-brand" strokeWidth={40} strokeLinecap="round" strokeLinejoin="round" />
+      <g fill="none" strokeWidth={30} strokeLinecap="round" strokeLinejoin="round" className="stroke-brand">
+        <path d="M64 264H149L179 213" strokeOpacity={0.4} />
+        <path d="M179 213L222 350L269 154L311 264H363" />
+      </g>
+      <circle cx={410} cy={264} r={15} fill="none" strokeWidth={30} className="stroke-brand" />
     </svg>
   );
 }

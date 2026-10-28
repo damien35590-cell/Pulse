@@ -13,8 +13,8 @@ const maskable = await brand("pulse-mark-maskable.svg");
 const mono = await brand("pulse-mark-monochrome.svg");
 const png = (svg, size) => sharp(svg, { density: 384 }).resize(size, size).png().toBuffer();
 
-// iOS arrondit lui-même : on retire le rx du master pour un fond plein
-const fullBleed = master.toString().replace(' rx="115"', "");
+// Badge 96 px : trait plus épais pour rester lisible
+const badgeMono = mono.toString().replace('stroke-width="30"', 'stroke-width="40"');
 
 // ICO : trois PNG embarqués (16/32/48)
 function ico(images) {
@@ -36,11 +36,11 @@ function ico(images) {
 await mkdir(out("public/icons"), { recursive: true });
 await writeFile(out("app/icon.svg"), master);
 await writeFile(out("app/favicon.ico"), ico(await Promise.all([16, 32, 48].map(async (size) => ({ size, data: await png(master, size) })))));
-await writeFile(out("app/apple-icon.png"), await png(Buffer.from(fullBleed), 180));
+await writeFile(out("app/apple-icon.png"), await png(maskable, 180)); // iOS arrondit lui-même : fond plein, marque à 0,85
 for (const s of [192, 512]) {
-  await writeFile(out(`public/icons/icon-volt-${s}.png`), await png(master, s));
-  await writeFile(out(`public/icons/icon-volt-maskable-${s}.png`), await png(maskable, s));
+  await writeFile(out(`public/icons/icon-live-${s}.png`), await png(master, s));
+  await writeFile(out(`public/icons/icon-live-maskable-${s}.png`), await png(maskable, s));
 }
-await writeFile(out("public/icons/icon-volt-monochrome-512.png"), await png(mono, 512));
-await writeFile(out("public/icons/badge-volt-96.png"), await png(mono, 96)); // badge des notifications (silhouette blanche)
+await writeFile(out("public/icons/icon-live-monochrome-512.png"), await png(mono, 512));
+await writeFile(out("public/icons/badge-live-96.png"), await png(Buffer.from(badgeMono), 96)); // badge des notifications (silhouette blanche)
 console.log("icons ok");

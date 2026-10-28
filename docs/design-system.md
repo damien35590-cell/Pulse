@@ -61,12 +61,12 @@ pastilles atteintes pleines, non atteintes en simple contour ; filtre actif en `
 
 ## Marque (`components/brand/logo.tsx`)
 
-- **`<PulseMark size>`** : le symbole seul (battement de cœur Volt sur fond `bg-bg`). Pour les petits espaces et les rappels de marque : barre du haut, avatar d'app, état vide.
+- **`<PulseMark size>`** : le symbole « live trace » seul, sur fond `bg-bg` : amorce atténuée (`stroke-brand` à 40 %), pic unique, point de fin (le bout de la trace GPS en direct). Pour les petits espaces et les rappels de marque : barre du haut, avatar d'app, état vide.
 - **`<PulseLogo size>`** : symbole + mot-symbole « Pulse » (`font-num` 600, `text-ink`). Seulement là où l'on présente l'app : connexion, écran d'accueil, à propos. Jamais deux fois sur le même écran.
 - **Taille minimale** : 16 px pour `PulseMark` (taille du favicon, encore lisible), 24 px pour `PulseLogo` (sinon le mot-symbole devient trop petit).
 - **Zone de protection** : laisser vide autour du logo au moins ¼ de `size` (8 px pour un symbole de 32 px). Ne pas le coller à un bord de carte ni à un texte.
-- **Uniquement les tokens** : trait `stroke-brand` (vire au vert foncé `--brand-text` en thème clair pour rester lisible), fond `bg-bg`. Pas de recoloration, de dégradé, d'ombre ni de déformation, et pas de SVG recopié à la main : toujours passer par ces composants.
-- Fichiers sources dans `assets/brand/` (master, maskable, monochrome). Les icônes d'app (`app/icon.svg`, `favicon.ico`, `apple-icon.png`, `public/icons/*`) sont générées par `npm run icons` : modifier le SVG, relancer, committer le résultat.
+- **Uniquement les tokens** : trait et point de fin `stroke-brand`, amorce à `strokeOpacity` 0,4 (vire au vert foncé `--brand-text` en thème clair pour rester lisible), fond `bg-bg`. Pas de recoloration, de dégradé, d'ombre ni de déformation, et pas de SVG recopié à la main : toujours passer par ces composants.
+- **Logo « live trace »** : fond noir #0A0A0C, amorce atténuée #5B6B1F, pic Volt #C6F432 et point de fin Volt (trait 30 sur 512, extrémités arrondies). L'icône d'app et la marque dans l'app sont désormais identiques. Sources dans `assets/brand/` (master, maskable à 0,85, monochrome blanc sans amorce). Les icônes (`app/icon.svg`, `favicon.ico`, `apple-icon.png`, `public/icons/icon-live-*`, `badge-live-96.png`) sont générées par `npm run icons` : modifier le SVG, relancer, committer. Renommer `live` à chaque refonte pour contourner le cache Android.
 
 ## Recettes (`lib/ui.ts`)
 
