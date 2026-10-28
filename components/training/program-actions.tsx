@@ -1,5 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Pause, Play, SkipForward, Unlink } from "lucide-react";
 import { ConfirmSheet } from "@/components/ui/bottom-sheet";
@@ -125,5 +126,24 @@ export function DetachSession({ sessionId, className }: { sessionId: string; cla
         confirmLabel="Détacher"
       />
     </>
+  );
+}
+
+/**
+ * Muscu du jour sur la carte d'accueil : « Démarrer la séance » (même départ que le « + » : la suggestion du jour, déjà préparée)
+ * et « Passer ». Aucune séance de muscu n'existe en base à passer : « Passer » est mémorisé pour la journée dans le navigateur.
+ */
+export function LiftActions() {
+  const key = `pulse-lift-skip-${new Date().toLocaleDateString("sv-SE")}`;
+  const [skipped, setSkipped] = useState(false);
+  useEffect(() => { try { setSkipped(localStorage.getItem(key) === "1"); } catch { /* stockage indisponible */ } }, [key]);
+  if (skipped) return <p className="mt-4 text-sm text-ink-mute">Séance passée pour aujourd’hui.</p>;
+  return (
+    <div className="mt-5 grid grid-cols-[2fr_1fr] gap-2">
+      <Link href="/record/session?suggest=1" onPointerDown={() => tap(12)} className={cn(ui.btnPrimary, "w-full px-4")}>Démarrer la séance</Link>
+      <button type="button" onClick={() => { tap(); try { localStorage.setItem(key, "1"); } catch { /* stockage indisponible */ } setSkipped(true); }} className={cn(ui.btnSecondary, "bg-transparent px-4 text-ink-soft")}>
+        <SkipForward className="h-4 w-4" aria-hidden />Passer
+      </button>
+    </div>
   );
 }

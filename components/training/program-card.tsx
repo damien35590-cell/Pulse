@@ -7,7 +7,7 @@ import { sessionFromProgram } from "@/lib/routes/session-fit";
 import { fmtDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
-import { PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
+import { LiftActions, PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
 import { SessionCarousel } from "./session-carousel";
 
 /** « Bloc 1 · Semaine 2/4 · Reprise & VMA » : pied de la carte d'accueil, le nom du programme y tient sans tronquer le libellé du haut. */
@@ -149,7 +149,7 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
               <ul className="mt-2 space-y-1.5">
                 {(r ? [r.steps] : c.lines).map((l) => <li key={l} className="text-[15px] leading-snug text-ink-soft">{l}</li>)}
               </ul>
-              {c.kind === "lift" && c.primary && <Link href={c.primary.href} className={cn(ui.btnPrimary, "mt-5 w-full")}>{c.primary.label}</Link>}
+              {c.kind === "lift" && <LiftActions />}
               {c.next && <p className="mt-3 text-sm text-ink-mute">{c.next}</p>}
             </div>
           ) : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
