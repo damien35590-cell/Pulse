@@ -78,3 +78,17 @@ export function planSession(s: FitSession, existing: Existing[]): { status: "exi
   const replaces = existing.filter((e) => e !== own && isSegmentActivity(e) && overlaps(e, s)).map((e) => e.id);
   return { status: replaces.length ? "replace" : own ? "exists" : "create", ownId: own?.id ?? null, replaces };
 }
+
+/** Seuils d'une sortie détectée automatiquement (segments hors session). */
+export const MIN_SEGMENT_MS = 5 * 60 * 1000;
+export const MIN_WALK_M = 300;
+const WALK_FIT_TYPE = 7;
+
+/**
+ * Un groupe de segments devient une activité seulement s'il contient au moins un segment de 5 min ou plus (des bouts de 1 à 4 min recollés,
+ * c'est le téléphone qui bouge dans la poche) et, pour une marche, s'il fait au moins 300 m.
+ */
+export function keepGroup(g: (Piece & { distanceM: number })[]) {
+  if (!g.some((p) => p.endMs - p.startMs >= MIN_SEGMENT_MS)) return false;
+  return g[0].type !== WALK_FIT_TYPE || g.reduce((s, p) => s + p.distanceM, 0) >= MIN_WALK_M;
+}

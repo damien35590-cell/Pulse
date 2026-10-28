@@ -1,8 +1,9 @@
 import type { ActivityType } from "@prisma/client";
 import { SPORT_LABEL } from "@/lib/sports";
 import { prisma } from "@/lib/prisma";
-import { absorbActivities, findOverlapping, processActivity } from "@/lib/pipeline/post-import";
-import { leftoverGroups, mergedSpan, planSession, type Existing, type FitSession, type Piece } from "@/lib/sync/google-fit-merge";
+import { absorbActivities, OVERLAP_RATIO, overlapRatio, processActivity } from "@/lib/pipeline/post-import";
+import { awardBadges } from "@/lib/data/badges";
+import { isSegmentActivity, keepGroup, leftoverGroups, mergedSpan, planSession, type Existing, type FitSession } from "@/lib/sync/google-fit-merge";
 
 /** Source des activités créées par cette synchro (les plus anciennes portent « fit » ; on les reconnaît à leur dedupeKey « gfit-… »). */
 export const GOOGLE_FIT_SOURCE = "google-fit";
@@ -33,9 +34,17 @@ const AUTO_TITLES: Record<string, string> = {
   RUN: SPORT_LABEL("RUN"),
 };
 
-// Fonction pour rafraîchir le jeton Google s'il est expiré
+/** Marge avant expiration : en dessous, on renouvelle le jeton. */
+const TOKEN_MARGIN_S = 5 * 60;
+
+/**
+ * Jeton Google valide : celui en base s'il vaut encore plus de 5 min, sinon renouvelé (et réécrit en base).
+ * Un renouvellement refusé n'est plus avalé : avec un jeton mort, Google répondrait 401 à chaque appel. On lève une erreur claire,
+ * sauf si l'ancien jeton est encore valable (il sert jusqu'au bout).
+ */
 export async function getValidAccessToken(account: any) {
-  if (!account.refresh_token) return account.access_token;
+  const left = (account.expires_at ?? 0) - Math.floor(Date.now() / 1000);
+  if (!account.refresh_token || (account.access_token && left > TOKEN_MARGIN_S)) return account.access_token;
 
   try {
     const response = await fetch("https://oauth2.googleapis.com/token", {
@@ -68,8 +77,10 @@ export async function getValidAccessToken(account: any) {
 
     return tokens.access_token;
   } catch (error) {
-    console.error("Erreur de rafraîchissement du token :", error);
-    return account.access_token;
+    console.error("[google-fit] renouvellement du jeton refusé :", error);
+    if (account.access_token && left > 0) return account.access_token;
+    const why = (error as { error_description?: string; error?: string })?.error_description ?? (error as { error?: string })?.error ?? (error instanceof Error ? error.message : "inconnu");
+    throw new Error(`Google : jeton expiré et renouvellement refusé (${why}). Reconnecte ton compte Google.`);
   }
 }
 
@@ -116,12 +127,15 @@ export async function fetchSessionDistanceM(
   }
 }
 
-// Récupère les activités détectées automatiquement (vélo, marche, course)
+/** Distance d'un seau d'agrégat Google (somme des points com.google.distance.delta). */
+const bucketDistance = (b: any) => Math.round((b.dataset ?? []).flatMap((d: any) => d.point ?? []).reduce((s: number, p: any) => s + (p.value?.[0]?.fpVal ?? 0), 0));
+
+/** Activités détectées automatiquement (vélo, marche, course) AVEC leur distance : un seul appel (agrégat de distance par segment). */
 async function fetchActivitySegments(
   token: string,
   startMs: number,
   endMs: number
-): Promise<{ activity: number; startMs: number; endMs: number }[]> {
+): Promise<{ activity: number; startMs: number; endMs: number; distanceM: number }[]> {
   try {
     const res = await fetch(AGGREGATE_URL, {
       method: "POST",
@@ -130,7 +144,7 @@ async function fetchActivitySegments(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        aggregateBy: [{ dataTypeName: "com.google.activity.segment" }],
+        aggregateBy: [{ dataTypeName: "com.google.distance.delta" }],
         bucketByActivitySegment: { minDurationMillis: 60 * 1000 }, // 1 min : les morceaux courts sont recollés, puis seuil de 5 min (MIN_AUTO_S)
         startTimeMillis: startMs,
         endTimeMillis: endMs,
@@ -151,6 +165,7 @@ async function fetchActivitySegments(
         activity: b.activity as number,
         startMs: Number(b.startTimeMillis),
         endMs: Number(b.endTimeMillis),
+        distanceM: bucketDistance(b),
       }));
   } catch (e) {
     console.warn("[google-fit] segments: erreur", e);
@@ -162,7 +177,6 @@ async function fetchActivitySegments(
 const MIN_AUTO_S = 5 * 60;
 const TOLERANCE_MS = 5 * 60 * 1000;
 
-type Sourced = Piece & { id: string };
 /** Session Google Fit telle que l'appli Fit l'affiche (« Course à pied du midi », 12:35 → 13:16). */
 export type RawSession = FitSession & { name: string | null; activityType: number; activeMs: number | null };
 
@@ -180,6 +194,22 @@ export async function fetchSessions(token: string, startMs: number, endMs: numbe
       id: String(s.id), name: s.name || null, activityType: Number(s.activityType),
       startMs: Number(s.startTimeMillis), endMs: Number(s.endTimeMillis), activeMs: s.activeTimeMillis ? Number(s.activeTimeMillis) : null,
     }));
+}
+
+/** Distance de chaque session de la période, en un seul appel (agrégat par session). Vide si Google refuse : on retombe sur un appel par session. */
+async function fetchSessionDistances(token: string, startMs: number, endMs: number): Promise<Map<string, number>> {
+  try {
+    const res = await fetch(AGGREGATE_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ aggregateBy: [{ dataTypeName: "com.google.distance.delta" }], bucketBySession: { minDurationMillis: 0 }, startTimeMillis: startMs, endTimeMillis: endMs }),
+    });
+    if (!res.ok) return new Map();
+    const data = await res.json();
+    return new Map((data.bucket ?? []).filter((b: any) => b.session?.id).map((b: any) => [String(b.session.id), bucketDistance(b)]));
+  } catch {
+    return new Map();
+  }
 }
 
 /** FC moyenne / max sur une période (agrégat com.google.heart_rate.summary) ; null sans mesure ou sans autorisation de lecture. */
@@ -200,11 +230,16 @@ async function fetchHeartRate(token: string, startMs: number, endMs: number): Pr
 }
 
 /** Ce qu'une session donne à l'activité : distance agrégée sur toute sa période, temps actif (sinon durée), temps écoulé, FC si dispo. */
-export async function sessionValues(token: string, s: RawSession) {
-  const [distanceM, hr] = await Promise.all([fetchSessionDistanceM(token, s.startMs, s.endMs), fetchHeartRate(token, s.startMs, s.endMs)]);
-  const elapsedS = Math.round((s.endMs - s.startMs) / 1000);
-  return { distanceM: distanceM ?? 0, movingS: s.activeMs ? Math.min(elapsedS, Math.round(s.activeMs / 1000)) : elapsedS, elapsedS, hr };
+/** `known` : distance déjà lue par fetchSessionDistances ; `hr` : la lecture de la FC est autorisée (sinon pas d'appel). Durées tronquées à la seconde, comme l'appli Fit. */
+export async function sessionValues(token: string, s: RawSession, opts: { known?: number; hr?: boolean } = {}) {
+  const [distanceM, hr] = await Promise.all([
+    opts.known ?? fetchSessionDistanceM(token, s.startMs, s.endMs),
+    opts.hr ? fetchHeartRate(token, s.startMs, s.endMs) : null,
+  ]);
+  const elapsedS = Math.floor((s.endMs - s.startMs) / 1000);
+  return { distanceM: distanceM ?? 0, movingS: s.activeMs ? Math.min(elapsedS, Math.floor(s.activeMs / 1000)) : elapsedS, elapsedS, hr };
 }
+const canReadHr = (scope: string | null | undefined) => !!scope?.includes("fitness.heart_rate.read");
 
 /** Activités Google Fit d'un utilisateur qui commencent dans la période (un jour de marge avant). */
 export async function loadExisting(uid: string, startMs: number, endMs: number): Promise<(Existing & { type: ActivityType })[]> {
@@ -242,36 +277,18 @@ export async function rebuildFromSession(uid: string, s: RawSession, plan: { own
   return keep;
 }
 
-/** Distance d'une sortie recollée : somme des morceaux (null si Google n'en donne pour aucun). */
-async function piecesDistanceM(token: string, g: Piece[]): Promise<number | null> {
-  const parts = await Promise.all(g.map((p) => fetchSessionDistanceM(token, p.startMs, p.endMs)));
-  return parts.some((d) => d != null) ? parts.reduce<number>((s, d) => s + (d ?? 0), 0) : null;
-}
-
-/**
- * Activités nées de segments déjà en base pour un groupe de segments hors sessions : par id (dedupeKey, mergedSourceIds) ou du même type
- * démarrant dans la période. Aucune → à créer. Une seule → complétée si elle ne couvre pas encore tous les morceaux. Plusieurs → importées
- * séparément avant le recollage : on n'y touche pas ici (rattrapage : tools/fusionner-gfit.ts).
- */
-async function existingFor(uid: string, types: ActivityType[], ids: string[], span: { startMs: number; endMs: number }) {
-  return prisma.activity.findMany({
-    where: {
-      userId: uid,
-      OR: [
-        { dedupeKey: { in: ids.map((i) => `gfit-${i}`) } },
-        { mergedSourceIds: { hasSome: ids } },
-        { dedupeKey: { startsWith: "gfit-seg-" }, type: { in: types }, startedAt: { gte: new Date(span.startMs - TOLERANCE_MS), lte: new Date(span.endMs) } },
-      ],
-    },
-    select: { id: true, dedupeKey: true, mergedSourceIds: true, distanceM: true },
-  });
-}
+/** Distance d'une sortie recollée : somme des morceaux (déjà lue avec les segments). */
+const piecesDistanceM = (g: { distanceM: number }[]) => g.reduce((s, p) => s + p.distanceM, 0);
 
 /**
  * Synchro Google Fit. Les SESSIONS font foi (ce que montre l'appli Fit) : une activité par session, clé gfit-<id de session>.
  * Les segments bruts ne servent que pour le temps qu'aucune session ne couvre (vélotaf, marches détectés), recollés par type (< 10 min).
  * Rien n'est jamais supprimé ici : une session recouverte par d'anciennes activités nées de segments est signalée (« à reconstruire »)
  * et laissée à tools/reconstruire-gfit.ts.
+ *
+ * Rapidité (la fonction Vercel est aux États-Unis, la base à Londres : chaque requête coûte) : 4 appels Google en tout (liste des sessions,
+ * distance par session, segments avec leur distance, plus le renouvellement du jeton s'il expire), activités de la période lues une fois
+ * et cherchées en mémoire, badges recalculés une seule fois à la fin.
  */
 export async function syncGoogleFit(uid: string, days: number = 7) {
   const account = await prisma.account.findFirst({
@@ -285,8 +302,20 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   const validToken = await getValidAccessToken(account);
   const endMs = Date.now(), startMs = endMs - days * 864e5;
 
-  const sessions = await fetchSessions(validToken, startMs, endMs);
-  const existing = await loadExisting(uid, startMs, endMs);
+  const [sessions, distances, segments, existing, around] = await Promise.all([
+    fetchSessions(validToken, startMs, endMs),
+    fetchSessionDistances(validToken, startMs, endMs),
+    fetchActivitySegments(validToken, startMs, endMs),
+    loadExisting(uid, startMs, endMs),
+    // Toutes sources : pour ne pas doubler une sortie déjà enregistrée par Strava, un fichier FIT, une saisie…
+    prisma.activity.findMany({
+      where: { userId: uid, startedAt: { gte: new Date(startMs - 864e5), lte: new Date(endMs) } },
+      select: { startedAt: true, movingTimeS: true, elapsedTimeS: true },
+    }),
+  ]);
+  const takenBy = (span: { startedAt: Date; movingTimeS: number; elapsedTimeS?: number | null }) => around.some((o) => overlapRatio(o, span) > OVERLAP_RATIO);
+  const hr = canReadHr(account.scope);
+  const created: string[] = [];
 
   let saved = 0;
   let duplicates = 0;
@@ -300,59 +329,59 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     const plan = planSession(s, existing);
     if (plan.status === "replace") { pending++; continue; }
     if (plan.status === "exists") {
-      const e = await prisma.activity.findUnique({ where: { id: plan.ownId! }, select: { distanceM: true } });
-      if (e && e.distanceM === 0) {
-        const d = await fetchSessionDistanceM(validToken, s.startMs, s.endMs);
-        if (d) { await prisma.activity.update({ where: { id: plan.ownId! }, data: { distanceM: d } }); updated++; continue; }
-      }
-      duplicates++;
+      const own = await prisma.activity.findUnique({ where: { id: plan.ownId! }, select: { distanceM: true } });
+      const d = distances.get(s.id);
+      if (own && own.distanceM === 0 && d) { await prisma.activity.update({ where: { id: plan.ownId! }, data: { distanceM: d } }); updated++; }
+      else duplicates++;
       continue;
     }
-    const v = await sessionValues(validToken, s);
-    // Même sortie déjà enregistrée par une autre source (FIT, Strava, saisie…) : Google Fit n'apporte rien de plus.
-    if ((await findOverlapping(uid, { startedAt: new Date(s.startMs), movingTimeS: v.movingS, elapsedTimeS: v.elapsedS })).length) { duplicates++; continue; }
+    const v = await sessionValues(validToken, s, { known: distances.get(s.id), hr });
+    const span = { startedAt: new Date(s.startMs), movingTimeS: v.movingS, elapsedTimeS: v.elapsedS };
+    if (takenBy(span)) { duplicates++; continue; }
     let id: string;
     try {
       id = await createFromSession(uid, s, v);
     } catch (e: any) {
       throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
     }
+    around.push(span);
+    existing.push({ id, type: mapFitType(s.activityType), dedupeKey: `gfit-${s.id}`, mergedSourceIds: [], startMs: s.startMs, endMs: s.endMs });
+    created.push(id);
     saved++;
-    await processActivity(id);
   }
 
   // ---------- 2. Segments hors sessions (vélotaf, marches détectés) : recollés par type ----------
-  const segments = await fetchActivitySegments(validToken, startMs, endMs);
   for (const g of leftoverGroups(segments.map((s) => ({ ...s, type: s.activity, id: `seg-${s.activity}-${s.startMs}` })), sessions)) {
     const span = mergedSpan(g), ids = g.map((p) => p.id), merged = g.length > 1;
-    // Les petits bouts isolés restent ignorés ; recollés, ils comptent.
-    if (span.movingS < MIN_AUTO_S) continue;
-    const typeEnum = mapFitType(g[0].activity);
-    const found = await existingFor(uid, typeEnum === "EBIKE" ? ["EBIKE", "RIDE"] : [typeEnum], ids, span);
-    if (found.length > 1) { duplicates++; continue; }
+    // Au moins 5 min en tout, un segment de 5 min ou plus, et 300 m pour une marche : le reste, c'est le téléphone qui bouge dans la poche.
+    if (span.movingS < MIN_AUTO_S || !keepGroup(g)) continue;
+    const typeEnum = mapFitType(g[0].activity), types: string[] = typeEnum === "EBIKE" ? ["EBIKE", "RIDE"] : [typeEnum];
+    // Déjà en base : par id (clé, morceaux recollés) ou activité née de segments du même type qui démarre dans la sortie.
+    const found = existing.filter((e) =>
+      ids.some((i) => e.dedupeKey === `gfit-${i}` || e.mergedSourceIds.includes(i))
+      || (isSegmentActivity(e) && types.includes(e.type) && e.startMs >= span.startMs - TOLERANCE_MS && e.startMs <= span.endMs));
+    const distanceM = piecesDistanceM(g);
+    if (found.length > 1) { duplicates++; continue; } // importés séparément avant le recollage : tools/fusionner-gfit.ts
     if (found.length === 1) {
       const e = found[0], has = new Set([...e.mergedSourceIds, e.dedupeKey?.replace(/^gfit-/, "")]);
       if (ids.every((i) => has.has(i))) {
-        if (e.distanceM === 0) {
-          const d = await piecesDistanceM(validToken, g);
-          if (d) { await prisma.activity.update({ where: { id: e.id }, data: { distanceM: d } }); updated++; continue; }
-        }
-        duplicates++;
+        const own = await prisma.activity.findUnique({ where: { id: e.id }, select: { distanceM: true } });
+        if (own && own.distanceM === 0 && distanceM) { await prisma.activity.update({ where: { id: e.id }, data: { distanceM } }); updated++; }
+        else duplicates++;
         continue;
       }
       // La sortie a grandi (ou n'avait été prise qu'en partie) : on la complète, sans toucher à ce que tu as saisi dessus.
-      const d = await piecesDistanceM(validToken, g);
       await prisma.activity.update({
         where: { id: e.id },
-        data: { startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: merged ? span.elapsedS : null, ...(d != null ? { distanceM: d } : {}), mergedSourceIds: merged ? ids : [] },
+        data: { startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: merged ? span.elapsedS : null, distanceM, mergedSourceIds: merged ? ids : [] },
       });
-      await processActivity(e.id);
+      created.push(e.id);
       if (merged) joined += g.length - 1;
       updated++;
       continue;
     }
-    if ((await findOverlapping(uid, { startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: span.elapsedS })).length) { duplicates++; continue; }
-    const distanceM = await piecesDistanceM(validToken, g);
+    const at = { startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: span.elapsedS };
+    if (takenBy(at)) { duplicates++; continue; }
     const dedupeKey = `gfit-${g[0].id}`;
     let id: string;
     try {
@@ -360,18 +389,27 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
         data: {
           userId: uid, dedupeKey, externalId: dedupeKey, source: GOOGLE_FIT_SOURCE,
           title: AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`, type: typeEnum,
-          startedAt: new Date(span.startMs), movingTimeS: span.movingS,
+          startedAt: at.startedAt, movingTimeS: span.movingS,
           ...(merged ? { elapsedTimeS: span.elapsedS, mergedSourceIds: ids } : {}),
-          distanceM: distanceM ?? 0,
+          distanceM,
         },
         select: { id: true },
       }));
     } catch (e: any) {
       throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
     }
+    around.push(at);
+    existing.push({ id, type: typeEnum, dedupeKey, mergedSourceIds: merged ? ids : [], startMs: span.startMs, endMs: span.endMs });
     if (merged) joined += g.length - 1;
+    created.push(id);
     auto++;
-    await processActivity(id);
+  }
+
+  // ---------- 3. Traitement d'import (charge, records, programme, anecdote), puis badges une seule fois ----------
+  for (const id of created) await processActivity(id, undefined, { badges: false });
+  if (created.length) {
+    const tz = (await prisma.user.findUnique({ where: { id: uid }, select: { timezone: true } }))?.timezone ?? "Europe/Paris";
+    await awardBadges(uid, tz).catch((e) => console.error("[google-fit] badges", e));
   }
 
   return {

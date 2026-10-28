@@ -221,7 +221,7 @@ export type ProcessResult = {
  * Chaque étape est isolée : une erreur est journalisée et renvoyée, jamais levée, pour ne pas bloquer l'import.
  * `hint.points` : trace complète si l'appelant l'a encore en mémoire (plus précise pour les records que la trace compactée en base).
  */
-export async function processActivity(activityId: string, hint?: { points?: Pt[] }): Promise<ProcessResult> {
+export async function processActivity(activityId: string, hint?: { points?: Pt[] }, opts: { badges?: boolean } = {}): Promise<ProcessResult> {
   const res: ProcessResult = { activityId, removed: [], records: [], badges: 0, story: null, errors: [] };
   const fail = (step: string, e: unknown) => {
     const m = `${step} : ${e instanceof Error ? e.message : String(e)}`;
@@ -250,7 +250,7 @@ export async function processActivity(activityId: string, hint?: { points?: Pt[]
 
   try {
     const user = await prisma.user.findUnique({ where: { id: a.userId }, select: { timezone: true } });
-    res.badges = await awardBadges(a.userId, user?.timezone ?? "Europe/Paris");
+    if (opts.badges !== false) res.badges = await awardBadges(a.userId, user?.timezone ?? "Europe/Paris");
   } catch (e) { fail("badges", e); }
 
   try { await linkActivityToPlannedSession(a); }

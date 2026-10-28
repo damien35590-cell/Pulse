@@ -15,7 +15,7 @@ const row = "flex min-h-14 w-full items-center gap-3 rounded-tile bg-surface px-
 const tile = "grid size-10 shrink-0 place-items-center rounded-tile bg-surface-2 text-ink-soft";
 const plural = (n: number) => (n > 1 ? `${n} nouvelles activités` : "1 nouvelle activité");
 
-type SyncResult = { total?: number; error?: string; retryAfterS?: number; lastSyncAt?: string | null };
+type SyncResult = { total?: number; error?: string; errors?: string[]; retryAfterS?: number; lastSyncAt?: string | null };
 
 /**
  * Feuille du bouton « + » : séance de muscu (seule action en Volt), import de fichier, synchro Intervals.icu + Google Fit, saisie manuelle.
@@ -29,7 +29,7 @@ export function PlusSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => { if (open) plusMenu().then(setMenu).catch(() => {}); }, [open]);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); }, [toast]);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), toast.ok ? 2500 : 6000); return () => clearTimeout(t); }, [toast]);
 
   function workout() {
     tap(12);
@@ -50,7 +50,9 @@ export function PlusSheet({ open, onClose }: { open: boolean; onClose: () => voi
     onClose();
     if (status === 200) {
       tap();
-      setToast({ text: j.total ? plural(j.total) : "Déjà à jour", ok: true });
+      // Une source en échec (jeton Google refusé…) se voit, même si l'autre a réussi.
+      const failed = j.errors?.[0];
+      setToast(failed ? { text: `${j.total ? `${plural(j.total)} · ` : ""}${failed}`, ok: false } : { text: j.total ? plural(j.total) : "Déjà à jour", ok: true });
       if (j.total) router.refresh();
     } else if (status === 429) {
       const min = Math.ceil((j.retryAfterS ?? 60) / 60);

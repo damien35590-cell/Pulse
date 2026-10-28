@@ -35,7 +35,9 @@ export async function POST() {
   // Si l'une échoue, l'autre continue (comme la tâche de nuit).
   const [intervals, googleFit] = await Promise.allSettled([syncIntervals(uid, DAYS), syncGoogleFit(uid, DAYS)]);
   const count = (r: PromiseSettledResult<{ saved: number }>) => (r.status === "fulfilled" ? r.value.saved : null);
-  const errors = [intervals, googleFit].flatMap((r) => (r.status === "rejected" ? [r.reason instanceof Error ? r.reason.message : String(r.reason)] : []));
+  // Erreurs nommées par source : la feuille « + » les affiche au lieu d'un « Déjà à jour » trompeur.
+  const errors = ([["Intervals.icu", intervals], ["Google Fit", googleFit]] as const).flatMap(([name, r]) => (r.status === "rejected" ? [`${name} : ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`] : []));
+  for (const e of errors) console.error("[sync/now]", e);
   if (intervals.status === "rejected" && googleFit.status === "rejected") {
     return NextResponse.json({ error: "Synchronisation impossible", errors }, { status: 502 });
   }

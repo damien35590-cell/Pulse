@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-gfit-merge.ts
 import assert from "node:assert/strict";
-import { groupFragments, groupPieces, leftoverGroups, mergedSpan, planSession, type Existing } from "../lib/sync/google-fit-merge";
+import { groupFragments, groupPieces, keepGroup, leftoverGroups, mergedSpan, planSession, type Existing } from "../lib/sync/google-fit-merge";
 import { isSoftActivity, isTrainingActivity } from "../lib/sports";
 
 const MIN = 60_000, t0 = Date.parse("2026-10-27T10:30:00Z");
@@ -66,6 +66,16 @@ assert.equal(isSoftActivity({ type: "WALK", source: "google-fit", dedupeKey: "gf
   assert.equal(after.ownId, "a1");
   // Un vélotaf (segments) qui ne recouvre pas la session n'est pas concerné.
   assert.equal(planSession(run, [{ id: "v", dedupeKey: "gfit-seg-1-1", mergedSourceIds: [], startMs: at(17, 30), endMs: at(18, 0) }]).status, "create");
+}
+
+// ── Bruit : bouts de marche recollés sans vrai segment, ou presque sans distance ──
+{
+  const seg = (type: number, min: number, m: number, at = 0) => ({ type, startMs: t0 + at * MIN, endMs: t0 + (at + min) * MIN, distanceM: m });
+  assert.equal(keepGroup([seg(7, 3, 200), seg(7, 4, 200, 5)]), false, "aucun segment de 5 min : ignoré");
+  assert.equal(keepGroup([seg(7, 8, 140)]), false, "marche de 140 m : ignorée");
+  assert.equal(keepGroup([seg(7, 8, 250), seg(7, 2, 100, 9)]), true, "350 m avec un segment de 8 min : gardée");
+  assert.equal(keepGroup([seg(1, 26, 2340)]), true, "vélotaf : pas de seuil de distance");
+  assert.equal(keepGroup([seg(1, 6, 50)]), true);
 }
 
 console.log("google fit, morceaux recollés : ok");
