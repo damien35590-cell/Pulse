@@ -3,7 +3,7 @@
  * viennent de lib/workout/loop.ts, la seule source : la carte « Progression » de la page Programme et la séance proposée par « Démarrer » lisent le même résultat.
  * Fonction pure (tests : tools/test-workout.ts).
  */
-import { capOf, entriesOf, isJump, nextVariant, type StrengthRow } from "../analytics/strength";
+import { capOf, entriesOf, isJump, nextVariant, type StrengthRow } from "../analytics/strength-rows";
 import { catalogFor, resolveName } from "./catalog";
 import { loopReps, loopState, type LoopState } from "./loop";
 

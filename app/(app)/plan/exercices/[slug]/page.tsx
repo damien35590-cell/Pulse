@@ -9,20 +9,21 @@ import type { SetDetailV2 } from "@/types/training";
 import { describe } from "@/lib/progression";
 import { fmtNum } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SetsLine } from "@/components/workout/hard-mark";
 
 export const dynamic = "force-dynamic";
 
 const TZ = "Europe/Paris";
 const fmtDate = (d: Date) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: TZ }).format(d);
 
-/** « 10 · 10 · 8 à 60 kg » d'après le réel série par série, sinon le prévu « 3 × 10 à 60 kg ». */
+/** « 10 · 10 · 8 à 60 kg » d'après le réel série par série (point `warn` après une série marquée « Dur »), sinon le prévu « 3 × 10 à 60 kg ». */
 function performed(r: { sets: number; reps: number; loadKg: number | null; setsDetail: unknown }) {
   const d = Array.isArray(r.setsDetail) ? (r.setsDetail as SetDetailV2[]).filter((s) => !s.isWarmup) : [];
   if (!d.length) return describe(r);
   const loads = [...new Set(d.map((s) => s.loadKg).filter((l): l is number => l != null))];
   const rep = (s: SetDetailV2) => `${s.done === false ? "✗" : ""}${s.durationS ? `${s.durationS} s` : s.reps}`;
-  if (loads.length > 1) return d.map((s) => `${rep(s)}${s.loadKg != null ? ` × ${fmtNum(s.loadKg)}` : ""}`).join(" · ") + " kg";
-  return d.map(rep).join(" · ") + (loads.length ? ` à ${fmtNum(loads[0])} kg` : "");
+  if (loads.length > 1) return <SetsLine items={d.map((s) => ({ text: `${rep(s)}${s.loadKg != null ? ` × ${fmtNum(s.loadKg)}` : ""}`, hard: s.hard }))} suffix=" kg" />;
+  return <SetsLine items={d.map((s) => ({ text: rep(s), hard: s.hard }))} suffix={loads.length ? ` à ${fmtNum(loads[0])} kg` : ""} />;
 }
 const bestLoad = (r: { loadKg: number | null; setsDetail: unknown }) =>
   Math.max(r.loadKg ?? 0, ...(Array.isArray(r.setsDetail) ? (r.setsDetail as SetDetailV2[]).filter((s) => s.done !== false && !s.isWarmup).map((s) => s.loadKg ?? 0) : []));

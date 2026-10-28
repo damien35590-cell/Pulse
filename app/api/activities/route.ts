@@ -15,7 +15,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
 
 /**
- * Réel série par série : [{ reps, loadKg, done, completedAt?, restTakenS? }], sinon rien (colonne optionnelle).
+ * Réel série par série : [{ reps, loadKg, done, completedAt?, restTakenS?, hard? }], sinon rien (colonne optionnelle).
  * `completedAt` / `restTakenS` (SetLogger) servent ensuite à calculer la FC de la série (annotateSets).
  */
 function cleanDetail(v: unknown): Prisma.InputJsonValue | undefined {
@@ -27,6 +27,7 @@ function cleanDetail(v: unknown): Prisma.InputJsonValue | undefined {
       reps: Math.max(0, Math.round(Number(s?.reps)) || 0), loadKg: Number.isFinite(load) && load >= 0 ? load : null, done: s?.done !== false,
       ...(Number.isFinite(at) ? { completedAt: new Date(at).toISOString() } : {}),
       ...(rest > 0 && rest <= 3600 ? { restTakenS: rest } : {}),
+      ...(s?.hard === true ? { hard: true } : {}),
     };
   });
 }

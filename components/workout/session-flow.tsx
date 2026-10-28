@@ -85,10 +85,18 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
     try { localStorage.setItem(STORE, JSON.stringify({ v: 2, clientId: run.clientId, title: run.title, kind: run.kind, templateId: run.templateId, startedAt: run.startedAt, exercises: exs })); } catch { /* stockage indisponible */ }
   }
 
-  /** Quitter garde les séries validées sur le téléphone ; sans série, il n'y a rien à reprendre. */
+  /** Quitter garde les séries validées sur le téléphone ; sans série, il n'y a rien à reprendre. `replace` : l'entrée « garde » du retour Android disparaît. */
   function quit() {
     if (done(latest.current) === 0) { useHeartRate.getState().discard(); clearStored(); }
-    router.push("/record");
+    router.replace("/record");
+  }
+
+  /** Abandon : rien n'est enregistré (ni séance, ni progression), la séance en cours et sa FC sont effacées, y compris d'une file d'envoi. */
+  function discard() {
+    useHeartRate.getState().discard();
+    clearStored();
+    if (run) removePending(run.clientId).catch(() => null);
+    router.replace("/record");
   }
 
   async function save(exs: LiftExercise[], opts: { templateName?: string }) {
@@ -123,7 +131,7 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
 
   if (res) return <StoryReveal story={res.story} record={res.record} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />;
   if (phase === "run" && run) {
-    return <SetLogger title={run.title} exercises={run.exercises} startedAt={run.startedAt} templateName={run.title} hrMax={hrMax} onChange={persist} onSave={save} onExit={quit} />;
+    return <SetLogger title={run.title} exercises={run.exercises} startedAt={run.startedAt} templateName={run.title} hrMax={hrMax} onChange={persist} onSave={save} onExit={quit} onDiscard={discard} />;
   }
   if (phase === "prep" && draft) return <PrepScreen draft={draft} onStart={startRun} onBack={() => router.push(SESSION)} />;
 

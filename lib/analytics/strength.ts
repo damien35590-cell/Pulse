@@ -5,12 +5,12 @@
  */
 import { prisma } from "../prisma";
 import { dayKey, shiftDay, weekKeys } from "../dates";
-import { exerciseKey, type SetDetail } from "../exercises";
-import { lafayCode, musclesOf, volumeByMuscle, UPPER_GROUPS, type Group, type MuscleLoad } from "../muscles";
-import { isVariantCode, ladderKey, nextInLadder } from "../workout/catalog";
+import type { SetDetail } from "../exercises";
+import { musclesOf, volumeByMuscle, UPPER_GROUPS, type Group, type MuscleLoad } from "../muscles";
 import { lafayView } from "../workout/lafay";
+import { capOf, doneSets, groupKey, isJump, nextVariant, sumReps, variantOf, type Det, type Entry, type StrengthRow } from "./strength-rows";
 
-export type StrengthRow = { activityId: string; startedAt: Date; name: string; sets: number; reps: number; loadKg: number | null; setsDetail: SetDetail[] | null };
+export { capOf, doneSets, entriesOf, groupKey, isJump, nextVariant, sumReps, variantOf, type Entry, type StrengthRow } from "./strength-rows";
 /** En dessous, pas assez de séances sur la période pour juger une progression ou un équilibre haut / bas. */
 export const MIN_SESSIONS = 3;
 export type StrengthStatus = "progress" | "stall1" | "stall2" | "evolve";
@@ -21,6 +21,7 @@ export type ExerciseProgress = {
   status: StrengthStatus;          // progrès / blocage 1 (une séance sans progrès) / blocage 2 (deux de suite ou plus) / à faire évoluer (plafond atteint)
   sessions: number;
   repsPerSession: number[];        // du plus ancien au plus récent
+  hardPerSession: number[];        // mêmes séances : séries marquées « Dur » au SetLogger (ressenti, pour le coach)
   points: { day: string; reps: number; variant: string | null }[]; // mêmes séances, avec leur jour et leur variante (B1 → B2 : le changement se lit ici)
   lastDay: string;                 // AAAA-MM-JJ
   hint: string | null;             // conseil quand l'exercice est en blocage 2 ou à faire évoluer
@@ -40,53 +41,10 @@ export type StrengthAnalysis = {
   prev: { sessions: number; reps: number } | null;
 };
 
-type Det = SetDetail & { isWarmup?: boolean };
 const TARGET = [2, 3] as const;
 const lab = (k: string) => new Date(k + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const pct = (a: number, b: number) => Math.round((a / b) * 100);
 
-/** Séries réellement faites, échauffement exclu. Sans détail série par série, on suppose le prévu réalisé (comme progression.ts). */
-export function doneSets(r: StrengthRow): Det[] {
-  if (!r.setsDetail) return Array.from({ length: r.sets }, () => ({ reps: r.reps, loadKg: r.loadKg, done: true }));
-  return (r.setsDetail as Det[]).filter((s) => s.done && !s.isWarmup);
-}
-export const sumReps = (sets: Det[]) => sets.reduce((s, x) => s + x.reps, 0);
-
-/**
- * Un exercice Lafay = son échelle (B1 et B2 sont le même exercice à deux niveaux ; A2 et A3 sont deux échelles distinctes
- * de la famille A, cf. lib/workout/catalog.ts) ; sinon le nom normalisé.
- */
-export function groupKey(name: string) {
-  const c = lafayCode(name);
-  if (!c) return exerciseKey(name);
-  return ladderKey(c.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : c.letter.toUpperCase());
-}
-
-/** Échelles Lafay, de la plus facile à la plus difficile. Une variante change l'exercice : le compteur de blocage repart de zéro. */
-export const nextVariant = (v: string | null) => nextInLadder(v);
-/** « B2 » ; « B » seul quand la lettre est la forme finale d'une échelle ; null pour les autres exercices. */
-export const variantOf = (name: string) => {
-  const c = lafayCode(name);
-  if (!c) return null;
-  const v = c.digits != null ? `${c.letter.toUpperCase()}${c.digits}` : c.letter.toUpperCase();
-  return isVariantCode(v) ? v : null;
-};
-/** Plafond de répétitions par série : 12, ou 20 pour F (squat sauté). */
-export const isJump = (name: string) => lafayCode(name)?.letter === "f" || /squat.*saut/i.test(name);
-export const capOf = (name: string) => (isJump(name) ? 20 : 12);
-
-/** Une séance d'un exercice dans une variante : total de reps, cible N, toutes les séries à la cible ou plus. */
-export type Entry = { variant: string | null; total: number; n: number; sets: number; met: boolean };
-export function entriesOf(list: StrengthRow[]): Entry[] {
-  const out: (Entry & { id: string })[] = [];
-  for (const r of list) { // du plus récent au plus ancien
-    const d = doneSets(r), variant = variantOf(r.name);
-    if (!d.length) continue;
-    const met = d.length >= r.sets && d.every((x) => x.reps >= r.reps), total = sumReps(d), same = out.find((e) => e.id === r.activityId && e.variant === variant);
-    if (same) { same.total += total; same.met = same.met && met; } else out.push({ id: r.activityId, variant, total, n: r.reps, sets: r.sets, met });
-  }
-  return out;
-}
 /** Progrès = total supérieur à la séance précédente de la même variante, ou toutes les séries à la cible. Première séance d'une variante : progrès. */
 export function stallsOf(entries: Entry[]): number {
   const run: Entry[] = []; // séances consécutives de la variante actuelle
@@ -137,12 +95,12 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
     if (!t) continue;
     const evolve = t.change === "evolve" || (t.change === "repeat" && t.hint === "saute plus haut");
     const reset = t.change === "evolve" || t.change === "restart";
-    const perSession = new Map<string, { day: string; reps: number; variant: string | null }>();
-    for (const r of [...list].reverse()) if (weekOf(r.startedAt) >= 0) { const o = perSession.get(r.activityId); perSession.set(r.activityId, { day: dayKey(r.startedAt, tz), reps: (o?.reps ?? 0) + sumReps(doneSets(r)), variant: variantOf(r.name) }); }
+    const perSession = new Map<string, { day: string; reps: number; variant: string | null; hard: number }>();
+    for (const r of [...list].reverse()) if (weekOf(r.startedAt) >= 0) { const o = perSession.get(r.activityId); perSession.set(r.activityId, { day: dayKey(r.startedAt, tz), reps: (o?.reps ?? 0) + sumReps(doneSets(r)), variant: variantOf(r.name), hard: (o?.hard ?? 0) + doneSets(r).filter((d) => d.hard).length }); }
     exercises.push({
       key, name: last.name.trim(), variant: variantOf(last.name), level: `${t.sets} × ${t.reps}`,
       status: evolve ? "evolve" : v.state === "stall2" ? "stall2" : v.state === "stall1" ? "stall1" : "progress",
-      sessions: perSession.size, repsPerSession: [...perSession.values()].map((x) => x.reps), points: [...perSession.values()], lastDay: dayKey(last.startedAt, tz),
+      sessions: perSession.size, repsPerSession: [...perSession.values()].map((x) => x.reps), hardPerSession: [...perSession.values()].map((x) => x.hard), points: [...perSession.values()].map(({ day, reps, variant }) => ({ day, reps, variant })), lastDay: dayKey(last.startedAt, tz),
       hint: evolve || v.state === "stall2" ? t.hint : null, nextVariant: t.change === "evolve" ? t.variant : null, restartTarget: reset ? t.reps : null,
     });
   }

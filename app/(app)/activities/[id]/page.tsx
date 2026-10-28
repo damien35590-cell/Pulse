@@ -37,6 +37,7 @@ import { DetachSession } from "@/components/training/program-actions";
 import { isVirtual } from "@/lib/art/card";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
+import { SetsLine } from "@/components/workout/hard-mark";
 import { getGear } from "@/lib/data/gear";
 import { selectableGear } from "@/lib/gear";
 import { CompareActivity, type Comparable } from "@/components/activity/compare-activity";
@@ -175,7 +176,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
                     <li key={e.id} className="px-4 py-3">
                       <p className="font-semibold text-ink">{e.name}</p>
                       <p className="text-sm text-ink-soft">{e.sets} × {e.reps}{e.loadKg != null ? ` à ${fmtNum(e.loadKg)} kg` : ""}{e.restS != null ? `, repos ${e.restS} s` : ""}</p>
-                      {Array.isArray(e.setsDetail) && <p className="font-num text-sm tabular-nums text-ink">Réel : {(e.setsDetail as { reps: number; loadKg: number | null; done: boolean }[]).map((s) => `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`).join(" · ")}</p>}
+                      {Array.isArray(e.setsDetail) && <p className="font-num text-sm tabular-nums text-ink">Réel : <SetsLine items={(e.setsDetail as SetDetail[]).map((s) => ({ text: `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`, hard: s.hard }))} /></p>}
                       {Array.isArray(e.setsDetail) && (e.setsDetail as SetDetail[]).some((s) => s.hrPeak != null) && (
                         <ol className="mt-0.5">
                           {(e.setsDetail as SetDetail[]).map((s, i) => s.hrPeak != null && (

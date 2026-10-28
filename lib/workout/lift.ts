@@ -10,6 +10,7 @@ export function toLift(d: DraftExercise): LiftExercise {
     name: d.name, sets: d.sets, reps: d.reps, kg: d.loadKg ?? 0, step: bodyweight ? 1 : 2.5,
     restS: d.restSec, restAfterS: d.restAfterSec, bodyweight, timed: catalogFor(d.code, d.variant)?.mode === "time",
     prev: (d.last?.reps ?? []).map((reps) => ({ reps, kg: d.last?.loadKg ?? 0 })),
+    ...(d.past?.length ? { past: d.past } : {}),
     done: [],
   };
 }
@@ -27,6 +28,7 @@ export function toPayload(e: LiftExercise) {
       ...(e.timed ? { durationS: d.reps } : {}),
       ...(d.at ? { completedAt: new Date(d.at).toISOString() } : {}),
       ...(d.restS ? { restTakenS: d.restS } : {}),
+      ...(d.hard ? { hard: true } : {}),
     })),
   };
 }

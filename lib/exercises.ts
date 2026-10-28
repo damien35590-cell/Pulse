@@ -4,6 +4,8 @@ export type SetDetail = {
   reps: number; loadKg: number | null; done: boolean;
   /** Séances enregistrées au SetLogger : validation (ISO), repos pris (s), puis FC avec une ceinture (lib/workout/hr.ts). */
   completedAt?: string; restTakenS?: number; hrPeak?: number | null; hrEndRest?: number | null;
+  /** Série marquée « Dur » au SetLogger (ressenti) ; absent = non. N’entre pas dans la règle de progression. */
+  hard?: boolean;
 };
 /** Une occurrence passée d'un exercice : le prévu (sets/reps/loadKg) et, si saisi, le réel série par série. */
 export type Past = { date: string; sets: number; reps: number; loadKg: number | null; restS: number | null; setsDetail: SetDetail[] | null };

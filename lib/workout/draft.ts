@@ -40,7 +40,9 @@ export function planExercise(s: Structure, history: StrengthRow[]): DraftExercis
     const reps = p?.reps ?? s.reps;
     // Le conseil parle des séries proposées ici (celles du modèle), pas de celles de la dernière séance.
     const hint = p?.change === "evolve" ? `passe à ${variant} : ${s.sets}×${reps}` : p?.change === "restart" ? `repars à ${s.sets}×${reps}${variant ? ` en ${variant}` : ""}` : p?.hint ?? null;
-    return { ...base, variant, name: displayName(s.code, variant), reps, loadKg: s.loadKg, hint };
+    // De quoi rejouer la même règle en fin d'exercice, sur le téléphone (verdict « prochaine fois »).
+    const past = history.slice(0, 6).map((r) => ({ activityId: r.activityId, name: r.name, sets: r.sets, reps: r.reps, setsDetail: r.setsDetail?.map((d) => ({ reps: d.reps, done: d.done !== false && !(d as { isWarmup?: boolean }).isWarmup })) ?? null }));
+    return { ...base, variant, name: displayName(s.code, variant), reps, loadKg: s.loadKg, hint, ...(past.length ? { past } : {}) };
   }
 
   const past: Past[] = history.slice(0, 4).map((r) => ({ date: r.startedAt.toISOString(), sets: r.sets, reps: r.reps, loadKg: r.loadKg, restS: null, setsDetail: r.setsDetail }));

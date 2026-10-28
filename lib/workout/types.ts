@@ -5,6 +5,9 @@ export type Kind = "HAUT" | "BAS" | "LIBRE";
 /** La dernière fois qu'on a fait l'exercice : reps série par série et total. */
 export type LastTime = { date: string; variant: string | null; reps: number[]; total: number; loadKg: number | null };
 
+/** Une séance passée d’un exercice Lafay, juste ce qu’il faut pour rejouer la règle de progression sur le téléphone (fin d’exercice du SetLogger). */
+export type PastRow = { activityId: string; name: string; sets: number; reps: number; setsDetail: { reps: number; done: boolean }[] | null };
+
 export type DraftExercise = {
   /** Identifiant local (clé React) ; n'a aucun sens en base. */
   id: string;
@@ -23,6 +26,8 @@ export type DraftExercise = {
   loadKg: number | null;
   note: string | null;
   last: LastTime | null;
+  /** Lafay : séances précédentes de l’échelle (6 au plus, de la plus récente à la plus ancienne). */
+  past?: PastRow[];
   /** Pourquoi cette cible : « passe à B2 à 6×7 », « saute plus haut »… */
   hint: string | null;
 };

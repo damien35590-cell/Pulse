@@ -49,7 +49,8 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
       regularite: { seancesParSemaine: r1(s.regularity.perWeek), cible: "2 à 3", pctSeriesHautDuCorps: s.regularity.upperPct },
       exercices: s.exercises.slice(0, 12).map((e) => ({
         nom: e.name, variante: e.variant, niveau: e.level, statut: { progress: "progresse", stall1: "1 séance sans progrès", stall2: "bloqué (2 séances ou plus)", evolve: "plafond atteint" }[e.status],
-        seances: e.sessions, totalRepsDernieresSeances: e.repsPerSession.slice(-6), derniereSeance: e.lastDay, conseilPulse: e.hint,
+        seances: e.sessions, totalRepsDernieresSeances: e.repsPerSession.slice(-6),
+        ...(e.hardPerSession.some((n) => n > 0) ? { seriesMarqueesDuresDernieresSeances: e.hardPerSession.slice(-6) } : {}), derniereSeance: e.lastDay, conseilPulse: e.hint,
       })),
       programmes: plans,
       ...(fc ? { frequenceCardiaque: fc } : {}),

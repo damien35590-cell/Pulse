@@ -6,6 +6,8 @@ import { kindOfNames, nextKind } from "../lib/workout/kind";
 import { defaultVariant, displayName, resolveName, restAfterFor, variantsOf } from "../lib/workout/catalog";
 import { nameOnly } from "../lib/data/strength-program";
 import { planExercise, type Structure } from "../lib/workout/draft";
+import { nextVerdict } from "../lib/workout/next-target";
+import { toPayload } from "../lib/workout/lift";
 
 const d = (iso: string) => new Date(iso + "T08:00:00Z");
 const row = (id: string, day: string, name: string, sets: number, reps: number, done: number[], loadKg: number | null = null): StrengthRow =>
@@ -130,6 +132,20 @@ assert.deepEqual([p.name, p.variant, p.reps, p.loadKg], ["Squat", null, 9, 60]);
 // Une seule ligne de la séance la plus récente compte pour « dernière fois », même si l'exercice y figure deux fois.
 p = planExercise(base, [row("z", "2026-10-12", "B2 - dips", 3, 8, [8, 8, 8]), row("z", "2026-10-12", "B2 - dips", 3, 8, [7, 7, 7]), row("y", "2026-10-05", "B2 - dips", 6, 8, six(6))]);
 assert.equal(p.last?.reps.length, 6);
+
+// ── Verdict « prochaine fois » du SetLogger : même règle que applyLafayProgress ──
+{
+  const past = (id: string, done: number[]) => ({ activityId: id, name: "B1 - dips", sets: 6, reps: 8, setsDetail: done.map((r) => ({ reps: r, done: true })) });
+  const ex = (done: number[], p = [past("a", six(7))]) => ({ name: "B1 - dips", sets: 6, reps: 8, done: done.map((reps) => ({ reps })), past: p });
+  assert.equal(nextVerdict(ex(six(8)))?.tone, "up", "toutes les séries à la cible : N+1");
+  assert.equal(nextVerdict(ex(six(8)))?.text, "Prochaine fois : 6 × 9");
+  assert.equal(nextVerdict(ex([8, 8, 8, 7, 7, 7]))?.tone, "same", "cible manquée : même cible");
+  assert.equal(nextVerdict(ex([8, 8, 7, 7, 6, 6], [past("a", [8, 8, 8, 7, 7, 6]), past("b", [8, 8, 8, 8, 7, 6])]))?.tone, "down", "deux séances sans gain : on redescend");
+  assert.equal(nextVerdict({ ...ex(six(8)), past: undefined }), null, "sans historique embarqué : pas de verdict");
+  const pay = toPayload({ name: "B1 - dips", sets: 2, reps: 8, kg: 0, step: 1, restS: 60, bodyweight: true, prev: [], done: [{ reps: 8, kg: 0, hard: true }, { reps: 7, kg: 0 }] });
+  assert.equal(pay.setsDetail[0].hard, true, "« Dur » part avec la série");
+  assert.equal("hard" in pay.setsDetail[1], false, "absent quand la série n’est pas marquée");
+}
 
 console.log("workout : OK");
 

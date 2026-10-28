@@ -78,6 +78,7 @@ export type SetDetailV2 = {
   rir?: number;       // reps en réserve ressenties
   isWarmup?: boolean;
   durationS?: number; // gainage, isométrie
+  hard?: boolean;     // marquée « Dur » au SetLogger
 };
 
 // ═════════ B. Catalogue (dans le code) ═════════
