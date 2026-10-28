@@ -87,7 +87,7 @@ export function AnatomyHeatmap({ data, hasData, span = "7 jours" }: { data: Reco
     <div>
       <div className="flex gap-2 rounded-2xl bg-gradient-to-b from-surface-2/60 to-transparent px-1 pt-3"><Body title="Face" shapes={FRONT} front {...props} /><Body title="Dos" shapes={BACK} {...props} /></div>
       <p className="mt-2 min-h-[44px] text-center text-sm" aria-live="polite">
-        {a && active ? <><b>{cap(active)}</b> : {fmtKg(a.tonnage)}, {a.sets.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} séries sur {span}</> : <span className="text-ink-soft">{hasData ? "Touchez un muscle pour voir son volume." : `Aucune séance de musculation sur ${span}.`}</span>}
+        {a && active ? <><b>{cap(active)}</b> : {fmtKg(a.tonnage)}, {a.sets.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} séries sur {span}</> : <span className="text-ink-soft">{hasData ? "Touche un muscle pour voir son volume." : `Aucune séance de musculation sur ${span}.`}</span>}
       </p>
       <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
         {GROUPS.map((g) => {

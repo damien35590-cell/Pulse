@@ -24,7 +24,7 @@ const KEY_RING = "ring-2 ring-ink";
 const sessionDot = (s: CalSession) => (s.status === "COMPLETED" || s.status === "PARTIAL" ? "bg-act-run" : s.status === "SKIPPED" ? "bg-ink-mute/30" : cn("bg-ink-mute", s.isKey && KEY_RING));
 const statusLabel: Record<SessionStatus, string> = { PLANNED: "Prévue", COMPLETED: "Faite", PARTIAL: "Partielle", MOVED: "Déplacée", SKIPPED: "Passée" };
 const raceLabel = { REGISTERED: "Inscrit", COMPLETED: "Courue", DNS: "Absent", DNF: "Abandon" } as const;
-const StarIcon = ({ className }: { className?: string }) => <Star className={cn("fill-amber-400 text-amber-500", className)} aria-hidden />;
+const StarIcon = ({ className }: { className?: string }) => <Star className={cn("fill-warn text-warn", className)} aria-hidden />;
 
 export function CalendarView({ data, today }: { data: CalendarData; today: string }) {
   const [view, setView] = useState<"month" | "week">("month");

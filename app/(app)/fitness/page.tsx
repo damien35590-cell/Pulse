@@ -53,7 +53,7 @@ export default async function FitnessPage() {
     <div className="space-y-5">
       <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
       <header><h1 className="font-display text-3xl font-bold leading-none">Forme physique</h1>
-        <p className="mt-2 text-sm text-ink-soft">Calculée sur votre charge d’entraînement, comme sur intervals.icu : fitness sur 42 jours, fatigue sur 7 jours.</p></header>
+        <p className="mt-2 text-sm text-ink-soft">Calculée sur ta charge d’entraînement, comme sur intervals.icu : fitness sur 42 jours, fatigue sur 7 jours.</p></header>
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-xl border border-line bg-surface p-4"><p className="text-sm text-ink-soft">Fitness</p><p className="font-display text-4xl font-bold tabular-nums">{Math.round(t.ctl)}</p><p className={`text-xs font-semibold ${ramp >= 0 ? "text-brand" : "text-ink-soft"}`}>{ramp >= 0 ? "+" : ""}{Math.round(ramp)} sur 7 jours</p></div>
         <div className="rounded-xl border border-line bg-surface p-4"><p className="text-sm text-ink-soft">Fatigue</p><p className="font-display text-4xl font-bold tabular-nums">{Math.round(t.atl)}</p></div>
@@ -61,14 +61,14 @@ export default async function FitnessPage() {
       <section className="rounded-xl border border-line bg-surface p-4">
         <div className="flex items-end justify-between"><div><p className="text-sm text-ink-soft">Forme du jour</p><p className="font-display text-5xl font-bold tabular-nums">{t.form > 0 ? "+" : ""}{Math.round(t.form)}</p></div><p className="font-display text-xl font-bold text-brand">{z.label}</p></div>
         <p className="mt-2">{z.tip}</p>
-        {ramp > 8 && <p className="mt-2 text-sm text-ink-soft">Votre fitness monte vite (+{Math.round(ramp)} en 7 jours) : pensez à une semaine plus légère.</p>}
+        {ramp > 8 && <p className="mt-2 text-sm text-ink-soft">Ta fitness monte vite (+{Math.round(ramp)} en 7 jours) : pense à une semaine plus légère.</p>}
       </section>
       <section className="space-y-4 rounded-xl border border-line bg-surface p-4">
         <div className="flex items-baseline justify-between"><h2 className="font-display text-lg font-bold">Charge des 7 derniers jours</h2><p className="font-display text-2xl font-bold tabular-nums">{Math.round(week)}</p></div>
         {week > 0 ? <>
           <Split title="Par sport" rows={sportRows} total={week} />
           <Split title="Par méthode de calcul" rows={sourceRows} total={week} />
-          <p className="text-xs leading-5 text-ink-soft"><b className="text-ink">Puissance</b> : capteur et FTP. <b className="text-ink">Cardio</b> : fréquence cardiaque et FC max. <b className="text-ink">Ressenti</b> : effort noté de 1 à 10 × durée. <b className="text-ink">Estimée</b> : durée et sport seulement. Notez l’effort de vos séances pour fiabiliser le score.</p>
+          <p className="text-xs leading-5 text-ink-soft"><b className="text-ink">Puissance</b> : capteur et FTP. <b className="text-ink">Cardio</b> : fréquence cardiaque et FC max. <b className="text-ink">Ressenti</b> : effort noté de 1 à 10 × durée. <b className="text-ink">Estimée</b> : durée et sport seulement. Note l’effort de tes séances pour fiabiliser le score.</p>
         </> : <p className="text-sm text-ink-soft">Aucune séance ces 7 derniers jours.</p>}
       </section>
       <section className="rounded-xl border border-line bg-surface p-4"><div className="mb-2 flex items-center gap-1"><h2 className="font-display text-lg font-bold">90 derniers jours</h2><FormHelp /></div><FitnessChart data={data} /></section>

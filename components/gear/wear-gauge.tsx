@@ -4,9 +4,9 @@ import type { WearLevel } from "@/lib/gear";
 import { cn } from "@/lib/utils";
 
 export const LEVEL_STYLE: Record<WearLevel, { bar: string; text: string; label: string }> = {
-  ok: { bar: "bg-green-500", text: "text-ink-soft", label: "En forme" },
-  warn: { bar: "bg-amber-500", text: "text-amber-600 dark:text-amber-400", label: "À surveiller" },
-  critical: { bar: "bg-red-600", text: "text-red-600 dark:text-red-400", label: "À remplacer" },
+  ok: { bar: "bg-good", text: "text-ink-soft", label: "En forme" },
+  warn: { bar: "bg-warn", text: "text-warn", label: "À surveiller" },
+  critical: { bar: "bg-bad", text: "text-bad", label: "À remplacer" },
 };
 
 /** Jauge de durée de vie : km parcourus face au seuil critique ; sans seuil, simple compteur. */

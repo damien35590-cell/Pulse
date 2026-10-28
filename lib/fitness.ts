@@ -34,9 +34,9 @@ export function formSeries(acts: (Parameters<typeof fitnessSeries>[0][number] & 
 }
 
 export function zone(form: number) {
-  if (form > 20) return { label: "Transition", tip: "Vous récupérez beaucoup : reprenez du volume." };
+  if (form > 20) return { label: "Transition", tip: "Tu récupères beaucoup : reprends du volume." };
   if (form > 5) return { label: "Frais", tip: "Bon moment pour une séance clé ou une compétition." };
-  if (form > -10) return { label: "Zone neutre", tip: "Charge stable : vous pouvez avancer." };
-  if (form > -30) return { label: "Optimal", tip: "Vous progressez : cette fatigue est productive." };
-  return { label: "Risque élevé", tip: "Fatigue très forte : prévoyez du repos." };
+  if (form > -10) return { label: "Zone neutre", tip: "Charge stable : tu peux avancer." };
+  if (form > -30) return { label: "Optimal", tip: "Tu progresses : cette fatigue est productive." };
+  return { label: "Risque élevé", tip: "Fatigue très forte : prévois du repos." };
 }

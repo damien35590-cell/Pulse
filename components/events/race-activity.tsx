@@ -40,7 +40,7 @@ export function RaceActivityCard({ raceId, activity: a, hasResult }: { raceId: s
           </div>
           <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft" aria-hidden />
         </div>
-        {route && <svg viewBox="0 0 320 110" className="mt-1 h-24 w-full" role="img" aria-label="Tracé de la sortie"><path d={route.d} fill="none" stroke="#F24A00" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /><circle cx={route.end[0]} cy={route.end[1]} r={4.5} fill="#F24A00" /></svg>}
+        {route && <svg viewBox="0 0 320 110" className="mt-1 h-24 w-full" role="img" aria-label="Tracé de la sortie"><path d={route.d} fill="none" className="stroke-brand" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /><circle cx={route.end[0]} cy={route.end[1]} r={4.5} className="fill-brand-text" /></svg>}
         <dl className="mt-2 grid grid-cols-2 gap-px border-t border-line bg-line">
           {cells.map((c) => <div key={c.l} className="bg-surface px-4 py-2.5"><dt className="text-xs text-ink-soft">{c.l}{c.l === "Temps montre" && !hasResult ? " (provisoire)" : ""}</dt><dd className="font-display text-xl font-bold tabular-nums">{c.v}</dd></div>)}
         </dl>

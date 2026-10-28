@@ -60,8 +60,8 @@ export default async function DashboardPage() {
       <div className="space-y-8">
         {d.empty ? (
           <section className={cn(ui.card, "p-6")}>
-            <h2 className="text-[28px] font-bold leading-tight tracking-tight">Votre première sortie commence ici</h2>
-            <p className="mt-2 text-[15px] text-ink-soft">Enregistrez une activité ou importez vos fichiers Strava et MyWhoosh : Pulse en tirera des anecdotes dès la première.</p>
+            <h2 className="text-[28px] font-bold leading-tight tracking-tight">Ta première sortie commence ici</h2>
+            <p className="mt-2 text-[15px] text-ink-soft">Enregistre une activité ou importe tes fichiers Strava et MyWhoosh : Pulse en tirera des anecdotes dès la première.</p>
             <Link href="/record" className={cn(ui.btnPrimary, "mt-5 w-full")}>Enregistrer une sortie</Link>
           </section>
         ) : (

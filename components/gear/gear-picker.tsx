@@ -35,13 +35,13 @@ export function GearPicker({ activityId, options, selected, retired }: { activit
             <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(o.id)}
               className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold", on ? "border-brand bg-brand text-brand-ink" : "border-line bg-surface")}>
               {on ? <Check className="h-4 w-4" aria-hidden /> : <I className="h-4 w-4" aria-hidden />}{o.name}
-              {o.worn.length > 0 && <AlertTriangle className={cn("h-4 w-4", !on && "text-red-600 dark:text-red-400")} aria-label="Seuil critique dépassé" />}
+              {o.worn.length > 0 && <AlertTriangle className={cn("h-4 w-4", !on && "text-bad")} aria-label="Seuil critique dépassé" />}
             </button>
           );
         })}
         {retired.map((n) => <span key={n} className="inline-flex min-h-11 items-center rounded-full bg-surface-2 px-3.5 text-sm text-ink-soft">{n} (retiré)</span>)}
       </div>
-      {worn.length > 0 && <p role="status" className="mt-2 flex gap-2 rounded-xl bg-red-600/10 px-3 py-2.5 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />À remplacer : {worn.join(", ")}.</p>}
+      {worn.length > 0 && <p role="status" className="mt-2 flex gap-2 rounded-xl bg-bad/10 px-3 py-2.5 text-sm text-bad"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />À remplacer : {worn.join(", ")}.</p>}
     </section>
   );
 }

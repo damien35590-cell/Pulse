@@ -5,7 +5,7 @@ import type { Bilan } from "@/lib/races/bilan";
 // Confettis déterministes (pas de Math.random : même rendu serveur et client).
 const CONFETTI = Array.from({ length: 16 }, (_, i) => {
   const a = (i / 16) * Math.PI * 2 + (i % 2) * 0.2, d = 70 + (i % 4) * 22;
-  return { x: Math.cos(a) * d, y: Math.sin(a) * d - 30, c: ["#F24A00", "#1C9E5F", "#F5B700", "#3B82F6"][i % 4], r: (i * 47) % 180, s: 6 + (i % 3) * 2 };
+  return { x: Math.cos(a) * d, y: Math.sin(a) * d - 30, c: ["rgb(var(--brand))", "rgb(var(--good))", "rgb(var(--warn))", "rgb(var(--act-ride))"][i % 4], r: (i * 47) % 180, s: 6 + (i % 3) * 2 };
 });
 
 export function RaceBilan({ bilan }: { bilan: Bilan }) {

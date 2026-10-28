@@ -19,11 +19,11 @@ export function GoalCard({ km, goalKm, sport, streak }: { km: number; goalKm: nu
       <div className="flex items-baseline justify-between">
         <h2 className="font-display text-xl font-semibold">Objectif de {fmtNum(goalKm, 0)} km</h2>
         {/* Pourcentage RÉEL : 142 km sur 30 km = 473 % */}
-        <span className={cn("font-display text-2xl font-bold tabular-nums", over && "text-green-600 dark:text-green-400")}>{Math.round(real).toLocaleString("fr-FR")} %</span>
+        <span className={cn("font-display text-2xl font-bold tabular-nums", over && "text-good")}>{Math.round(real).toLocaleString("fr-FR")} %</span>
       </div>
       <div className="my-3 h-3 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
         <motion.div
-          className={cn("h-full rounded-full", over ? "bg-green-500 shadow-[0_0_14px_rgba(34,197,94,0.65)]" : "bg-brand")}
+          className={cn("h-full rounded-full", over ? "bg-good" : "bg-brand")}
           initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
         />
       </div>

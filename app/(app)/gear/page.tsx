@@ -70,23 +70,23 @@ export default async function GearPage() {
       <h1 className="font-display text-3xl font-bold leading-none">Équipement</h1>
 
       {alerts.length > 0 && (
-        <div role="alert" className="flex gap-3 rounded-xl border border-red-600/40 bg-red-600/10 p-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+        <div role="alert" className="flex gap-3 rounded-xl border border-bad/40 bg-bad/10 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-bad" aria-hidden />
           <p className="text-sm"><b>{alerts.length === 1 ? "Un composant a" : `${alerts.length} composants ont`} dépassé son seuil critique</b> : {alerts.map((g) => g.name).join(", ")}. Une fois changé, touchez « Gérer » puis « Remplacer » pour repartir de zéro.</p>
         </div>
       )}
 
-      {roots.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-ink-soft">Aucun matériel. Ajoutez votre vélo, votre home trainer ou vos chaussures, puis leurs composants (chaîne, cassette) : chaque sortie fera avancer leurs compteurs.</p>}
+      {roots.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-ink-soft">Aucun matériel. Ajoute ton vélo, ton home trainer ou tes chaussures, puis leurs composants (chaîne, cassette) : chaque sortie fera avancer leurs compteurs.</p>}
 
       <ul className="space-y-3">
         {roots.map((g) => (
-          <li key={g.id} className={cn("rounded-xl border bg-surface p-4", g.level === "critical" ? "border-red-600/60" : "border-line")}>
+          <li key={g.id} className={cn("rounded-xl border bg-surface p-4", g.level === "critical" ? "border-bad/60" : "border-line")}>
             <Head g={g} />
             <WearGauge km={g.km} limitKm={g.limitKm} level={g.level} name={g.name} />
             {partsOf(g.id).length > 0 && (
               <ul className="mt-3 space-y-3 border-t border-line pt-3">
                 {partsOf(g.id).map((p) => (
-                  <li key={p.id} className={cn("rounded-lg p-3", p.level === "critical" ? "bg-red-600/10" : "bg-surface-2/60")}>
+                  <li key={p.id} className={cn("rounded-lg p-3", p.level === "critical" ? "bg-bad/10" : "bg-surface-2/60")}>
                     <Head g={p} small />
                     <WearGauge km={p.km} limitKm={p.limitKm} level={p.level} name={p.name} />
                     <Manage g={p} />

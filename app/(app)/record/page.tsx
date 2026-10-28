@@ -60,11 +60,11 @@ export default function RecordPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const movingTimeS = num(f.h) * 3600 + num(f.min) * 60;
-    if (movingTimeS <= 0) return setErr("Indiquez la durée de la sortie.");
+    if (movingTimeS <= 0) return setErr("Indique la durée de la sortie.");
     let exercises: unknown[] | undefined;
     if (workout) {
       const list = exs.filter((x) => x.name.trim()).map((x) => ({ name: x.name.trim(), sets: Math.round(num(x.sets)), reps: Math.round(num(x.reps)), loadKg: x.loadKg.trim() === "" ? null : num(x.loadKg), restS: x.restS.trim() === "" ? null : Math.round(num(x.restS)), comment: x.comment.trim() || null, setsDetail: x.detail?.map((r) => ({ reps: Math.round(num(r.reps)), loadKg: r.load.trim() === "" ? null : num(r.load), done: r.done })) }));
-      if (!list.length || list.some((x) => x.sets < 1 || x.reps < 1)) return setErr("Ajoutez au moins un exercice avec son nom, ses séries et ses répétitions.");
+      if (!list.length || list.some((x) => x.sets < 1 || x.reps < 1)) return setErr("Ajoute au moins un exercice avec son nom, ses séries et ses répétitions.");
       exercises = list;
     }
     setBusy(true); setErr("");
@@ -73,7 +73,7 @@ export default function RecordPage() {
     const r = await fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       type, title, startedAt: new Date(f.when).toISOString(), distanceM: workout ? 0 : num(f.km) * 1000, movingTimeS, elevationGainM: workout ? 0 : num(f.elev), feeling, rpe, notes: f.notes || null, exercises, gearIds: gearId ? [gearId] : [] }) });
     setBusy(false);
-    if (!r.ok) return setErr("Impossible d’enregistrer. Vérifiez votre connexion et réessayez.");
+    if (!r.ok) return setErr("Impossible d’enregistrer. Vérifie ta connexion et réessaie.");
     const j = await r.json(); setRes({ story: j.story, record: j.record, id: j.id, gearAlerts: j.gearAlerts });
   }
 
@@ -168,7 +168,7 @@ export default function RecordPage() {
               {gearOpts.map((g) => <option key={g.id} value={g.id}>{gear.some((p) => (p.id === g.id || p.parentId === g.id) && p.level === "critical") ? "⚠ " : ""}{g.name} ({GEAR_KINDS[g.kind].label}, {g.km.toLocaleString("fr-FR")} km)</option>)}
             </select>
           </label>
-          {worn.length > 0 && <p role="status" className="mt-2 flex gap-2 rounded-xl bg-red-600/10 px-3 py-2.5 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{worn.map((g) => `${g.name} : ${g.km.toLocaleString("fr-FR")} / ${g.limitKm?.toLocaleString("fr-FR")} km`).join(" · ")}. Seuil critique dépassé.</p>}
+          {worn.length > 0 && <p role="status" className="mt-2 flex gap-2 rounded-xl bg-bad/10 px-3 py-2.5 text-sm text-bad"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{worn.map((g) => `${g.name} : ${g.km.toLocaleString("fr-FR")} / ${g.limitKm?.toLocaleString("fr-FR")} km`).join(" · ")}. Seuil critique dépassé.</p>}
         </div>
       )}
       <label className="block text-sm text-ink-soft">Date et heure<input type="datetime-local" value={f.when} onChange={set("when")} className={cn(field, "text-lg font-semibold")} /></label>
@@ -178,8 +178,8 @@ export default function RecordPage() {
       <label className="block text-sm text-ink-soft">Notes<textarea value={f.notes} onChange={set("notes")} rows={3} className="mt-1 w-full rounded-xl border border-line bg-surface p-4 text-base" /></label>
       {err && <p role="alert" className="text-sm font-medium text-brand">{err}</p>}
       <button disabled={busy} className="min-h-14 w-full rounded-xl bg-brand font-display text-xl font-semibold text-brand-ink disabled:opacity-60">{busy ? "Enregistrement…" : "Enregistrer la sortie"}</button>
-      <p className="text-center text-sm text-ink-soft">Vous avez un fichier GPX ou FIT ? <Link href="/import" className="font-semibold text-brand">Importez-le</Link></p>
-      {res && <StoryReveal story={res.story} record={res.record} alerts={res.gearAlerts?.map((g) => `${g.name} a atteint ${g.km.toLocaleString("fr-FR")} km (seuil ${g.limitKm?.toLocaleString("fr-FR")} km) : pensez à le remplacer.`)} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />}
+      <p className="text-center text-sm text-ink-soft">Tu as un fichier GPX ou FIT ? <Link href="/import" className="font-semibold text-brand">Importe-le</Link></p>
+      {res && <StoryReveal story={res.story} record={res.record} alerts={res.gearAlerts?.map((g) => `${g.name} a atteint ${g.km.toLocaleString("fr-FR")} km (seuil ${g.limitKm?.toLocaleString("fr-FR")} km) : pense à le remplacer.`)} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />}
     </form>
   );
 }

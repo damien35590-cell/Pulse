@@ -36,7 +36,7 @@ export function weeklyInsights(acts: Act[], { now, tz }: WeeklyCtx): Insight[] {
   const recent = runs.filter((a) => a.startedAt.getTime() >= d30), before = runs.filter((a) => a.startedAt.getTime() < d30 && a.startedAt.getTime() >= d60);
   if (recent.length >= 3 && before.length >= 3) {
     const gain = pace(before) - pace(recent);
-    if (gain >= 5) out.push({ id: "pace", tone: "progress", icon: "trend", title: `${Math.round(gain)} s de moins au km`, body: "Votre allure moyenne s’est améliorée en 30 jours. Ça ne se voit pas d’une sortie à l’autre, mais le chrono ne ment pas." });
+    if (gain >= 5) out.push({ id: "pace", tone: "progress", icon: "trend", title: `${Math.round(gain)} s de moins au km`, body: "Ton allure moyenne s’est améliorée en 30 jours. Ça ne se voit pas d’une sortie à l’autre, mais le chrono ne ment pas." });
   }
 
   const month = dayKey(now, tz).slice(0, 7);

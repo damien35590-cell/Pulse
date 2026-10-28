@@ -30,7 +30,7 @@ export default function ImportPage() {
       const j = await r.json();
       if (!r.ok) return setSync({ busy: false, err: j.error ?? "Échec de la synchronisation" });
       setSync({ busy: false, msg: j.found === 0 ? "Aucune activité trouvée sur Intervals.icu ces 7 derniers jours." : `${j.saved} nouvelle(s) sortie(s) enregistrée(s), ${j.duplicates} déjà présente(s)${j.backfilled ? `, ${j.backfilled} complétée(s) avec le détail` : ""}${j.skipped ? `, ${j.skipped} sans fichier (ignorée${j.skipped > 1 ? "s" : ""})` : ""}.${j.errors?.length ? ` ${j.errors.length} erreur(s).` : ""}${racesNote(j.racesLinked)}` });
-    } catch { setSync({ busy: false, err: "Connexion impossible, réessayez." }); }
+    } catch { setSync({ busy: false, err: "Connexion impossible, réessaie." }); }
   }
 
   async function syncFitNow() {
@@ -40,7 +40,7 @@ export default function ImportPage() {
       const j = await r.json();
       if (!r.ok) return setSyncFit({ busy: false, err: j.error ?? "Échec de la synchronisation Google Fit" });
       setSyncFit({ busy: false, msg: j.count === 0 ? "Aucune activité trouvée sur Google Fit ces 7 derniers jours." : `${j.message}${racesNote(j.racesLinked)}` });
-    } catch { setSyncFit({ busy: false, err: "Connexion impossible, réessayez." }); }
+    } catch { setSyncFit({ busy: false, err: "Connexion impossible, réessaie." }); }
   }
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -69,12 +69,12 @@ export default function ImportPage() {
     <section className="space-y-5">
       <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
       <h1 className="font-display text-3xl font-bold leading-none">Importer</h1>
-      <p className="text-ink-soft">Fichiers FIT ou GPX (Strava, MyWhoosh, votre montre), ou l’archive ZIP exportée de Strava. Les sorties déjà présentes sont ignorées.</p>
+      <p className="text-ink-soft">Fichiers FIT ou GPX (Strava, MyWhoosh, ta montre), ou l’archive ZIP exportée de Strava. Les sorties déjà présentes sont ignorées.</p>
 
       {/* Bloc Google Fit */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <p className="font-bold">Synchroniser depuis Google Fit</p>
-        <p className="mt-1 text-sm text-ink-soft">Récupère vos activités physiques (vélo, running, etc.) des 7 derniers jours.</p>
+        <p className="mt-1 text-sm text-ink-soft">Récupère tes activités physiques (vélo, running, etc.) des 7 derniers jours.</p>
         <button onClick={syncFitNow} disabled={syncFit.busy} className="mt-3 min-h-12 w-full rounded-xl border border-brand bg-transparent font-display text-lg font-semibold text-brand disabled:opacity-60">{syncFit.busy ? "Synchronisation…" : "Synchroniser Google Fit"}</button>
         {syncFit.msg && <p role="status" className="mt-2 text-sm">{syncFit.msg}</p>}
         {syncFit.err && <p role="alert" className="mt-2 text-sm font-medium text-brand">{syncFit.err}</p>}
@@ -83,7 +83,7 @@ export default function ImportPage() {
       {/* Bloc Intervals.icu */}
       <div className="rounded-xl border border-line bg-surface p-4">
         <p className="font-bold">Synchroniser depuis Intervals.icu</p>
-        <p className="mt-1 text-sm text-ink-soft">Récupère vos sorties MyWhoosh des 7 derniers jours. Pulse le fait aussi chaque nuit, tout seul.</p>
+        <p className="mt-1 text-sm text-ink-soft">Récupère tes sorties MyWhoosh des 7 derniers jours. Pulse le fait aussi chaque nuit, tout seul.</p>
         <button onClick={syncNow} disabled={sync.busy} className="mt-3 min-h-12 w-full rounded-xl bg-brand font-display text-lg font-semibold text-brand-ink disabled:opacity-60">{sync.busy ? "Synchronisation…" : "Synchroniser Intervals"}</button>
         {sync.msg && <p role="status" className="mt-2 text-sm">{sync.msg}</p>}
         {sync.err && <p role="alert" className="mt-2 text-sm font-medium text-brand">{sync.err}</p>}
@@ -103,7 +103,7 @@ export default function ImportPage() {
           <Link href="/activities" className="mt-3 grid min-h-12 place-items-center rounded-xl bg-surface-2 font-semibold">Voir mes activités</Link>
         </div>
       )}
-      {failed && <p role="alert" className="text-sm font-medium text-brand">L’enregistrement a échoué. Vérifiez votre connexion et réessayez : les sorties déjà enregistrées ne seront pas dupliquées.</p>}
+      {failed && <p role="alert" className="text-sm font-medium text-brand">L’enregistrement a échoué. Vérifie ta connexion et réessaie : les sorties déjà enregistrées ne seront pas dupliquées.</p>}
 
       {items.length > 0 && (
         <>

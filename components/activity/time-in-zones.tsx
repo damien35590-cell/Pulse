@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { ZONES } from "@/lib/zones";
 import { cn } from "@/lib/utils";
+import { useThemeColors } from "@/lib/use-theme-colors";
 
 const rows = (sec: number[]) => {
   const tot = sec.reduce((a, b) => a + b, 0) || 1;
@@ -11,7 +12,7 @@ const rows = (sec: number[]) => {
 
 /** Temps passé dans chaque zone. `power` et `hr` : secondes par zone (6 valeurs). */
 export function TimeInZones({ power, hr }: { power?: number[]; hr?: number[] }) {
-  const [tab, setTab] = useState<"power" | "hr">(power ? "power" : "hr");
+  const [tab, setTab] = useState<"power" | "hr">(power ? "power" : "hr"), t = useThemeColors();
   const data = rows((tab === "power" ? power : hr) ?? new Array(6).fill(0));
   return (
     <div>
@@ -24,10 +25,10 @@ export function TimeInZones({ power, hr }: { power?: number[]; hr?: number[] }) 
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 64, left: 0, bottom: 0 }}>
             <XAxis type="number" hide domain={[0, 100]} />
-            <YAxis type="category" dataKey="name" width={112} tick={{ fontSize: 12, fill: "#8A8A95" }} axisLine={false} tickLine={false} />
+            <YAxis type="category" dataKey="name" width={112} tick={{ fontSize: 12, fill: t.inkMute }} axisLine={false} tickLine={false} />
             <Bar dataKey="pct" radius={[0, 6, 6, 0]} isAnimationActive={false} minPointSize={2}>
               {data.map((d) => <Cell key={d.name} fill={d.color} />)}
-              <LabelList dataKey="label" position="right" style={{ fontSize: 11, fill: "#8A8A95" }} />
+              <LabelList dataKey="label" position="right" style={{ fontSize: 11, fill: t.inkMute }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

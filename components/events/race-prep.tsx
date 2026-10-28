@@ -7,9 +7,9 @@ import { GoalTimeInline, RaceGoalButton } from "./prep-actions";
 
 const fr = (n: number, d = 1) => n.toLocaleString("fr-FR", { maximumFractionDigits: d });
 export const STATE_STYLE: Record<PrepState, string> = {
-  "En avance": "bg-[#22C55E]/15 text-green-700 dark:text-green-400",
+  "En avance": "bg-good/15 text-good",
   "Dans le rythme": "bg-brand/10 text-brand",
-  "À relancer": "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "À relancer": "bg-warn/15 text-warn",
 };
 
 function Gauge({ title, value, sub, pct }: { title: string; value: string; sub: string; pct: number | null }) {
@@ -17,7 +17,7 @@ function Gauge({ title, value, sub, pct }: { title: string; value: string; sub: 
     <div className="min-w-0 rounded-xl border border-line bg-surface p-3">
       <p className="truncate text-xs font-semibold text-ink-soft">{title}</p>
       <p className="mt-0.5 font-display text-2xl font-bold leading-tight tabular-nums">{value}</p>
-      {pct != null && <div className="my-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className={cn("h-full rounded-full", pct >= 100 ? "bg-[#22C55E]" : "bg-brand")} style={{ width: `${Math.min(100, pct)}%` }} /></div>}
+      {pct != null && <div className="my-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className={cn("h-full rounded-full", pct >= 100 ? "bg-good" : "bg-brand")} style={{ width: `${Math.min(100, pct)}%` }} /></div>}
       <p className="text-xs leading-snug text-ink-soft">{sub}</p>
     </div>
   );
@@ -66,7 +66,7 @@ export function RacePrepSection({ id, prep: p, distanceKm, hasGoalTime, goal }: 
           <div><p className="text-xs font-semibold text-ink-soft">Allure cible</p><p className="font-display text-2xl font-bold tabular-nums">{p.pace.goal}</p></div>
           <div className="text-right">
             <p className="text-xs font-semibold text-ink-soft">Allure récente</p>
-            <p className={cn("font-display text-2xl font-bold tabular-nums", p.pace.recentS && p.pace.recentS <= p.pace.goalS && "text-green-700 dark:text-green-400")}>{p.pace.recent ?? "—"}</p>
+            <p className={cn("font-display text-2xl font-bold tabular-nums", p.pace.recentS && p.pace.recentS <= p.pace.goalS && "text-good")}>{p.pace.recent ?? "—"}</p>
             <p className="text-[11px] text-ink-soft">{p.pace.n ? `${p.pace.n} sortie${p.pace.n > 1 ? "s" : ""} de distance proche` : "pas de sortie de distance proche"}</p>
           </div>
         </div>

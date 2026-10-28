@@ -43,7 +43,7 @@ export function ImportRace({ label = "Importer depuis un lien", primary = false,
       const r = await previewRaceImport(link);
       if (!r.ok) {
         // Échec : formulaire vide, lien conservé, saisie à la main.
-        setError(`${r.error} Vous pouvez saisir la course à la main.`);
+        setError(`${r.error} Tu peux saisir la course à la main.`);
         setBase({ url: link, platform: "OTHER" }); setF(toForm({ url: link })); setStep("form");
       } else if (r.races.length === 1) choose(r.races[0]);
       else { setRaces(r.races); setStep("pick"); }
@@ -73,7 +73,7 @@ export function ImportRace({ label = "Importer depuis un lien", primary = false,
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div role="dialog" aria-modal="true" aria-label="Importer une course" className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-line bg-bg sm:rounded-3xl">
             <div className="flex items-center justify-between px-5 pb-2 pt-4">
-              <h2 className="font-display text-xl font-bold">{step === "url" ? "Importer une course" : step === "pick" ? "Choisissez votre épreuve" : "Vérifiez et enregistrez"}</h2>
+              <h2 className="font-display text-xl font-bold">{step === "url" ? "Importer une course" : step === "pick" ? "Choisis ton épreuve" : "Vérifie et enregistre"}</h2>
               <button onClick={() => setOpen(false)} aria-label="Fermer" className="flex h-11 w-11 items-center justify-center text-ink-soft"><X className="h-5 w-5" /></button>
             </div>
 

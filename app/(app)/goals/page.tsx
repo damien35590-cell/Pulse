@@ -25,7 +25,7 @@ export default async function GoalsPage() {
     <div className="space-y-5">
       <Link href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand">‹ Accueil</Link>
       <h1 className="font-display text-3xl font-bold leading-none">Objectifs</h1>
-      {goals.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-ink-soft">Aucun objectif pour l’instant. Ajoutez-en un ci-dessous.</p>}
+      {goals.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-ink-soft">Aucun objectif pour l’instant. Ajoutes-en un ci-dessous.</p>}
       {goals.map((g) => {
         const m = METRICS[g.metric as Metric], p = goalProgress({ metric: g.metric as Metric, period: g.period as Period, target: g.target, type: g.type }, acts, now, "Europe/Paris"), u = m.unit;
         return (
@@ -36,7 +36,7 @@ export default async function GoalsPage() {
             <div className="relative my-3 h-2.5 rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(p.pct)} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-brand" style={{ width: `${p.pct}%` }} /><span className="absolute -bottom-1 -top-1 w-0.5 bg-ink-soft" style={{ left: `${Math.min(100, p.elapsed * 100)}%` }} />
             </div>
-            <p className="text-sm text-ink-soft">Le trait gris est le rythme à tenir. {p.done ? "Objectif atteint." : p.onTrack ? <>À ce rythme, vous finissez à <b className="text-ink">{fmtNum(p.projected)} {u}</b> : sur la bonne voie.</> : <>À ce rythme : {fmtNum(p.projected)} {u}. Il reste {fmtNum(p.target - p.value)} {u}.</>}</p>
+            <p className="text-sm text-ink-soft">Le trait gris est le rythme à tenir. {p.done ? "Objectif atteint." : p.onTrack ? <>À ce rythme, tu finis à <b className="text-ink">{fmtNum(p.projected)} {u}</b> : sur la bonne voie.</> : <>À ce rythme : {fmtNum(p.projected)} {u}. Il reste {fmtNum(p.target - p.value)} {u}.</>}</p>
           </section>
         );
       })}

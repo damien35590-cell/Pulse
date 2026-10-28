@@ -148,7 +148,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
 
       {total === 0 && (filtered
         ? <p className="rounded-xl border border-line bg-surface p-5 text-ink-soft">Aucune activité pour ce filtre. <Link href="/activities" className="font-semibold text-brand">Tout afficher</Link></p>
-        : <p className="rounded-xl border border-line bg-surface p-5 text-ink-soft">Rien ici pour l’instant. <Link href="/record" className="font-semibold text-brand">Enregistrez une sortie</Link> ou <Link href="/import" className="font-semibold text-brand">importez vos fichiers</Link>.</p>
+        : <p className="rounded-xl border border-line bg-surface p-5 text-ink-soft">Rien ici pour l’instant. <Link href="/record" className="font-semibold text-brand">Enregistre une sortie</Link> ou <Link href="/import" className="font-semibold text-brand">importe tes fichiers</Link>.</p>
       )}
 
       {byDate && [...years].map(([y, months], yi) => {

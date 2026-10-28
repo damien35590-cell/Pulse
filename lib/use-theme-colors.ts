@@ -7,10 +7,10 @@ import { useEffect, useState } from "react";
  * Valeurs prêtes à l'emploi (`rgb(r g b)`). Règle des graphiques de données :
  * `brand` (aplat) pour les barres et remplissages, `brandText` (vert foncé en clair) pour traits et points, `inkMute` pour la référence.
  */
-export type ThemeColors = { brand: string; brandText: string; ink: string; inkSoft: string; inkMute: string; surface: string; surface2: string; line: string };
+export type ThemeColors = { brand: string; brandText: string; ink: string; inkSoft: string; inkMute: string; surface: string; surface2: string; line: string; good: string };
 
 const VARS: Record<keyof ThemeColors, string> = {
-  brand: "--brand", brandText: "--brand-text", ink: "--ink", inkSoft: "--ink-soft", inkMute: "--ink-mute", surface: "--surface", surface2: "--surface-2", line: "--line",
+  brand: "--brand", brandText: "--brand-text", ink: "--ink", inkSoft: "--ink-soft", inkMute: "--ink-mute", surface: "--surface", surface2: "--surface-2", line: "--line", good: "--good",
 };
 // Avant le premier rendu client (serveur) : pas de couleur en dur, le trait hérite du texte.
 const FALLBACK = Object.fromEntries(Object.keys(VARS).map((k) => [k, "currentColor"])) as ThemeColors;

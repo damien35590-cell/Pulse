@@ -23,7 +23,7 @@ export function StoryReveal({ story, record, alerts = [], onClose }: { story: st
         <p className="font-display text-4xl font-bold leading-none text-brand">{record ? "Record battu" : "Sortie enregistrée"}</p>
         {story && <p className="mt-4 text-lg leading-snug">{story}</p>}
         {alerts.length > 0 && (
-          <div role="alert" className="mt-4 space-y-1.5 rounded-xl bg-red-600/10 p-3 text-left text-sm text-red-700 dark:text-red-300">
+          <div role="alert" className="mt-4 space-y-1.5 rounded-xl bg-bad/10 p-3 text-left text-sm text-bad">
             {alerts.map((a) => <p key={a} className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{a}</p>)}
           </div>
         )}

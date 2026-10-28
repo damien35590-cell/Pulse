@@ -54,7 +54,7 @@ export function EditableTitle({ activityId, title, editing: editingProp, onEditi
           <button type="button" onClick={() => { tap(); setEditing(true); }} aria-label="Renommer l’activité" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-ink-soft hover:bg-surface-2"><Pencil className="h-5 w-5" aria-hidden /></button>
         )}
       </div>
-      {err && <p role="alert" className="text-sm font-medium text-bad">Impossible de renommer. Vérifiez votre connexion et réessayez.</p>}
+      {err && <p role="alert" className="text-sm font-medium text-bad">Impossible de renommer. Vérifie ta connexion et réessaie.</p>}
     </div>
   );
 }
