@@ -7,6 +7,7 @@
  *   pour un exercice chargé la série la plus lourde, pour un exercice au chrono (gainage, planche) la plus longue tenue, en secondes (« 1 min 30 »).
  */
 import { dayKey } from "../dates";
+import { isSoftActivity } from "../sports";
 import { fmtClock, fmtKm, fmtNum } from "../format";
 import { doneSets, groupKey, sumReps, variantOf, type StrengthRow } from "./strength";
 import { catalogFor, isLafayCode, resolveName } from "../workout/catalog";
@@ -34,7 +35,17 @@ export type RecordInput = {
   /** Courbes de puissance des sorties VÉLO : [5 s, 30 s, 1 min, 5 min, 20 min, 1 h] (lib/power.ts). */
   curves: { activityId: string; startedAt: Date; curve: (number | null)[] | null }[];
   strength: StrengthRow[];
+  /** Activités récentes (toute nature) : donnent l'onglet par défaut, voir `latestRecordSport`. */
+  recent?: { type: string; startedAt: Date; source?: string | null; dedupeKey?: string | null; title?: string | null }[];
 };
+
+/** Onglet par défaut : le sport de la dernière activité d'entraînement parmi Running et Muscu (marches et vélotafs ignorés). null sans aucune. */
+export function latestRecordSport(recent: NonNullable<RecordInput["recent"]>): "RUN" | "WORKOUT" | null {
+  const last = recent
+    .filter((a) => (a.type === "RUN" || a.type === "WORKOUT") && !isSoftActivity(a))
+    .reduce<(typeof recent)[number] | null>((m, a) => (!m || +a.startedAt > +m.startedAt ? a : m), null);
+  return last ? (last.type as "RUN" | "WORKOUT") : null;
+}
 
 const fmtDay = (d: Date, tz: string) =>
   new Date(dayKey(d, tz) + "T00:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -135,6 +146,8 @@ export function buildSportRecords(input: RecordInput): RecordsBySport {
   const sports = RECORD_SPORTS
     .map((sport): SportRecords => ({ sport, rows: sport === "WORKOUT" ? strengthRecords(input.strength, input.tz) : enduranceRows(sport, input) }))
     .filter((s) => s.rows.length > 0);
-  // Onglet par défaut : Running s'il a des records, sinon le premier onglet disponible
-  return { sports, defaultSport: sports[0]?.sport ?? null };
+  // Onglet par défaut : le sport de la dernière séance Running / Muscu s'il a des records, sinon Running, sinon le premier onglet disponible
+  const last = latestRecordSport(input.recent ?? []);
+  const has = (s: RecordSport) => sports.some((x) => x.sport === s);
+  return { sports, defaultSport: last && has(last) ? last : has("RUN") ? "RUN" : sports[0]?.sport ?? null };
 }

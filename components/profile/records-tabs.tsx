@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Dumbbell, Mountain, Route, Zap } from "lucide-react";
 import { Segmented } from "@/components/ui/segmented";
@@ -9,8 +9,6 @@ import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import type { RecordRow, RecordSport, RecordsBySport } from "@/lib/analytics/records";
-
-const STORAGE_KEY = "pulse:records-sport";
 
 /** Pastille de chaque ligne, aux couleurs du sport : le code (5K, 10K, 21,1 ; code Lafay) s'il y en a un, sinon un pictogramme. */
 function RecordTile({ row, sport }: { row: RecordRow; sport: RecordSport }) {
@@ -22,25 +20,14 @@ function RecordTile({ row, sport }: { row: RecordRow; sport: RecordSport }) {
   );
 }
 
-/** Records personnels : un onglet par sport (Running d'abord, seulement ceux qui ont des records), le dernier choisi est retenu. */
+/** Records personnels : un onglet par sport (seulement ceux qui ont des records), ouvert sur le sport de la dernière séance Running / Muscu (data.defaultSport). */
 export function RecordsTabs({ data, limit, moreHref }: { data: RecordsBySport; limit?: number; moreHref?: string }) {
   const [sport, setSport] = useState<RecordSport | null>(data.defaultSport);
-
-  // Après l'hydratation : on reprend l'onglet choisi la dernière fois (le stockage peut être indisponible ou vide)
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && data.sports.some((s) => s.sport === saved)) setSport(saved as RecordSport);
-    } catch { /* stockage indisponible : on garde l'onglet par défaut */ }
-  }, [data.sports]);
 
   if (!data.sports.length) return <p className="text-ink-soft">Tes records apparaîtront dès ta première sortie.</p>;
 
   const current = data.sports.find((s) => s.sport === sport) ?? data.sports[0];
-  const choose = (v: RecordSport) => {
-    setSport(v);
-    try { localStorage.setItem(STORAGE_KEY, v); } catch { /* sans conséquence */ }
-  };
+  const choose = (v: RecordSport) => setSport(v);
 
   return (
     <div className="space-y-3">

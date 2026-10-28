@@ -1,7 +1,7 @@
 // Lancer avec : npx tsx tools/test-coach-notes.ts
 import { volumeByMuscle } from "../lib/muscles";
 import assert from "node:assert/strict";
-import { frame, overviewNotes, timeChange, planNotes, rankNotes, rateChange, runNotes, strengthNotes, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
+import { exceptionalPrevious, frame, overviewNotes as overview, timeChange, planNotes, rankNotes, rateChange, runNotes as run, strengthNotes as strength, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
 import type { StrengthAnalysis } from "../lib/analytics/strength";
 
 const tz = "Europe/Paris", now = new Date("2026-10-23T10:00:00Z"); // vendredi
@@ -9,6 +9,10 @@ const period = { weeks: 4, tz, now, current: true };
 const act = (type: string, day: string, min: number, o: Partial<CoachAct> = {}): CoachAct => ({
   type, title: "Séance", source: "fit", dedupeKey: null, startedAt: new Date(day + "T08:00:00Z"), distanceM: 0, movingTimeS: min * 60, load: 50, ...o,
 });
+// Les règles se testent sans le plafond d'affichage (2) ; le plafond a ses propres assertions plus bas.
+const overviewNotes = (i: Parameters<typeof overview>[0]) => overview({ max: 20, ...i });
+const runNotes = (i: Parameters<typeof run>[0]) => run({ max: 20, ...i });
+const strengthNotes = (i: Parameters<typeof strength>[0]) => strength({ max: 20, ...i });
 const ids = (l: CoachNote[]) => l.map((n) => n.id);
 const byId = (l: CoachNote[], id: string) => l.find((n) => n.id === id);
 
@@ -23,9 +27,9 @@ assert.equal(frame({ ...period, current: false }).fullWeeks, 4);
 assert.equal(rateChange(26, 26, 28, 28), 0);
 assert.equal(rateChange(10, 26, 0, 28), null);
 
-// Classement : alertes d'abord, 4 au plus
+// Classement : alertes d'abord, 2 au plus
 const n = (id: string, tone: CoachNote["tone"]): CoachNote => ({ id, tone, title: id, body: "" });
-assert.deepEqual(ids(rankNotes([n("a", "info"), n("b", "good"), n("c", "bad"), n("d", "warn"), n("e", "warn")])), ["c", "d", "e", "b"]);
+assert.deepEqual(ids(rankNotes([n("a", "info"), n("b", "good"), n("c", "bad"), n("d", "warn"), n("e", "warn")])), ["c", "d"], "deux commentaires au plus, alerte puis vigilance");
 
 // Programmes : suivi, séances clés manquées
 assert.equal(planNotes([{ sport: "RUN", name: "Base VMA", planned: 1, done: 0, missedKey: 0 }]).length, 0, "une seule séance prévue : rien à dire");
@@ -47,7 +51,7 @@ let o = overviewNotes({ acts: live, period });
 assert.equal(byId(o, "freq")?.tone, "good", "4 séances par semaine : dans la cible");
 assert.equal(byId(o, "volume")?.title, "Volume stable");
 assert.ok(!ids(o).some((i) => i.startsWith("gap-")), "rien ne manque");
-assert.ok(o.length <= 4);
+assert.ok(overview({ acts: live, period }).length <= 2, "affichage : 2 commentaires au plus");
 
 // Vélotaf et marche ne comptent pas
 o = overviewNotes({ acts: [...live, ...Array.from({ length: 20 }, (_, i) => act("EBIKE", `2026-10-${String(1 + i).padStart(2, "0")}`, 30, { title: "Vélotaf" }))], period });
@@ -128,3 +132,25 @@ const vol = byId(overviewNotes({ acts: mk, period }), "volume");
 assert.ok(vol && vol.title.includes(String(Math.abs(tc.pct!))), `coach « ${vol?.title} » = tuile ${tc.pct} %`);
 
 console.log("coach-notes : OK");
+
+// Période précédente exceptionnelle (5 jours de randonnée en septembre) : ni « -81 % », ni alerte, on compare au volume habituel
+{
+  const trip = ["2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14"].map((day) => act("HIKE", day, 360, { distanceM: 20000 }));
+  const lighter = live.filter((a) => +a.startedAt >= +new Date("2026-09-28T00:00:00Z") ? !(a.type === "WORKOUT") : true); // période en cours plus légère
+  const odd = overviewNotes({ acts: [...lighter, ...trip], period });
+  const v = byId(odd, "volume");
+  assert.ok(v, "une ligne de volume reste affichée");
+  assert.equal(v!.tone, "info", "style neutre, pas « À surveiller »");
+  assert.equal(v!.title, "Période précédente exceptionnelle (randonnée) : comparaison peu parlante.");
+  assert.match(v!.body, /volume hebdomadaire habituel/);
+  assert.ok(!/-\d+ % de temps/.test(odd.map((x) => x.title).join(" ")), "plus de « -x % de temps »");
+  assert.ok(overview({ acts: [...lighter, ...trip], period }).length <= 2, "jamais plus de 2 commentaires");
+  assert.equal(exceptionalPrevious(live, period), null, "volume régulier : rien d'exceptionnel");
+  assert.equal(exceptionalPrevious([...live, ...trip], period)?.label, "randonnée");
+  assert.equal(exceptionalPrevious([], period), null, "sans historique : pas de médiane, pas d'exception");
+}
+// Une baisse de volume ordinaire n'est plus une alerte
+{
+  const drop = overviewNotes({ acts: live.filter((a) => +a.startedAt < +new Date("2026-09-28T00:00:00Z") || a.type === "RUN"), period });
+  assert.ok(drop.every((x) => x.id !== "volume" || x.tone !== "warn"), "baisse de volume : neutre");
+}

@@ -1,6 +1,6 @@
 // Lancer avec : npx tsx tools/test-records.ts
 import assert from "node:assert/strict";
-import { buildSportRecords, fmtHold, strengthRecords } from "../lib/analytics/records";
+import { latestRecordSport, buildSportRecords, fmtHold, strengthRecords } from "../lib/analytics/records";
 import type { StrengthRow } from "../lib/analytics/strength";
 
 const tz = "Europe/Paris";
@@ -69,3 +69,18 @@ assert.equal(s.find((r) => r.label.includes("B2"))!.code, "B2", "muscu : code La
 assert.equal(s.find((r) => r.label === "Rowing haltère")!.code, undefined, "muscu : pas de code hors Lafay");
 
 console.log("records : tout est vert");
+
+// Onglet par défaut : le sport de la dernière activité d'entraînement Running / Muscu, marches et vélotafs ignorés
+{
+  const at = (type: string, day: string, o: object = {}) => ({ type, startedAt: d(day), ...o });
+  assert.equal(latestRecordSport([at("RUN", "2026-10-20"), at("WORKOUT", "2026-10-27")]), "WORKOUT");
+  assert.equal(latestRecordSport([at("RUN", "2026-10-28"), at("WORKOUT", "2026-10-27")]), "RUN");
+  assert.equal(latestRecordSport([at("WORKOUT", "2026-10-20"), at("EBIKE", "2026-10-28"), at("WALK", "2026-10-29"), at("RIDE", "2026-10-30")]), "WORKOUT", "e-bike, marche et vélo ignorés");
+  assert.equal(latestRecordSport([]), null);
+  const mk = (recent: { type: string; startedAt: Date }[], p = prs) => buildSportRecords({ tz, prs: p, curves, strength: rows, recent });
+  assert.equal(mk([at("WORKOUT", "2026-10-27")]).defaultSport, "WORKOUT");
+  assert.equal(mk([at("RUN", "2026-10-27")]).defaultSport, "RUN");
+  assert.equal(mk([]).defaultSport, "RUN", "sans activité : Running");
+  assert.equal(mk([at("RUN", "2026-10-27")], prs.filter((p) => p.type !== "RUN")).defaultSport, "WORKOUT", "dernier sport sans record : Running absent, premier onglet disponible");
+  assert.notEqual(mk([at("RUN", "2026-10-27")]).defaultSport, "RIDE", "jamais Vélo par défaut");
+}

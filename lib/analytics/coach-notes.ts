@@ -1,5 +1,5 @@
 /**
- * « Le mot du coach » de la page Analyse : 2 à 4 commentaires tirés des chiffres de la période choisie,
+ * « Le mot du coach » de la page Analyse : 1 à 2 commentaires tirés des chiffres de la période choisie,
  * comparés à la période précédente de même durée, à tes cibles (2–3 courses + 2–3 muscu par semaine) et à tes programmes.
  * Règles déterministes, aucun appel d'IA : chaque règle ne parle que si elle a quelque chose d'utile à dire.
  * Fonctions pures (tests : tools/test-coach-notes.ts).
@@ -25,8 +25,12 @@ export type CoachAct = { type: string; title: string; source: string; dedupeKey:
 export const TARGET_RUNS: readonly [number, number] = [2, 3];
 export const TARGET_LIFTS: readonly [number, number] = [2, 3];
 const TARGET_ALL: readonly [number, number] = [TARGET_RUNS[0] + TARGET_LIFTS[0], TARGET_RUNS[1] + TARGET_LIFTS[1]];
-/** Nombre maximal de commentaires affichés. */
-export const MAX_NOTES = 4;
+/** Nombre maximal de commentaires affichés : deux, les plus utiles d'abord. */
+export const MAX_NOTES = 2;
+/** Une période précédente est « exceptionnelle » quand son volume hebdomadaire dépasse ce multiple de la médiane des 12 dernières semaines. */
+export const EXCEPTIONAL_RATIO = 2;
+const TYPICAL_WEEKS = 12;
+const KIND_LABEL: Record<string, string> = { HIKE: "randonnée", RIDE: "vélo", RUN: "course", WORKOUT: "muscu" };
 
 const RANK: Record<CoachTone, number> = { bad: 0, warn: 1, good: 2, info: 3 };
 const fr = (n: number, d = 0) => n.toLocaleString("fr-FR", { maximumFractionDigits: d });
@@ -50,6 +54,26 @@ export function timeChange(acts: { startedAt: Date; movingTimeS: number }[], p: 
 /** Les plus importants d'abord (alerte, vigilance, progrès, info), dans l'ordre des règles à importance égale. */
 export function rankNotes(notes: CoachNote[], max = MAX_NOTES): CoachNote[] {
   return notes.map((n, i) => ({ n, i })).sort((a, b) => RANK[a.n.tone] - RANK[b.n.tone] || a.i - b.i).slice(0, max).map((x) => x.n);
+}
+
+/**
+ * Période précédente hors norme (séjour de randonnée, semaine de camp…) : son volume par semaine dépasse 2 × la médiane hebdomadaire des 12 dernières semaines.
+ * La comparaison avec elle ne dit rien d'utile ; on renvoie alors le volume habituel (médiane) et la discipline dominante de la période. null sinon.
+ */
+export function exceptionalPrevious(training: CoachAct[], p: CoachPeriod): { typicalS: number; prevWeeklyS: number; label: string | null } | null {
+  const f = frame(p), key = (a: CoachAct) => dayKey(a.startedAt, p.tz);
+  const weekly = Array.from({ length: TYPICAL_WEEKS }, (_, i) => {
+    const mon = shiftDay(f.lastFullMon, -7 * i);
+    return training.filter((a) => key(a) >= mon && key(a) <= shiftDay(mon, 6)).reduce((s, a) => s + a.movingTimeS, 0);
+  }).sort((a, b) => a - b);
+  const typicalS = (weekly[5] + weekly[6]) / 2; // médiane de 12 valeurs
+  const prev = training.filter((a) => key(a) >= f.prevStart && key(a) <= f.prevEnd);
+  const prevWeeklyS = prev.reduce((s, a) => s + a.movingTimeS, 0) / p.weeks;
+  if (!(typicalS > 0) || prevWeeklyS <= EXCEPTIONAL_RATIO * typicalS) return null;
+  const byType = new Map<string, number>();
+  for (const a of prev) byType.set(a.type, (byType.get(a.type) ?? 0) + a.movingTimeS);
+  const top = [...byType].sort((a, b) => b[1] - a[1])[0];
+  return { typicalS, prevWeeklyS, label: top ? KIND_LABEL[top[0]] ?? null : null };
 }
 
 /** Bornes utiles d'une période : jours de la période, période précédente, semaines terminées. */
@@ -101,8 +125,8 @@ export function planNotes(plans: PlanAdherence[]): CoachNote[] {
 
 // ───────── Onglet « Tous » ─────────
 
-export function overviewNotes(input: { acts: CoachAct[]; period: CoachPeriod; plans?: PlanAdherence[] }): CoachNote[] {
-  const { acts, period: p, plans = [] } = input;
+export function overviewNotes(input: { acts: CoachAct[]; period: CoachPeriod; plans?: PlanAdherence[]; max?: number }): CoachNote[] {
+  const { acts, period: p, plans = [], max = MAX_NOTES } = input;
   const f = frame(p), notes: CoachNote[] = [];
   const training = acts.filter((a) => !isCommute({ ...a }) && +a.startedAt <= +p.now);
   const between = (a: CoachAct, from: string, to: string) => { const k = dayKey(a.startedAt, p.tz); return k >= from && k <= to; };
@@ -138,7 +162,7 @@ export function overviewNotes(input: { acts: CoachAct[]; period: CoachPeriod; pl
   if (start && end && Math.max(start.ctl, end.ctl) >= 5) {
     const d = end.ctl - start.ctl, perWeek = d / p.weeks;
     if (d >= 3) notes.push({ id: "ctl", tone: perWeek > 8 ? "warn" : "good", title: "Forme de fond en hausse", body: `Fitness ${fr(start.ctl)} → ${fr(end.ctl)} sur la période. ${perWeek > 8 ? `Le rythme est rapide (+${fr(perWeek)} par semaine) : prévois une semaine plus légère bientôt.` : "Tu construis : continue sur ce tempo."}` });
-    else if (d <= -3) notes.push({ id: "ctl", tone: "warn", title: "Forme de fond en baisse", body: `Fitness ${fr(start.ctl)} → ${fr(end.ctl)} sur la période. Normal après une coupure ou une semaine de récup ; sinon, remets du volume progressivement.` });
+    else if (d <= -3) notes.push({ id: "ctl", tone: "info", title: "Forme de fond en baisse", body: `Fitness ${fr(start.ctl)} → ${fr(end.ctl)} sur la période. Normal après une coupure ou une semaine de récup ; sinon, remets du volume progressivement.` });
   }
 
   // 4. Régularité : séances par semaine terminée, comparée à ta cible
@@ -153,27 +177,35 @@ export function overviewNotes(input: { acts: CoachAct[]; period: CoachPeriod; pl
 
   // 5. Volume d'entraînement par rapport à la période précédente, à durée égale
   const tc = timeChange(training, p), pct = tc.prevCount >= 2 ? tc.pct : null;
-  if (pct != null && cur.length) {
+  const odd = pct != null && cur.length ? exceptionalPrevious(training, p) : null;
+  if (odd) {
+    // Comparer à un séjour hors norme n'apprend rien (« -81 % de temps ») : on compare au volume habituel, sans alarme.
+    const perWeek = (time(cur) / f.span) * 7, vsTypical = Math.round((perWeek / odd.typicalS - 1) * 100);
+    notes.push({
+      id: "volume", tone: "info", title: `Période précédente exceptionnelle${odd.label ? ` (${odd.label})` : ""} : comparaison peu parlante.`,
+      body: `${hours(perWeek)} par semaine en ce moment, contre ${hours(odd.typicalS)} de volume hebdomadaire habituel (médiane des ${TYPICAL_WEEKS} dernières semaines, ${vsTypical > 0 ? "+" : ""}${vsTypical} %).`,
+    });
+  } else if (pct != null && cur.length) {
     const vs = `${hours(time(cur))} contre ${hours(time(prev))} sur les ${p.weeks} semaines précédentes${f.span < f.prevSpan ? ", à durée égale" : ""}`;
     if (pct >= 15) notes.push({ id: "volume", tone: "good", title: `+${pct} % de temps d'entraînement`, body: `${vs}.` });
-    else if (pct <= -25) notes.push({ id: "volume", tone: "warn", title: `${pct} % de temps d'entraînement`, body: `${vs}. Si c'est voulu (récupération, fatigue), parfait ; sinon, reprends par une séance de plus par semaine.` });
+    else if (pct <= -25) notes.push({ id: "volume", tone: "info", title: `${pct} % de temps d'entraînement`, body: `${vs}. Si c'est voulu (récupération, fatigue), parfait ; sinon, reprends par une séance de plus par semaine.` });
     else notes.push({ id: "volume", tone: "info", title: "Volume stable", body: `${vs} (${pct > 0 ? "+" : ""}${pct} %).` });
   }
 
-  return rankNotes([...notes, ...planNotes(plans)]);
+  return rankNotes([...notes, ...planNotes(plans)], max);
 }
 
 // ───────── Onglet « Course à pied » ─────────
 
-export function runNotes(input: { acts: CoachAct[]; period: CoachPeriod; goal?: RunGoal | null; plans?: PlanAdherence[] }): CoachNote[] {
-  const { acts, period: p, goal = null, plans = [] } = input;
+export function runNotes(input: { acts: CoachAct[]; period: CoachPeriod; goal?: RunGoal | null; plans?: PlanAdherence[]; max?: number }): CoachNote[] {
+  const { acts, period: p, goal = null, plans = [], max = MAX_NOTES } = input;
   const f = frame(p), notes: CoachNote[] = [];
   const runs = acts.filter((a) => a.type === "RUN" && !isCommute({ ...a }) && +a.startedAt <= +p.now).sort((a, b) => +a.startedAt - +b.startedAt);
   const between = (a: CoachAct, from: string, to: string) => { const k = dayKey(a.startedAt, p.tz); return k >= from && k <= to; };
   const cur = runs.filter((a) => between(a, f.startKey, f.endKey)), prev = runs.filter((a) => between(a, f.prevStart, f.prevEnd));
   const km = (l: CoachAct[]) => l.reduce((s, a) => s + a.distanceM, 0) / 1000;
   const paceOf = (l: CoachAct[]) => l.reduce((s, a) => s + a.movingTimeS, 0) / km(l); // s/km
-  if (!cur.length) return rankNotes(planNotes(plans));
+  if (!cur.length) return rankNotes(planNotes(plans), max);
 
   // 1. Hausse brutale du volume : dernière semaine terminée contre la moyenne des 3 précédentes (historique chargé au-delà de la période)
   {
@@ -214,23 +246,23 @@ export function runNotes(input: { acts: CoachAct[]; period: CoachPeriod; goal?: 
   if (pct != null) {
     const vs = `${fr(km(cur), 1)} km contre ${fr(km(prev), 1)} km sur les ${p.weeks} semaines précédentes${f.span < f.prevSpan ? ", à durée égale" : ""}`;
     if (pct >= 15) notes.push({ id: "volume", tone: "good", title: `+${pct} % de kilomètres`, body: `${vs}.` });
-    else if (pct <= -25) notes.push({ id: "volume", tone: "warn", title: `${pct} % de kilomètres`, body: `${vs}.` });
+    else if (pct <= -25) notes.push({ id: "volume", tone: "info", title: `${pct} % de kilomètres`, body: `${vs}.` });
     else notes.push({ id: "volume", tone: "info", title: "Kilométrage stable", body: `${vs} (${pct > 0 ? "+" : ""}${pct} %).` });
   }
 
-  return rankNotes([...notes, ...planNotes(plans.filter((x) => x.sport === "RUN"))]);
+  return rankNotes([...notes, ...planNotes(plans.filter((x) => x.sport === "RUN"))], max);
 }
 
 // ───────── Onglet « Musculation » ─────────
 
 /** `perWeek` : séances par semaine de la page (`sessionsPerWeek`, comme la tuile) ; à défaut, celle de l'analyse de muscu. */
-export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeriod; plans?: PlanAdherence[]; perWeek?: number | null }): CoachNote[] {
-  const { data, period: p, plans = [] } = input;
-  if (data.empty) return rankNotes(planNotes(plans.filter((x) => x.sport === "WORKOUT")));
+export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeriod; plans?: PlanAdherence[]; perWeek?: number | null; max?: number }): CoachNote[] {
+  const { data, period: p, plans = [], max = MAX_NOTES } = input;
+  if (data.empty) return rankNotes(planNotes(plans.filter((x) => x.sport === "WORKOUT")), max);
   // Moins de 3 séances sur la période : aucune affirmation sur la progression ni sur l'équilibre haut / bas, une seule ligne.
   if (data.summary.sessions < MIN_SESSIONS) {
     const few: CoachNote = { id: "few", tone: "info", title: `Pas assez de séances pour juger la progression (${data.summary.sessions} / ${MIN_SESSIONS}).`, body: "" };
-    return [few, ...planNotes(plans.filter((x) => x.sport === "WORKOUT"))].slice(0, MAX_NOTES);
+    return [few, ...planNotes(plans.filter((x) => x.sport === "WORKOUT"))].slice(0, max);
   }
   const f = frame(p), notes: CoachNote[] = [];
 
@@ -264,8 +296,8 @@ export function strengthNotes(input: { data: StrengthAnalysis; period: CoachPeri
   if (pct != null) {
     const vs = `${fr(data.summary.reps)} répétitions contre ${fr(prev!.reps)} sur les ${p.weeks} semaines précédentes${f.span < f.prevSpan ? ", à durée égale" : ""}`;
     if (pct >= 15) notes.push({ id: "volume", tone: "good", title: `+${pct} % de répétitions`, body: `${vs}.` });
-    else if (pct <= -25) notes.push({ id: "volume", tone: "warn", title: `${pct} % de répétitions`, body: `${vs}.` });
+    else if (pct <= -25) notes.push({ id: "volume", tone: "info", title: `${pct} % de répétitions`, body: `${vs}.` });
   }
 
-  return rankNotes([...notes, ...planNotes(plans.filter((x) => x.sport === "WORKOUT"))]);
+  return rankNotes([...notes, ...planNotes(plans.filter((x) => x.sport === "WORKOUT"))], max);
 }

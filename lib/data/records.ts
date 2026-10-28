@@ -5,9 +5,10 @@ import type { SetDetail } from "@/lib/exercises";
 
 /** Records personnels de la page Vous, regroupés par sport (RUN, RIDE, HIKE, WORKOUT). */
 export async function getRecordsBySport(userId: string, tz: string): Promise<RecordsBySport> {
-  const [prs, streams, exercises] = await Promise.all([
+  const [prs, streams, recent, exercises] = await Promise.all([
     prisma.personalRecord.findMany({ where: { userId }, select: { kind: true, type: true, value: true, activityId: true, achievedAt: true } }),
     prisma.activityStream.findMany({ where: { activity: { userId, type: "RIDE" } }, select: { activityId: true, curve: true, activity: { select: { startedAt: true } } } }),
+    prisma.activity.findMany({ where: { userId, type: { in: ["RUN", "WORKOUT"] } }, orderBy: { startedAt: "desc" }, take: 10, select: { type: true, startedAt: true, source: true, dedupeKey: true, title: true } }),
     prisma.workoutExercise.findMany({
       where: { activity: { userId, type: "WORKOUT" } },
       select: { activityId: true, name: true, sets: true, reps: true, loadKg: true, setsDetail: true, activity: { select: { startedAt: true } } },
@@ -18,7 +19,7 @@ export async function getRecordsBySport(userId: string, tz: string): Promise<Rec
     setsDetail: Array.isArray(e.setsDetail) ? (e.setsDetail as unknown as SetDetail[]) : null,
   }));
   return buildSportRecords({
-    tz, prs, strength,
+    tz, prs, strength, recent,
     curves: streams.map((s) => ({ activityId: s.activityId, startedAt: s.activity.startedAt, curve: Array.isArray(s.curve) ? (s.curve as (number | null)[]) : null })),
   });
 }

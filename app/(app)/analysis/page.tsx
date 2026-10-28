@@ -18,7 +18,7 @@ import { getStrengthAnalysis } from "@/lib/analytics/strength";
 import { getCyclingAnalysis } from "@/lib/analytics/cycling";
 import { getHikingAnalysis } from "@/lib/analytics/hiking";
 import { parsePeriod, periodParams, weeksLabel } from "@/lib/analysis/period";
-import { overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
+import { MAX_NOTES, overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
 import { lastDebrief } from "@/lib/coach/store";
 import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
@@ -36,7 +36,6 @@ import { cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Analyse" };
 const TZ = "Europe/Paris";
-const MAX_NOTES = 3;
 const CALENDAR_WEEKS = 26;
 /** Courbes de la progression muscu : les 6 exercices du programme Haut / Bas tiennent tous. */
 const MAX_LADDERS = 6;

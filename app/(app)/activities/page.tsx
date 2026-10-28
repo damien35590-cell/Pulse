@@ -136,7 +136,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: S
 
       <div className="space-y-3">
         <div className="sticky top-bar z-20 -mx-4 flex items-center gap-1 bg-bg/80 py-1 pl-4 pr-1 backdrop-blur-xl">
-          <div className="no-scrollbar -ml-4 flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-contain pl-4 pr-2">
+          <div className="no-scrollbar -ml-4 flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-contain pl-4 pr-8 [-webkit-mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]">
             <Link href={qs({ t: "", m: "", n: "" })} aria-current={T === null ? "page" : undefined} className={chip(T === null)}>Tous</Link>
             {pool.map((k) => <Link key={k} href={qs({ t: k, m: "", n: "" })} aria-current={T === k ? "page" : undefined} className={chip(T === k)}><span className={cn("size-2 shrink-0 rounded-full", activityStyle(k).dot)} aria-hidden />{SPORTS[k].label}</Link>)}
           </div>

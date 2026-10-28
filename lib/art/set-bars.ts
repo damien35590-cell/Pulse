@@ -1,10 +1,10 @@
 /**
- * Données des SetBars (art d'une séance de muscu dans le fil) : un groupe par exercice (4 au plus, dans l'ordre de la séance), une barre par série.
+ * Données des SetBars (art d'une séance de muscu dans le fil) : un groupe par exercice (6 au plus, dans l'ordre de la séance ; une séance en compte 4 à 5), une barre par série.
  * Fonction pure (tests : tools/test-zone-ribbon.ts). Reps pour un exercice en répétitions, secondes pour un exercice « au chrono » (mode time).
  */
 import { catalogFor, resolveName } from "../workout/catalog";
 
-export const MAX_GROUPS = 4;
+export const MAX_GROUPS = 6;
 
 /** Un exercice de la séance, tel que lu en base (WorkoutExercise). `reps` = cible du jour (progression Lafay), `setsDetail` = le réel. */
 export type SetExercise = { name: string; sets: number; reps: number; setsDetail?: unknown };

@@ -1,3 +1,4 @@
+import { displayTitle } from "@/lib/activity/title";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CloudRain, Flag, MessageSquareText, Thermometer } from "lucide-react";
@@ -139,7 +140,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
     <article>
       <ActivityHero
         id={a.id}
-        title={a.title}
+        title={displayTitle({ title: a.title, plannedSession: planned })}
         points={points}
         gain={a.elevationGainM > 0 ? a.elevationGainM : undefined}
         elevationColor={sportFg}

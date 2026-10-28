@@ -1,6 +1,7 @@
 import { fmtKm, fmtDuration, fmtNum, fmtPace, fmtWhen } from "@/lib/format";
 import { previewTrack } from "@/lib/map/track";
-import { isSoftActivity } from "@/lib/sports";
+import { SPORT_LABEL, isSoftActivity } from "@/lib/sports";
+import { displayTitle, planTitle } from "@/lib/activity/title";
 import { insightLine, type InsightLine } from "@/lib/activity/comparables";
 import { parseRibbon } from "@/lib/art/zone-ribbon";
 import { ZONES } from "@/lib/zones";
@@ -59,7 +60,9 @@ export function summaryData(a: SummaryActivity, insight: ActivityInsight | undef
     exercises: a.exercises?.flatMap((e) => (e.name ? [{ name: e.name, sets: e.sets, reps: e.reps, setsDetail: e.setsDetail }] : [])),
   });
   return {
-    id: a.id, type: a.type, title: a.title, competition: a.sessionType === "race" || undefined, when: fmtWhen(a.startedAt, tz),
+    id: a.id, type: a.type, title: displayTitle(a), competition: a.sessionType === "race" || undefined,
+    // Titre repris du programme : le sport (que l'ancien titre disait souvent) passe dans la ligne de la date.
+    when: planTitle(a) ? `${SPORT_LABEL(a.type)} · ${fmtWhen(a.startedAt, tz)}` : fmtWhen(a.startedAt, tz),
     metrics: cells(a).map((c) => ({ label: c.l, value: c.v, unit: c.u })),
     insight: a.type === "WORKOUT" ? insight?.strength : insightLine(insight ?? { pace: null, chips: [] }, a.story) ?? undefined,
     zones: !route && !art.ribbon && !art.effort ? ribbonZones(a) : undefined,

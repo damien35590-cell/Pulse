@@ -183,12 +183,12 @@ const lift = setGroups([
   { name: "G - crunch", sets: 2, reps: 15, setsDetail: [{ reps: 15, done: true }, { reps: 20, done: true }] },
   { name: "H - relevés de genoux", sets: 2, reps: 10 },
 ]);
-assert.equal(lift.length, 4, "4 groupes au plus");
+assert.equal(lift.length, 5, "les 5 exercices de la séance sont rendus, aucun n'est écarté");
 assert.deepEqual(lift[0].sets, [9, 9, 8, 9], "échauffement et séries non faites exclus");
 assert.equal(lift[0].target, 9);
 assert.deepEqual(lift[1].sets, [12, 12, 12]);
 assert.equal(lift[2].target, 6, "repli : max de l'exercice");
-assert.deepEqual(lift.map((g) => g.code), ["B2", "A3", "C", "G"]);
+assert.deepEqual(lift.map((g) => g.code), ["B2", "A3", "C", "G", "H"]);
 assert.ok(lift.every((g) => g.max === 20), "échelle commune sur la séance (reps)");
 
 // Exercice au chrono (E4, mode time) : barre = secondes, échelle séparée des répétitions.
@@ -238,3 +238,12 @@ assert.equal(effectiveSessionType({ sessionType: "bogus" }), "easy");
   assert.ok(cardArt({ ...ride, title: "Vélo virtuel", sessionType: "interval" }).effort, "choix manuel : EffortStrip");
 }
 console.log("art du fil : ok");
+
+// Séance de 5 exercices dont un au chrono : tous rendus (régression « Haut du corps », 5 exercices, 30 séries → 4 groupes).
+const upper = setGroups([
+  { name: "B1 - tractions", sets: 6, reps: 8 }, { name: "A2 - pompes", sets: 6, reps: 15 }, { name: "A3 - pompes", sets: 6, reps: 12 },
+  { name: "E4 - flexions latérales", sets: 6, reps: 45 }, { name: "C1 - squats", sets: 6, reps: 20 },
+]);
+assert.equal(upper.length, 5);
+assert.equal(upper.reduce((s, g) => s + g.sets.length, 0), 30);
+assert.equal(setGroups(Array.from({ length: 8 }, (_, i) => ({ name: `Exo ${i}`, sets: 3, reps: 10 }))).length, 6, "plafond de sécurité à 6");
