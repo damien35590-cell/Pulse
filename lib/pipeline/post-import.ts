@@ -89,6 +89,43 @@ async function mergeInto(keep: Full, drop: Full) {
   ]);
 }
 
+/**
+ * Recolle dans le premier les morceaux d'une même sortie déjà importés séparément (Google Fit coupe à chaque pause, lib/sync/google-fit-merge.ts) :
+ * ressenti, matériel, séance du programme, records suivent (mergeInto), puis les totaux sont refaits sur toute la sortie :
+ * début du premier, fin du dernier, distance / D+ / calories / temps en mouvement additionnés, FC pondérée, séries FC et traces mises bout à bout.
+ * `sourceIds` : morceaux Google Fit recollés (Activity.mergedSourceIds). Renvoie l'id conservé ; à suivre de processActivity.
+ */
+export async function mergeSplitActivity(ids: string[], sourceIds: string[]): Promise<string | null> {
+  const all = (await Promise.all(ids.map(loadFull))).filter((a): a is Full => !!a).sort((a, b) => +a.startedAt - +b.startedAt);
+  if (!all.length) return null;
+  const first = all[0], t0 = +first.startedAt;
+  const end = Math.max(...all.map((a) => +a.startedAt + 1000 * Math.max(a.movingTimeS, a.elapsedTimeS ?? 0)));
+  const sum = (f: (a: Full) => number) => all.reduce((s, a) => s + f(a), 0);
+  const withHr = all.filter((a) => (a.avgHr ?? 0) > 0 && a.movingTimeS > 0), hrTime = withHr.reduce((s, a) => s + a.movingTimeS, 0);
+  const series = all.flatMap((a) => (Array.isArray(a.hrSeries) ? (a.hrSeries as { t: number; bpm: number }[]).map((p) => ({ t: p.t + Math.round((+a.startedAt - t0) / 1000), bpm: p.bpm })) : []));
+  const points = all.flatMap((a) => (Array.isArray(a.trackPoints) ? (a.trackPoints as { t?: number }[]) : [])).sort((p, q) => (p.t ?? 0) - (q.t ?? 0));
+  const totals: Prisma.ActivityUpdateInput = {
+    startedAt: first.startedAt,
+    movingTimeS: sum((a) => a.movingTimeS),
+    elapsedTimeS: Math.round((end - t0) / 1000),
+    distanceM: sum((a) => a.distanceM),
+    elevationGainM: sum((a) => a.elevationGainM),
+    calories: all.some((a) => a.calories != null) ? sum((a) => a.calories ?? 0) : null,
+    avgHr: hrTime ? Math.round(withHr.reduce((s, a) => s + a.avgHr! * a.movingTimeS, 0) / hrTime) : first.avgHr,
+    maxHr: all.some((a) => a.maxHr != null) ? Math.max(...all.map((a) => a.maxHr ?? 0)) : null,
+    ...(series.length ? { hrSeries: series as Prisma.InputJsonValue } : {}),
+    ...(points.length ? { trackPoints: points as Prisma.InputJsonValue } : {}),
+    mergedSourceIds: sourceIds,
+  };
+  for (const drop of all.slice(1)) {
+    const keep = await loadFull(first.id);
+    if (!keep) return null;
+    await mergeInto(keep, drop);
+  }
+  await prisma.activity.update({ where: { id: first.id }, data: totals });
+  return first.id;
+}
+
 /** Étape a : fusionne les doublons. Renvoie l'id de l'activité conservée (celle-ci ou une autre plus riche) et les ids supprimés. */
 async function dedupe(id: string) {
   let keep = await loadFull(id);

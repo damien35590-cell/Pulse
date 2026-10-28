@@ -2,6 +2,7 @@ import type { ActivityType } from "@prisma/client";
 import { SPORT_LABEL } from "@/lib/sports";
 import { prisma } from "@/lib/prisma";
 import { findOverlapping, processActivity } from "@/lib/pipeline/post-import";
+import { groupPieces, mergedSpan, type Piece } from "@/lib/sync/google-fit-merge";
 
 /** Source des activités créées par cette synchro (les plus anciennes portent « fit » ; on les reconnaît à leur dedupeKey « gfit-… »). */
 export const GOOGLE_FIT_SOURCE = "google-fit";
@@ -130,7 +131,7 @@ async function fetchActivitySegments(
       },
       body: JSON.stringify({
         aggregateBy: [{ dataTypeName: "com.google.activity.segment" }],
-        bucketByActivitySegment: { minDurationMillis: 5 * 60 * 1000 },
+        bucketByActivitySegment: { minDurationMillis: 60 * 1000 }, // 1 min : les morceaux courts sont recollés, puis seuil de 5 min (MIN_AUTO_S)
         startTimeMillis: startMs,
         endTimeMillis: endMs,
       }),
@@ -155,6 +156,38 @@ async function fetchActivitySegments(
     console.warn("[google-fit] segments: erreur", e);
     return [];
   }
+}
+
+/** Durée minimale d'une sortie détectée automatiquement, une fois ses morceaux recollés. */
+const MIN_AUTO_S = 5 * 60;
+const TOLERANCE_MS = 5 * 60 * 1000;
+
+type Sourced = Piece & { id: string };
+
+/** Distance d'une sortie recollée : somme des morceaux (null si Google n'en donne pour aucun). */
+async function piecesDistanceM(token: string, g: Piece[]): Promise<number | null> {
+  const parts = await Promise.all(g.map((p) => fetchSessionDistanceM(token, p.startMs, p.endMs)));
+  return parts.some((d) => d != null) ? parts.reduce<number>((s, d) => s + (d ?? 0), 0) : null;
+}
+
+/**
+ * Activités Google Fit déjà en base pour une sortie : par id (dedupeKey, mergedSourceIds) ou du même type démarrant dans la sortie.
+ * Aucune → à créer. Une seule → mise à jour si elle ne couvre pas encore tous les morceaux (sortie importée avant la fusion,
+ * ou encore en cours à la synchro précédente). Plusieurs → morceaux importés séparément avant cette règle : on n'y touche pas
+ * ici (rattrapage : tools/fusionner-gfit.ts).
+ */
+async function existingFor(uid: string, types: ActivityType[], ids: string[], span: { startMs: number; endMs: number }) {
+  return prisma.activity.findMany({
+    where: {
+      userId: uid,
+      OR: [
+        { dedupeKey: { in: ids.map((i) => `gfit-${i}`) } },
+        { mergedSourceIds: { hasSome: ids } },
+        { dedupeKey: { startsWith: "gfit-" }, type: { in: types }, startedAt: { gte: new Date(span.startMs - TOLERANCE_MS), lte: new Date(span.endMs) } },
+      ],
+    },
+    select: { id: true, dedupeKey: true, mergedSourceIds: true, distanceM: true },
+  });
 }
 
 export async function syncGoogleFit(uid: string, days: number = 7) {
@@ -185,173 +218,112 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   }
 
   const data = await res.json();
-  const sessions = data.session || [];
+  const sessions = (data.session || []).filter((s: any) => s.startTimeMillis && s.id);
 
   let saved = 0;
   let duplicates = 0;
   let updated = 0;
   let auto = 0;
+  let joined = 0;
   const sessionRanges: { startMs: number; endMs: number }[] = [];
 
-  // ---------- 1. Séances enregistrées (méthode d'origine) ----------
-  for (const session of sessions) {
-    if (!session.startTimeMillis) continue;
-
-    const start = new Date(parseInt(session.startTimeMillis));
-    let durationS = 0;
-
-    if (session.endTimeMillis) {
-      durationS = Math.floor(
-        (parseInt(session.endTimeMillis) - start.getTime()) / 1000
-      );
-    }
-
-    const dedupeKey = `gfit-${session.id}`;
-
-    const endMs = session.endTimeMillis ? parseInt(session.endTimeMillis) : null;
-    if (endMs) sessionRanges.push({ startMs: start.getTime(), endMs });
-
-    const distanceM = endMs
-      ? await fetchSessionDistanceM(validToken, start.getTime(), endMs)
-      : null;
-
-    const existing = await prisma.activity.findFirst({
-      where: { userId: uid, dedupeKey: dedupeKey },
-    });
-
-    if (existing) {
-      if (distanceM && existing.distanceM === 0) {
-        await prisma.activity.update({
-          where: { id: existing.id },
-          data: { distanceM },
-        });
-        updated++;
+  /**
+   * Importe (ou complète) une sortie faite d'un ou plusieurs morceaux consécutifs de même type.
+   * dedupeKey = « gfit-<id du premier morceau> » : la même clé qu'avant la fusion pour une sortie d'un seul morceau.
+   */
+  async function upsert(g: Sourced[], typeEnum: ActivityType, title: string): Promise<"created" | "updated" | "same"> {
+    const ids = g.map((p) => p.id), span = mergedSpan(g), merged = g.length > 1;
+    const types: ActivityType[] = typeEnum === "EBIKE" ? ["EBIKE", "RIDE"] : [typeEnum];
+    const found = await existingFor(uid, types, ids, span);
+    if (found.length > 1) return "same";
+    if (found.length === 1) {
+      const e = found[0], has = new Set([...e.mergedSourceIds, e.dedupeKey?.replace(/^gfit-/, "")]);
+      if (ids.every((i) => has.has(i))) {
+        if (e.distanceM === 0) {
+          const d = await piecesDistanceM(validToken, g);
+          if (d) { await prisma.activity.update({ where: { id: e.id }, data: { distanceM: d } }); return "updated"; }
+        }
+        return "same";
       }
-      duplicates++;
-      continue;
+      // La sortie a grandi (ou n'avait été prise qu'en partie) : on la complète, sans toucher à ce que tu as saisi dessus.
+      const d = await piecesDistanceM(validToken, g);
+      await prisma.activity.update({
+        where: { id: e.id },
+        data: {
+          startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: merged ? span.elapsedS : null,
+          ...(d != null ? { distanceM: d } : {}), mergedSourceIds: merged ? ids : [],
+        },
+      });
+      await processActivity(e.id);
+      if (merged) joined += g.length - 1;
+      return "updated";
     }
-
-    const typeEnum = mapFitType(session.activityType);
 
     // Même sortie déjà enregistrée par une autre source (FIT, saisie…) : Google Fit n'apporte rien de plus.
-    if ((await findOverlapping(uid, { startedAt: start, movingTimeS: Math.max(durationS, 0) })).length) {
-      duplicates++;
-      continue;
-    }
+    if ((await findOverlapping(uid, { startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: span.elapsedS })).length) return "same";
 
+    const distanceM = await piecesDistanceM(validToken, g);
+    const dedupeKey = `gfit-${g[0].id}`;
     let id: string;
     try {
       ({ id } = await prisma.activity.create({
         data: {
           userId: uid,
-          dedupeKey: dedupeKey,
-          externalId: session.id || dedupeKey,
+          dedupeKey,
+          externalId: dedupeKey,
           source: GOOGLE_FIT_SOURCE,
-          title: session.name || AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`,
+          title,
           type: typeEnum,
-          startedAt: start,
-          movingTimeS: durationS > 0 ? durationS : 0,
+          startedAt: new Date(span.startMs),
+          movingTimeS: span.movingS,
+          ...(merged ? { elapsedTimeS: span.elapsedS, mergedSourceIds: ids } : {}),
           distanceM: distanceM ?? 0,
         },
         select: { id: true },
       }));
-      saved++;
     } catch (e: any) {
       throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
     }
+    if (merged) joined += g.length - 1;
     await processActivity(id);
+    return "created";
   }
 
-  // ---------- 2. Activités détectées automatiquement ----------
+  // ---------- 1. Séances enregistrées : les morceaux d'une même sortie (pauses) sont recollés ----------
+  const sessionPieces: (Sourced & { s: any })[] = sessions.map((s: any) => {
+    const startMs = parseInt(s.startTimeMillis);
+    return { s, id: String(s.id), type: s.activityType, startMs, endMs: s.endTimeMillis ? parseInt(s.endTimeMillis) : startMs };
+  });
+  for (const g of groupPieces(sessionPieces)) {
+    const span = mergedSpan(g);
+    if (span.endMs > span.startMs) sessionRanges.push({ startMs: span.startMs, endMs: span.endMs });
+    const typeEnum = mapFitType(g[0].s.activityType);
+    const r = await upsert(g, typeEnum, g[0].s.name || AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`);
+    if (r === "created") saved++; else if (r === "updated") updated++; else duplicates++;
+  }
+
+  // ---------- 2. Activités détectées automatiquement : idem, segments recollés ----------
   const segments = await fetchActivitySegments(
     validToken,
     startTime.getTime(),
     endTime.getTime()
   );
 
-  const TOLERANCE_MS = 5 * 60 * 1000;
-
-  for (const seg of segments) {
+  for (const g of groupPieces(segments.map((s) => ({ ...s, type: s.activity, id: `seg-${s.activity}-${s.startMs}` })))) {
+    const span = mergedSpan(g);
     // Déjà couvert par une séance enregistrée ? On ignore.
-    const overlaps = sessionRanges.some(
-      (r) => seg.startMs < r.endMs && seg.endMs > r.startMs
-    );
-    if (overlaps) continue;
-
-    const typeEnum = mapFitType(seg.activity);
-
-    // Les bornes d'un segment peuvent bouger de quelques secondes :
-    // on cherche donc une activité du même type qui démarre à ±5 min.
-    const existing = await prisma.activity.findFirst({
-      where: {
-        userId: uid,
-        dedupeKey: { startsWith: "gfit-" },
-        // Les vélos déjà en base peuvent encore être en RIDE (avant reclassement en EBIKE).
-        type: { in: typeEnum === "EBIKE" ? ["EBIKE", "RIDE"] : [typeEnum] },
-        startedAt: {
-          gte: new Date(seg.startMs - TOLERANCE_MS),
-          lte: new Date(seg.startMs + TOLERANCE_MS),
-        },
-      },
-    });
-
-    if (existing) {
-      if (existing.distanceM === 0) {
-        const d = await fetchSessionDistanceM(validToken, seg.startMs, seg.endMs);
-        if (d) {
-          await prisma.activity.update({
-            where: { id: existing.id },
-            data: { distanceM: d },
-          });
-          updated++;
-        }
-      }
-      duplicates++;
-      continue;
-    }
-
-    const dedupeKey = `gfit-seg-${seg.activity}-${seg.startMs}`;
-    const durationS = Math.floor((seg.endMs - seg.startMs) / 1000);
-
-    // Même sortie déjà enregistrée par une autre source : on n'ajoute pas la version Google Fit, plus pauvre.
-    if ((await findOverlapping(uid, { startedAt: new Date(seg.startMs), movingTimeS: Math.max(durationS, 0) })).length) {
-      duplicates++;
-      continue;
-    }
-
-    const distanceM = await fetchSessionDistanceM(
-      validToken,
-      seg.startMs,
-      seg.endMs
-    );
-
-    let id: string;
-    try {
-      ({ id } = await prisma.activity.create({
-        data: {
-          userId: uid,
-          dedupeKey: dedupeKey,
-          externalId: dedupeKey,
-          source: GOOGLE_FIT_SOURCE,
-          title: AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`,
-          type: typeEnum,
-          startedAt: new Date(seg.startMs),
-          movingTimeS: durationS > 0 ? durationS : 0,
-          distanceM: distanceM ?? 0,
-        },
-        select: { id: true },
-      }));
-      auto++;
-    } catch (e: any) {
-      throw new Error(`Erreur Prisma : ${e.message || String(e)}`);
-    }
-    await processActivity(id);
+    if (sessionRanges.some((r) => span.startMs < r.endMs && span.endMs > r.startMs)) continue;
+    // Les petits bouts isolés restent ignorés ; recollés, ils comptent.
+    if (span.movingS < MIN_AUTO_S) continue;
+    const typeEnum = mapFitType(g[0].activity);
+    const r = await upsert(g, typeEnum, AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`);
+    if (r === "created") auto++; else if (r === "updated") updated++; else duplicates++;
   }
 
   return {
     success: true,
     count: sessions.length + segments.length,
     saved: saved + auto, // activités créées (séances + automatiques)
-    message: `${saved} séance(s), ${auto} activité(s) automatique(s), ${updated} distance(s) mise(s) à jour, ${duplicates} déjà présente(s).`,
+    message: `${saved} séance(s), ${auto} activité(s) automatique(s), ${updated} mise(s) à jour, ${duplicates} déjà présente(s)${joined ? `, ${joined} morceau(x) recollé(s)` : ""}.`,
   };
 }

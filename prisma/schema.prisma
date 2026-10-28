@@ -203,6 +203,7 @@ model Activity {
   sessionType    String?                 // choix manuel : "interval" | "easy" | "long" | "race" (l'import Strava remplit "race" et "long") ; null = automatique. Jamais écrit par un recalcul (lib/art/session-type.ts)
   intervalReps   Int?                    // nombre de répétitions détectées
   zoneRibbonAt   DateTime?               // dernier calcul du ruban, même sans résultat ; null = jamais calculé ou à recalculer (lib/data/zone-ribbon.ts)
+  mergedSourceIds String[]    @default([]) // Google Fit : morceaux d’une même sortie recollés (id de session, ou « seg-<type>-<début ms> » pour un segment) ; vide = un seul morceau (lib/sync/google-fit-merge.ts)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
