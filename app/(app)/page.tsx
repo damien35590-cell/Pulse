@@ -26,6 +26,7 @@ import { DayCard, StartProgramCard } from "@/components/training/program-card";
 import { PendingBadgesCard } from "@/components/profile/pending-badges-card";
 import { Avatar } from "@/components/profile/avatar";
 import { getCoach } from "@/lib/coach/load";
+import { getLiftWeek } from "@/lib/data/lift-week";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,8 @@ export default async function DashboardPage() {
   ]);
   // Le coach ne bloque jamais l'accueil : en cas de souci, la carte montre seulement le programme.
   const coach = d.empty ? null : await getCoach(s.user.id, run).catch((e) => { console.error("[coach]", e); return null; });
+  // Muscu de la semaine (faites + rotation à venir) pour la carte « Ta semaine » ; jamais bloquant.
+  const liftWeek = d.empty ? null : await getLiftWeek(s.user.id, run, coach, d.targets.lift).catch((e) => { console.error("[lift-week]", e); return null; });
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: TZ }).format(new Date());
   const goal = d.goals[0];
   const race = d.events[0];
@@ -94,7 +97,7 @@ export default async function DashboardPage() {
 
         {/* Carte du jour : séance du programme, muscu, repos ou séance faite, toujours une seule carte. */}
         <div className="space-y-3 empty:hidden">
-          <DayCard c={coach} p={run} />
+          <DayCard c={coach} p={run} lw={liftWeek} />
           {!run && <StartProgramCard />}
         </div>
 

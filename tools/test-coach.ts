@@ -114,3 +114,13 @@ assert.equal(sessionCondition({ ...slot, feels: 25 }, now, tz), null, "25 °C pi
 assert.equal(sessionCondition({ ...slot, at: slot.at + day, night: true }, now, tz), null, "créneau de demain : rien aujourd'hui");
 
 console.log("test-coach : OK");
+
+// ── Doctrine : pas de bas du corps la veille d'une séance clé ou d'une sortie longue ──
+{
+  const longTomorrow = { title: "Sortie longue · 45'", summary: "45' EF", minutes: 45, date: "2026-10-22", isKey: false, kind: "LONG_RUN" };
+  const c = coachToday({ ...base, lastLiftAt: now - 2 * day, lastLiftHalf: "upper", runNext: longTomorrow });
+  assert.notEqual(c.kind, "lift", "bas du corps la veille de la sortie longue : non");
+  const up = coachToday({ ...base, lastLiftAt: now - 2 * day, lastLiftHalf: "lower", runNext: longTomorrow });
+  assert.equal(up.kind, "lift", "haut du corps la veille : oui");
+  console.log("coach (veille de séance dure) : OK");
+}
