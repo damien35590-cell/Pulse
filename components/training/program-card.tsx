@@ -40,6 +40,33 @@ function upcomingAfter(p: RunProgramView, max = 5) {
   return all.filter((s) => from(s) > start).sort((a, b) => from(a) - from(b)).slice(0, max);
 }
 
+/** Séances déjà faites ou passées de la semaine du programme (diapos à gauche du jour). */
+const pastOfWeek = (week: { sessions: SessionView[] } | undefined) =>
+  (week?.sessions ?? []).filter((s) => s.status === "COMPLETED" || s.status === "SKIPPED");
+
+/** Séance passée de la semaine (diapo à gauche du jour) : lecture seule, lien vers la sortie si elle existe. */
+function PastSlide({ s }: { s: SessionView }) {
+  const done = s.status === "COMPLETED";
+  const body = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-label uppercase text-ink-mute">Séance {s.orderInWeek} · {done ? "faite" : "passée"}</p>
+        {s.isKeySession && <KeyBadge />}
+      </div>
+      <p className={cn("mt-1.5 text-xl font-bold leading-tight tracking-tight", !done && "text-ink-soft")}>{s.title}</p>
+      <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">≈ {fmtDuration(s.durationS)}</p>
+      {s.summary && <p className="mt-1.5 line-clamp-3 text-sm leading-snug text-ink-soft">{s.summary}</p>}
+      {s.activityId && (
+        <span className="mt-auto flex items-center gap-1 pt-3 text-sm font-semibold text-brand">Voir la sortie<ChevronRight className="size-4" aria-hidden /></span>
+      )}
+    </>
+  );
+  const box = "flex h-full flex-col rounded-tile bg-surface-2/60 p-3";
+  return s.activityId
+    ? <Link href={`/activities/${s.activityId}`} className={cn(box, "transition duration-150 ease-snappy active:scale-[0.985]")}>{body}</Link>
+    : <div className={box}>{body}</div>;
+}
+
 /** « Cette semaine », « Semaine prochaine », « Semaine 5 ». */
 const whenLabel = (week: number, current: number) =>
   week === current ? "Cette semaine" : week === current + 1 ? "Semaine prochaine" : `Semaine ${week}`;
@@ -97,8 +124,11 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
   const r = c?.run;
   // Faite / Passer sur la séance du programme : quand c'est elle que le coach propose aujourd'hui (ou sans coach).
   const planRun = n && (!c || c.kind === "run") ? n : null;
-  const upcoming = planRun && p ? upcomingAfter(p) : [];
   const week = p?.weeks.find((w) => w.number === p.current.number);
+  const past = p && !paused ? pastOfWeek(week) : [];
+  // Hors course du programme (muscu, repos, séance faite) : les séances à faire restent accessibles au doigt.
+  const upcoming = planRun && p ? upcomingAfter(p) : n && p ? [n, ...upcomingAfter(p, 4)] : [];
+  const swipe = !!p && !paused && (planRun ? true : !!c && past.length + upcoming.length > 0);
   const vma = p?.pendingTest ? <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div> : null;
   const cond = r?.condition ? CONDITION[r.condition] : null;
   const label = c ? "Aujourd’hui" : paused ? "Programme en pause" : "Prochaine séance";
@@ -127,12 +157,14 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
       {planRun && p ? (
         <SessionCarousel
           className="relative mt-1.5"
-          slideIds={[planRun.id, ...upcoming.map((s) => s.id)]}
+          slideIds={[...past.map((s) => s.id), planRun.id, ...upcoming.map((s) => s.id)]}
+          start={past.length}
           week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
           between={vma}
           footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
           count={`${p.weekDone}/${p.sessionsPerWeek}`}
         >
+          {past.map((s) => <PastSlide key={s.id} s={s} />)}
           <div>
             <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{planRun.title}</h2>
             {steps && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{steps}</p>}
@@ -141,18 +173,23 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
           </div>
           {upcoming.map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
         </SessionCarousel>
+      ) : swipe && c && p ? (
+        <SessionCarousel
+          className="relative mt-1.5"
+          slideIds={[...past.map((s) => s.id), "today", ...upcoming.map((s) => s.id)]}
+          start={past.length}
+          week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
+          between={vma}
+          footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
+          count={`${p.weekDone}/${p.sessionsPerWeek}`}
+        >
+          {past.map((s) => <PastSlide key={s.id} s={s} />)}
+          <CoachBody c={c} />
+          {upcoming.map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
+        </SessionCarousel>
       ) : (
         <>
-          {c ? (
-            <div className="relative mt-1.5">
-              <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{c.title}</h2>
-              <ul className="mt-2 space-y-1.5">
-                {(r ? [r.steps] : c.lines).map((l) => <li key={l} className="text-[15px] leading-snug text-ink-soft">{l}</li>)}
-              </ul>
-              {c.kind === "lift" && <LiftActions />}
-              {c.next && <p className="mt-3 text-sm text-ink-mute">{c.next}</p>}
-            </div>
-          ) : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
+          {c ? <CoachBody c={c} className="relative mt-1.5" /> : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
           {paused && p && (
             <div className="relative mt-4 space-y-3">
               <p className="flex items-center gap-2 text-[15px] text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />{c ? "Programme en pause : il t’attend, reprends quand tu veux." : "Il t’attend, reprends quand tu veux."}</p>
@@ -170,6 +207,20 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
         <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
       </Link>
     </section>
+  );
+}
+
+/** Conseil du coach hors course du programme : titre, lignes, actions muscu, « Demain : … ». */
+function CoachBody({ c, className }: { c: CoachPlan; className?: string }) {
+  return (
+    <div className={className}>
+      <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{c.title}</h2>
+      <ul className="mt-2 space-y-1.5">
+        {(c.run ? [c.run.steps] : c.lines).map((l) => <li key={l} className="text-[15px] leading-snug text-ink-soft">{l}</li>)}
+      </ul>
+      {c.kind === "lift" && <LiftActions />}
+      {c.next && <p className="mt-3 text-sm text-ink-mute">{c.next}</p>}
+    </div>
   );
 }
 

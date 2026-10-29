@@ -1,21 +1,24 @@
 "use client";
 
-import { Children, useRef, useState, type ReactNode } from "react";
+import { Children, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 
 type Dot = { id: string; title: string; status: string };
 
 /**
- * Carrousel au doigt des séances du programme : la prochaine d'abord, les suivantes en glissant.
+ * Carrousel au doigt des séances du programme : la carte s'ouvre sur `start` (le jour), les séances passées de la semaine à gauche,
+ * les suivantes à droite.
  * La séance suivante dépasse à peine (≈ 12 px) pour suggérer le swipe.
  * Les points de la semaine (en bas à droite) servent aussi d'indicateur : celui de la séance affichée porte l'anneau,
  * et toucher un point à faire amène le carrousel sur cette séance.
  */
-export function SessionCarousel({ children, slideIds, week, between, footer, count, className }: {
+export function SessionCarousel({ children, slideIds, start = 0, week, between, footer, count, className }: {
   children: ReactNode;
   /** Id de la séance de chaque diapo, dans l'ordre. */
   slideIds: string[];
+  /** Diapo affichée à l'ouverture (index). */
+  start?: number;
   /** Séances de la semaine en cours (points). */
   week: Dot[];
   /** Contenu entre le carrousel et le pied (ex. invitation au test VMA). */
@@ -28,17 +31,26 @@ export function SessionCarousel({ children, slideIds, week, between, footer, cou
 }) {
   const slides = Children.toArray(children);
   const track = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(start);
   const shownId = slideIds[active];
+
+  // Ouverture sur la diapo du jour, sans animation.
+  useLayoutEffect(() => {
+    const el = track.current, slide = el?.children[start] as HTMLElement | undefined;
+    if (!el || !slide || start === 0) return;
+    el.scrollLeft = slide.offsetLeft - el.offsetLeft - 16;
+  }, [start]);
 
   const onScroll = () => {
     const el = track.current;
     if (!el) return;
     const w = ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? el.clientWidth) + 12; // + gap-3
-    setActive(Math.min(slides.length - 1, Math.round(el.scrollLeft / Math.max(1, w))));
+    const i = Math.min(slides.length - 1, Math.round(el.scrollLeft / Math.max(1, w)));
+    if (i !== active) setActive(i);
   };
   const goTo = (id: string) => {
     const i = slideIds.indexOf(id);
+    if (i === active) return;
     const el = track.current, slide = el?.children[i] as HTMLElement | undefined;
     if (!el || !slide) return;
     tap();
@@ -52,7 +64,7 @@ export function SessionCarousel({ children, slideIds, week, between, footer, cou
         onScroll={onScroll}
         role="region"
         aria-roledescription="carrousel"
-        aria-label="Séances à venir"
+        aria-label="Séances du programme"
         className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-px-4 px-4"
       >
         {slides.map((s, i) => (
