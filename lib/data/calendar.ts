@@ -25,11 +25,15 @@ export async function getCalendar(userId: string, from: string, to: string): Pro
   const aLo = new Date(+lo - 864e5), aHi = new Date(+hi + 864e5);
   const [sessions, races, activities] = await Promise.all([
     prisma.plannedSession.findMany({
-      where: { userId, sport: "RUN", date: { gte: lo, lte: hi }, program: { status: { in: ["ACTIVE", "PAUSED"] } } },
+      where: {
+        userId, sport: "RUN", program: { status: { in: ["ACTIVE", "PAUSED"] } },
+        // Prévue dans la période, ou faite dans la période (séance faite un autre jour que prévu).
+        OR: [{ date: { gte: lo, lte: hi } }, { completedActivity: { is: { startedAt: { gte: aLo, lte: aHi } } } }],
+      },
       orderBy: [{ date: "asc" }, { orderInWeek: "asc" }],
       select: {
         id: true, date: true, title: true, kind: true, status: true, isKeySession: true, plannedDurationS: true,
-        completedActivityId: true, completedActivity: { select: { movingTimeS: true } },
+        completedActivityId: true, completedActivity: { select: { movingTimeS: true, startedAt: true } },
       },
     }),
     prisma.raceEvent.findMany({ where: { userId, date: { gte: aLo, lte: aHi } }, orderBy: { date: "asc" }, select: { id: true, date: true, name: true, eventName: true, sport: true, status: true } }),
@@ -43,9 +47,10 @@ export async function getCalendar(userId: string, from: string, to: string): Pro
   return {
     from, to,
     sessions: sessions.map((s) => ({
-      id: s.id, date: s.date.toISOString().slice(0, 10), title: s.title, kind: s.kind, status: s.status, isKey: s.isKeySession,
+      // Séance faite avec une sortie : le jour de la sortie (on ne fait pas toujours les séances dans l'ordre prévu) ; sinon le jour prévu.
+      id: s.id, date: s.completedActivity ? dayKey(s.completedActivity.startedAt, TZ) : s.date.toISOString().slice(0, 10), title: s.title, kind: s.kind, status: s.status, isKey: s.isKeySession,
       durationS: s.completedActivity?.movingTimeS ?? s.plannedDurationS, activityId: s.completedActivityId,
-    })),
+    })).filter((s) => inRange(s.date)),
     races: races.map((r) => ({ id: r.id, date: dayKey(r.date, TZ), name: r.eventName ?? r.name, sport: r.sport, status: r.status })).filter((r) => inRange(r.date)),
     activities: activities.filter((a) => !linked.has(a.id)).map((a) => ({ id: a.id, date: dayKey(a.startedAt, TZ), type: a.type as "RUN" | "WORKOUT", title: a.title, durationS: a.movingTimeS })).filter((a) => inRange(a.date)),
   };
