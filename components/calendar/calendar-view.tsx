@@ -128,7 +128,7 @@ export function CalendarView({ data, today }: { data: CalendarData; today: strin
           <p className="font-semibold first-letter:uppercase">{longDay(selected)}</p>
           {isEmpty(sel) && <p className="text-sm text-ink-soft">Rien de prévu ni de fait ce jour-là.</p>}
           {sel.races.map((r) => <Row key={r.id} icon={<StarIcon className="h-3.5 w-3.5" />} text={r.name} meta={raceLabel[r.status]} />)}
-          {sel.sessions.map((s) => <Row key={s.id} icon={<span className={cn(dot, sessionDot(s))} />} text={s.title} meta={[statusLabel[s.status], s.isKey ? "clé" : null, s.durationS ? fmtDuration(s.durationS) : null].filter(Boolean).join(" · ")} />)}
+          {sel.sessions.map((s) => <Row key={s.id} icon={<span className={cn(dot, sessionDot(s))} />} text={s.title} meta={[statusLabel[s.status], s.isKey ? "clé" : null, s.durationS ? fmtDuration(s.durationS) : null].filter(Boolean).join(" · ")} href={s.activityId ? `/activities/${s.activityId}` : undefined} />)}
           {sel.runs.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-act-run")} />} text={a.title} meta={`Running · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
           {sel.workouts.map((a) => <Row key={a.id} icon={<span className={cn(dot, "bg-act-strength")} />} text={a.title} meta={`Muscu · ${fmtDuration(a.durationS)}`} href={`/activities/${a.id}`} />)}
         </div>
