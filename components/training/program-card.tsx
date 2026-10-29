@@ -128,11 +128,16 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
   const week = p?.weeks.find((w) => w.number === p.current.number);
   const past0 = p && !paused ? pastOfWeek(week) : [];
   // Séance faite aujourd'hui : la diapo du coach (« Séance du jour faite ») la remplace et porte son point.
-  const doneToday = c?.kind === "done" ? past0.filter((s) => s.completedDay === dayKey(new Date(), "Europe/Paris")).at(-1) : undefined;
-  const past = doneToday ? past0.filter((s) => s.id !== doneToday.id) : past0;
+  // Si plusieurs séances sont cochées aujourd'hui, celle qui porte la sortie du jour l'emporte (une coche à la main peut dater d'aujourd'hui).
+  const todays = c?.kind === "done" ? past0.filter((s) => s.completedDay === dayKey(new Date(), "Europe/Paris")) : [];
+  const doneToday = todays.find((s) => s.activityId) ?? todays.at(-1);
+  // Diapos dans l'ordre de la semaine : la diapo du jour prend la place de sa séance, sinon elle suit les séances passées.
+  const cut = doneToday ? past0.indexOf(doneToday) : past0.length;
+  const before = past0.slice(0, cut), after = doneToday ? past0.slice(cut + 1) : [];
+  const past = planRun ? past0 : before;
   // Hors course du programme (muscu, repos, séance faite) : les séances à faire restent accessibles au doigt.
   const upcoming = planRun && p ? upcomingAfter(p) : n && p ? [n, ...upcomingAfter(p, 4)] : [];
-  const swipe = !!p && !paused && (planRun ? true : !!c && past.length + upcoming.length > 0);
+  const swipe = !!p && !paused && (planRun ? true : !!c && past0.length + upcoming.length > 0);
   const vma = p?.pendingTest ? <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div> : null;
   const cond = r?.condition ? CONDITION[r.condition] : null;
   const label = c ? "Aujourd’hui" : paused ? "Programme en pause" : "Prochaine séance";
@@ -180,15 +185,16 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
       ) : swipe && c && p ? (
         <SessionCarousel
           className="relative mt-1.5"
-          slideIds={[...past.map((s) => s.id), doneToday?.id ?? "today", ...upcoming.map((s) => s.id)]}
-          start={past.length}
+          slideIds={[...before.map((s) => s.id), doneToday?.id ?? "today", ...after.map((s) => s.id), ...upcoming.map((s) => s.id)]}
+          start={before.length}
           week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
           between={vma}
           footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
           count={`${p.weekDone}/${p.sessionsPerWeek}`}
         >
-          {past.map((s) => <PastSlide key={s.id} s={s} />)}
+          {before.map((s) => <PastSlide key={s.id} s={s} />)}
           <CoachBody c={c} />
+          {after.map((s) => <PastSlide key={s.id} s={s} />)}
           {upcoming.map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
         </SessionCarousel>
       ) : (
