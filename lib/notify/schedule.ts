@@ -53,6 +53,13 @@ export function morningGate(now: Date, tz: string, time: string): string | null 
   return null;
 }
 
+/**
+ * Dernier passage utile de cron-job.org (toutes les 15 min, dernier à 9 h 45) : à partir de 9 h 30, un échec n'aura
+ * plus de rattrapage, la route le signale alors en erreur (mail de cron-job.org). Avant, elle répond 200 et le passage suivant réessaie.
+ */
+export const MORNING_LAST_RETRY = "09:30";
+export const morningCanRetry = (now: Date, tz: string) => clockTime(now, tz) < MORNING_LAST_RETRY;
+
 /** Jour ISO (1 = lundi … 7 = dimanche) dans le fuseau donné. */
 export function isoDow(ms: number, tz: string) {
   const d = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short" }).format(new Date(ms));

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { coachToday, type CoachInput } from "../lib/coach/today";
 import { morningMessage, reminderMessage, slotShort, trend, weeklyMessage, weekTotals, REMINDER_LEAD_MAX_MIN, testMessage } from "../lib/notify/content";
-import { clockTime, isoDow, morningGate, notifyCrons, parseJob, REMINDER_HOURS_UTC } from "../lib/notify/schedule";
+import { clockTime, isoDow, morningCanRetry, morningGate, notifyCrons, parseJob, REMINDER_HOURS_UTC } from "../lib/notify/schedule";
 
 const tz = "Europe/Paris";
 const day = 864e5, min = 6e4;
@@ -148,6 +148,8 @@ const vercelHasMatin = () => (JSON.parse(readFileSync(new URL("../vercel.json", 
   assert.equal(morningGate(new Date("2026-10-22T04:15:00Z"), "Europe/Paris", "06:30") === null, false, "6 h 15 < 6 h 30");
   assert.equal(morningGate(new Date("2026-10-22T07:59:00Z"), "Europe/Paris", "06:00"), null, "9 h 59");
   assert.ok(morningGate(new Date("2026-10-22T08:00:00Z"), "Europe/Paris", "06:00"), "10 h 00 : fini");
+  assert.equal(morningCanRetry(new Date("2026-10-29T06:00:00Z"), "Europe/Paris"), true, "7 h (hiver) : un passage suivant réessaiera");
+  assert.equal(morningCanRetry(new Date("2026-10-29T08:30:00Z"), "Europe/Paris"), false, "9 h 30 : plus de rattrapage");
   assert.ok(!vercelHasMatin(), "le coach du matin n'est plus un cron Vercel");
 
   // vercel.json contient exactement les crons attendus (et garde la synchro Intervals).
