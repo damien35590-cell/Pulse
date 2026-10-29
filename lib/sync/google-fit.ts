@@ -1,4 +1,8 @@
-import type { ActivityType } from "@prisma/client";
+import type { ActivityType, Prisma } from "@prisma/client";
+import { encodePolyline } from "@/lib/polyline";
+import { compactTrack } from "@/lib/import/track";
+import type { TrackPoint } from "@/lib/import/types";
+import { refreshZoneRibbon } from "@/lib/data/zone-ribbon";
 import { SPORT_LABEL } from "@/lib/sports";
 import { prisma } from "@/lib/prisma";
 import { absorbActivities, OVERLAP_RATIO, overlapRatio, processActivity } from "@/lib/pipeline/post-import";
@@ -229,15 +233,72 @@ async function fetchHeartRate(token: string, startMs: number, endMs: number): Pr
   }
 }
 
+/** Source fusionnée des positions du téléphone (GPS + réseau) ; à défaut, on essaie les autres sources de positions du compte. */
+const MERGED_LOCATION = "derived:com.google.location.sample:com.google.android.gms:merge_location_samples";
+/** Positions moins précises que ça (m) écartées : ce sont des positions réseau, la trace ferait des zigzags. */
+const MAX_ACCURACY_M = 50;
+/** Sports en extérieur : les seuls pour lesquels on va chercher une trace. */
+const OUTDOOR: ReadonlySet<ActivityType> = new Set(["RUN", "WALK", "HIKE", "RIDE", "EBIKE"] as ActivityType[]);
+
+/** Trace GPS d'une sortie, prête à enregistrer (même format que les imports FIT / GPX / Strava). */
+export type FitTrack = { points: TrackPoint[]; polyline: string; startLat: number; startLng: number; trackPoints: Prisma.InputJsonValue };
+
+const nanos = (ms: number) => (BigInt(Math.round(ms)) * BigInt(1e6)).toString();
+
+async function readLocations(token: string, source: string, startMs: number, endMs: number): Promise<TrackPoint[]> {
+  const res = await fetch(
+    `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(source)}/datasets/${nanos(startMs)}-${nanos(endMs)}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.point ?? [])
+    .map((p: any) => {
+      const v = p.value ?? [], acc = v[2]?.fpVal;
+      const pt: TrackPoint = { t: Math.round(Number(p.startTimeNanos) / 1e6), lat: v[0]?.fpVal, lng: v[1]?.fpVal };
+      if (Number.isFinite(v[3]?.fpVal) && v[3].fpVal !== 0) pt.ele = v[3].fpVal;
+      return acc != null && acc > MAX_ACCURACY_M ? null : pt;
+    })
+    .filter((p: TrackPoint | null): p is TrackPoint => !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng) && Number.isFinite(p.t) && !(p.lat === 0 && p.lng === 0));
+}
+
+/**
+ * Trace GPS d'une période (positions enregistrées par le téléphone pendant la séance Fit). Null sans positions exploitables
+ * (séance en intérieur, localisation coupée, autorisation fitness.location.read absente) : la sortie s'importe alors sans carte.
+ */
+export async function fetchTrack(token: string, startMs: number, endMs: number): Promise<FitTrack | null> {
+  try {
+    let pts = await readLocations(token, MERGED_LOCATION, startMs, endMs);
+    if (pts.length < 2) {
+      const res = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources?dataTypeName=com.google.location.sample", { headers: { Authorization: `Bearer ${token}` } });
+      const ids: string[] = res.ok ? ((await res.json()).dataSource ?? []).map((d: any) => String(d.dataStreamId)).filter((id: string) => id !== MERGED_LOCATION) : [];
+      for (const id of ids) { pts = await readLocations(token, id, startMs, endMs); if (pts.length >= 2) break; }
+    }
+    pts = pts.sort((a, b) => a.t - b.t).filter((p, i, a) => i === 0 || p.t > a[i - 1].t);
+    if (pts.length < 2) return null;
+    const stride = Math.max(1, Math.ceil(pts.length / 500));
+    return {
+      points: pts,
+      polyline: encodePolyline(pts.filter((_, i) => i % stride === 0 || i === pts.length - 1).map((p) => [p.lat!, p.lng!])),
+      startLat: pts[0].lat!, startLng: pts[0].lng!,
+      trackPoints: JSON.parse(JSON.stringify(compactTrack(pts, 900))) as Prisma.InputJsonValue,
+    };
+  } catch (e) {
+    console.warn("[google-fit] trace: erreur", e);
+    return null;
+  }
+}
+
 /** Ce qu'une session donne à l'activité : distance agrégée sur toute sa période, temps actif (sinon durée), temps écoulé, FC si dispo. */
 /** `known` : distance déjà lue par fetchSessionDistances ; `hr` : la lecture de la FC est autorisée (sinon pas d'appel). Durées tronquées à la seconde, comme l'appli Fit. */
 export async function sessionValues(token: string, s: RawSession, opts: { known?: number; hr?: boolean } = {}) {
-  const [distanceM, hr] = await Promise.all([
+  const [distanceM, hr, track] = await Promise.all([
     opts.known ?? fetchSessionDistanceM(token, s.startMs, s.endMs),
     opts.hr ? fetchHeartRate(token, s.startMs, s.endMs) : null,
+    OUTDOOR.has(mapFitType(s.activityType)) ? fetchTrack(token, s.startMs, s.endMs) : null,
   ]);
   const elapsedS = Math.floor((s.endMs - s.startMs) / 1000);
-  return { distanceM: distanceM ?? 0, movingS: s.activeMs ? Math.min(elapsedS, Math.floor(s.activeMs / 1000)) : elapsedS, elapsedS, hr };
+  return { distanceM: distanceM ?? 0, movingS: s.activeMs ? Math.min(elapsedS, Math.floor(s.activeMs / 1000)) : elapsedS, elapsedS, hr, track };
 }
 const canReadHr = (scope: string | null | undefined) => !!scope?.includes("fitness.heart_rate.read");
 
@@ -259,6 +320,7 @@ export async function createFromSession(uid: string, s: RawSession, v: Awaited<R
       title: s.name || AUTO_TITLES[type] || `Activité ${type}`, type,
       startedAt: new Date(s.startMs), movingTimeS: v.movingS, elapsedTimeS: v.elapsedS, distanceM: v.distanceM,
       ...(v.hr ? { avgHr: v.hr.avg, maxHr: v.hr.max } : {}),
+      ...(v.track ? { polyline: v.track.polyline, startLat: v.track.startLat, startLng: v.track.startLng, trackPoints: v.track.trackPoints } : {}),
     },
     select: { id: true },
   });
@@ -270,10 +332,18 @@ export async function createFromSession(uid: string, s: RawSession, v: Awaited<R
  * des segments qui la recouvrent (ressenti, matériel, séance du programme, records…), les supprime, puis rejoue le traitement d'import.
  * Utilisé par tools/reconstruire-gfit.ts. Renvoie l'id gardé.
  */
-export async function rebuildFromSession(uid: string, s: RawSession, plan: { ownId: string | null; replaces: string[] }, token: string): Promise<string> {
-  const keep = plan.ownId ?? (await createFromSession(uid, s, await sessionValues(token, s)));
+export async function rebuildFromSession(uid: string, s: RawSession, plan: { ownId: string | null; replaces: string[] }, token: string, opts: { known?: number; hr?: boolean; badges?: boolean } = {}): Promise<string> {
+  const keep = plan.ownId ?? (await createFromSession(uid, s, await sessionValues(token, s, opts)));
+  // Séance du programme reliée automatiquement à un morceau : elle repasse à faire, et l'appariement est refait sur la sortie complète
+  // (avec sa trace, il voit l'intensité réelle : un footing ne capte plus un test VMA). Un choix fait à la main reste dans rejectedActivityIds.
+  if (plan.replaces.length) {
+    await prisma.plannedSession.updateMany({
+      where: { userId: uid, completedActivityId: { in: plan.replaces } },
+      data: { status: "PLANNED", completedActivityId: null, completedAt: null, complianceScore: null },
+    });
+  }
   await absorbActivities(keep, plan.replaces);
-  await processActivity(keep);
+  await processActivity(keep, undefined, { badges: opts.badges });
   return keep;
 }
 
@@ -283,8 +353,9 @@ const piecesDistanceM = (g: { distanceM: number }[]) => g.reduce((s, p) => s + p
 /**
  * Synchro Google Fit. Les SESSIONS font foi (ce que montre l'appli Fit) : une activité par session, clé gfit-<id de session>.
  * Les segments bruts ne servent que pour le temps qu'aucune session ne couvre (vélotaf, marches détectés), recollés par type (< 10 min).
- * Rien n'est jamais supprimé ici : une session recouverte par d'anciennes activités nées de segments est signalée (« à reconstruire »)
- * et laissée à tools/reconstruire-gfit.ts.
+ * Une session recouverte par des activités nées de segments (synchro lancée avant que Fit ait fini sa séance) est reconstruite tout de suite :
+ * l'activité de la session reprend ce que portaient les morceaux (ressenti, matériel, records…), puis les morceaux sont supprimés.
+ * Chaque sortie en extérieur reçoit sa trace GPS (positions du téléphone pendant la séance) : carte, allure au km, ruban d'allure.
  *
  * Rapidité (la fonction Vercel est aux États-Unis, la base à Londres : chaque requête coûte) : 4 appels Google en tout (liste des sessions,
  * distance par session, segments avec leur distance, plus le renouvellement du jeton s'il expire), activités de la période lues une fois
@@ -323,16 +394,39 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
   let auto = 0;
   let joined = 0;
   let pending = 0;
+  let rebuilt = 0;
 
   // ---------- 1. Sessions : la source de vérité ----------
   for (const s of sessions) {
     const plan = planSession(s, existing);
-    if (plan.status === "replace") { pending++; continue; }
+    if (plan.status === "replace") {
+      // Importée d'abord en morceaux (synchro lancée avant que Fit ait fini sa séance) : on la reconstruit depuis la séance complète.
+      try {
+        const keep = await rebuildFromSession(uid, s, plan, validToken, { known: distances.get(s.id), hr, badges: false });
+        for (const id of plan.replaces) { const i = existing.findIndex((e) => e.id === id); if (i >= 0) existing.splice(i, 1); }
+        if (!plan.ownId) existing.push({ id: keep, type: mapFitType(s.activityType), dedupeKey: `gfit-${s.id}`, mergedSourceIds: [], startMs: s.startMs, endMs: s.endMs });
+        rebuilt++;
+      } catch (e) {
+        console.error("[google-fit] reconstruction", s.id, e);
+        pending++;
+      }
+      continue;
+    }
     if (plan.status === "exists") {
-      const own = await prisma.activity.findUnique({ where: { id: plan.ownId! }, select: { distanceM: true } });
+      const own = await prisma.activity.findUnique({ where: { id: plan.ownId! }, select: { distanceM: true, polyline: true, type: true } });
       const d = distances.get(s.id);
-      if (own && own.distanceM === 0 && d) { await prisma.activity.update({ where: { id: plan.ownId! }, data: { distanceM: d } }); updated++; }
-      else duplicates++;
+      let changed = false;
+      if (own && own.distanceM === 0 && d) { await prisma.activity.update({ where: { id: plan.ownId! }, data: { distanceM: d } }); changed = true; }
+      // Sortie importée avant la récupération des traces : on lui ajoute sa carte (et son ruban d'allure, recalculé dessus).
+      if (own && !own.polyline && OUTDOOR.has(own.type)) {
+        const track = await fetchTrack(validToken, s.startMs, s.endMs);
+        if (track) {
+          await prisma.activity.update({ where: { id: plan.ownId! }, data: { polyline: track.polyline, startLat: track.startLat, startLng: track.startLng, trackPoints: track.trackPoints } });
+          await refreshZoneRibbon(plan.ownId!).catch((e) => console.error("[google-fit] ruban", e));
+          changed = true;
+        }
+      }
+      if (changed) updated++; else duplicates++;
       continue;
     }
     const v = await sessionValues(validToken, s, { known: distances.get(s.id), hr });
@@ -383,6 +477,7 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     const at = { startedAt: new Date(span.startMs), movingTimeS: span.movingS, elapsedTimeS: span.elapsedS };
     if (takenBy(at)) { duplicates++; continue; }
     const dedupeKey = `gfit-${g[0].id}`;
+    const track = OUTDOOR.has(typeEnum) ? await fetchTrack(validToken, span.startMs, span.endMs) : null;
     let id: string;
     try {
       ({ id } = await prisma.activity.create({
@@ -391,6 +486,7 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
           title: AUTO_TITLES[typeEnum] || `Activité ${typeEnum}`, type: typeEnum,
           startedAt: at.startedAt, movingTimeS: span.movingS,
           ...(merged ? { elapsedTimeS: span.elapsedS, mergedSourceIds: ids } : {}),
+          ...(track ? { polyline: track.polyline, startLat: track.startLat, startLng: track.startLng, trackPoints: track.trackPoints } : {}),
           distanceM,
         },
         select: { id: true },
@@ -407,7 +503,7 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
 
   // ---------- 3. Traitement d'import (charge, records, programme, anecdote), puis badges une seule fois ----------
   for (const id of created) await processActivity(id, undefined, { badges: false });
-  if (created.length) {
+  if (created.length || rebuilt) {
     const tz = (await prisma.user.findUnique({ where: { id: uid }, select: { timezone: true } }))?.timezone ?? "Europe/Paris";
     await awardBadges(uid, tz).catch((e) => console.error("[google-fit] badges", e));
   }
@@ -416,6 +512,6 @@ export async function syncGoogleFit(uid: string, days: number = 7) {
     success: true,
     count: sessions.length + segments.length,
     saved: saved + auto, // activités créées (séances + automatiques)
-    message: `${saved} séance(s), ${auto} activité(s) automatique(s), ${updated} mise(s) à jour, ${duplicates} déjà présente(s)${joined ? `, ${joined} morceau(x) recollé(s)` : ""}${pending ? `, ${pending} sortie(s) à reconstruire depuis la session` : ""}.`,
+    message: `${saved} séance(s), ${auto} activité(s) automatique(s), ${updated} mise(s) à jour, ${duplicates} déjà présente(s)${joined ? `, ${joined} morceau(x) recollé(s)` : ""}${rebuilt ? `, ${rebuilt} sortie(s) reconstruite(s) depuis la séance Fit` : ""}${pending ? `, ${pending} sortie(s) à reconstruire depuis la session` : ""}.`,
   };
 }
