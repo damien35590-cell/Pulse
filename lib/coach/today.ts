@@ -158,7 +158,9 @@ export function coachToday(i: CoachInput): CoachPlan {
   const half = nextHalf(i.lastLiftHalf);
   const runDue = !!i.runNext && i.runNext.date <= today;
   const runTomorrow = !!i.runNext && daysBetween(today, i.runNext.date) === 1;
-  const liftDue = sinceLift >= LIFT_EVERY_DAYS;
+  // Doctrine : pas de bas du corps (squats sautés) la veille d'une séance clé ou d'une sortie longue ; la rotation attend.
+  const hardTomorrow = runTomorrow && (i.runNext!.isKey || i.runNext!.kind === "LONG_RUN");
+  const liftDue = sinceLift >= LIFT_EVERY_DAYS && !(half === "lower" && hardTomorrow);
   const lift = HALF_SESSION[half];
   const runLine = (r: NonNullable<CoachInput["runNext"]>) => `${r.title} · ${r.minutes} min`;
 

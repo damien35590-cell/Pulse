@@ -8,6 +8,7 @@ import { loadHabitIndex } from "@/lib/habits/build";
 import { classicTitle, dist, proj } from "@/lib/habits/grid";
 import { aggregate, getForecast, type RideWeather } from "@/lib/weather/open-meteo";
 import type { RunProgramView } from "@/lib/data/training";
+import { kindOfNames } from "@/lib/workout/kind";
 import { bestSlot, coachToday, EASY_RUN_MIN, liftHalf, type CoachInput, type CoachPlan, type CoachSlot } from "./today";
 
 /** Un classique « tient » dans la séance à ±12 % et part à moins de 600 m de chez toi. */
@@ -46,7 +47,7 @@ export async function loadCoachInput(userId: string, run: RunProgramView | null,
     prisma.activity.findFirst({ where: { userId, type: "RUN" }, orderBy: { startedAt: "desc" }, select: { startedAt: true } }),
     prisma.activity.findFirst({
       where: { userId, type: "WORKOUT" }, orderBy: { startedAt: "desc" },
-      select: { startedAt: true, exercises: { select: { exercise: { select: { primaryMuscles: true } } } } },
+      select: { startedAt: true, kind: true, exercises: { select: { name: true, exercise: { select: { primaryMuscles: true } } } } },
     }),
   ]);
 
@@ -75,6 +76,7 @@ export async function loadCoachInput(userId: string, run: RunProgramView | null,
     }
   }
 
+  const lastLiftKind = lastLift ? (lastLift.kind ?? kindOfNames(lastLift.exercises.map((e) => e.name))) : null;
   const muscles = (lastLift?.exercises ?? []).flatMap((e) => (e.exercise?.primaryMuscles as string[] | undefined) ?? []);
   return {
     now: +now, tz,
@@ -82,7 +84,8 @@ export async function loadCoachInput(userId: string, run: RunProgramView | null,
     todayDone,
     lastRunAt: lastRun ? +lastRun.startedAt : null,
     lastLiftAt: lastLift ? +lastLift.startedAt : null,
-    lastLiftHalf: liftHalf(muscles),
+    // Même source que la page Programme et la suggestion du jour (Activity.kind, sinon déduit des noms d'exercices), puis les muscles.
+    lastLiftHalf: lastLiftKind === "HAUT" ? "upper" : lastLiftKind === "BAS" ? "lower" : liftHalf(muscles),
     runNext, slot, classic,
   };
 }

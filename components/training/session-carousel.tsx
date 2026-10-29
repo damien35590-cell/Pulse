@@ -4,35 +4,37 @@ import { Children, useLayoutEffect, useRef, useState, type ReactNode } from "rea
 import { cn } from "@/lib/utils";
 import { tap } from "@/lib/haptics";
 
-type Dot = { id: string; title: string; status: string };
+/** Une pastille : séance du programme course ou séance de muscu de la semaine. */
+export type WeekDot = { id: string; title: string; state: "done" | "skipped" | "todo" };
+/** Une rangée de pastilles (« Running », « Muscu ») et son compteur (« 2/3 »). */
+export type DotRow = { label: string; tone: "run" | "lift"; dots: WeekDot[]; count: string };
+
+const FILL = { run: "bg-brand", lift: "bg-ink/80" } as const;
+const RING = { run: "border-brand", lift: "border-ink/80" } as const;
 
 /**
- * Carrousel au doigt des séances du programme : la carte s'ouvre sur `start` (le jour), les séances passées de la semaine à gauche,
- * les suivantes à droite.
- * La séance suivante dépasse à peine (≈ 12 px) pour suggérer le swipe.
- * Les points de la semaine (en bas à droite) servent aussi d'indicateur : celui de la séance affichée porte l'anneau,
- * et toucher un point à faire amène le carrousel sur cette séance.
+ * Carrousel au doigt de la semaine : la carte s'ouvre sur `start` (aujourd'hui), ce qui est fait à gauche, ce qui vient à droite,
+ * course et muscu mêlées dans l'ordre des jours. La diapo suivante dépasse à peine pour suggérer le glissement.
+ * Les rangées de pastilles (en bas) servent d'indicateur : celles de la diapo affichée portent un anneau, quel que soit leur état,
+ * et toucher une pastille amène le carrousel sur sa diapo.
  */
-export function SessionCarousel({ children, slideIds, start = 0, week, between, footer, count, className }: {
+export function SessionCarousel({ children, slideDots, start = 0, rows, between, footer, className }: {
   children: ReactNode;
-  /** Id de la séance de chaque diapo, dans l'ordre. */
-  slideIds: string[];
+  /** Pastilles de chaque diapo, dans l'ordre (une diapo peut en porter plusieurs, ou aucune). */
+  slideDots: string[][];
   /** Diapo affichée à l'ouverture (index). */
   start?: number;
-  /** Séances de la semaine en cours (points). */
-  week: Dot[];
+  rows: DotRow[];
   /** Contenu entre le carrousel et le pied (ex. invitation au test VMA). */
   between?: ReactNode;
-  /** Pied à gauche : semaine du programme, encouragement. */
-  footer: ReactNode;
-  /** « 1/3 » */
-  count: string;
+  /** Ligne sous les pastilles : semaine du programme. */
+  footer?: ReactNode;
   className?: string;
 }) {
   const slides = Children.toArray(children);
   const track = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(start);
-  const shownId = slideIds[active];
+  const shown = new Set(slideDots[active] ?? []);
 
   // Ouverture sur la diapo du jour, sans animation.
   useLayoutEffect(() => {
@@ -49,8 +51,8 @@ export function SessionCarousel({ children, slideIds, start = 0, week, between, 
     if (i !== active) setActive(i);
   };
   const goTo = (id: string) => {
-    const i = slideIds.indexOf(id);
-    if (i === active) return;
+    const i = slideDots.findIndex((d) => d.includes(id));
+    if (i < 0 || i === active) return;
     const el = track.current, slide = el?.children[i] as HTMLElement | undefined;
     if (!el || !slide) return;
     tap();
@@ -64,7 +66,7 @@ export function SessionCarousel({ children, slideIds, start = 0, week, between, 
         onScroll={onScroll}
         role="region"
         aria-roledescription="carrousel"
-        aria-label="Séances du programme"
+        aria-label="Séances de la semaine"
         className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-px-4 px-4"
       >
         {slides.map((s, i) => (
@@ -82,34 +84,37 @@ export function SessionCarousel({ children, slideIds, start = 0, week, between, 
 
       {between}
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">{footer}</div>
-        <div className="flex shrink-0 items-center gap-2">
-          <ol className="-my-2 flex items-center" aria-label="Séances de la semaine">
-            {week.map((s) => {
-              const canGo = slideIds.includes(s.id), shown = s.id === shownId;
-              const state = s.status === "COMPLETED" ? "faite" : s.status === "SKIPPED" ? "passée" : "à faire";
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    disabled={!canGo}
-                    onClick={() => goTo(s.id)}
-                    aria-label={`${s.title} : ${state}${canGo ? ", afficher" : ""}`}
-                    aria-current={shown || undefined}
-                    className="grid size-7 place-items-center rounded-full disabled:cursor-default"
-                  >
-                    {/* Séance affichée : anneau clair autour du point, quel que soit son état (faite, passée, à faire). */}
-                    <span className={cn("size-3 rounded-full transition-[box-shadow,background-color] duration-200",
-                      s.status === "COMPLETED" ? "bg-brand" : s.status === "SKIPPED" ? "bg-line" : shown ? "border-2 border-brand" : "border-2 border-line",
-                      shown && "ring-2 ring-ink ring-offset-2 ring-offset-surface")} />
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-          <p className="font-num text-sm tabular-nums text-ink-soft">{count}</p>
-        </div>
+      <div className="mt-4 space-y-1">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-2">
+            <p className="w-16 shrink-0 text-label uppercase text-ink-mute">{r.label}</p>
+            <ol className="-my-2 flex items-center" aria-label={`${r.label} : séances de la semaine`}>
+              {r.dots.map((d) => {
+                const canGo = slideDots.some((s) => s.includes(d.id)), on = shown.has(d.id);
+                const state = d.state === "done" ? "faite" : d.state === "skipped" ? "passée" : "à faire";
+                return (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      disabled={!canGo}
+                      onClick={() => goTo(d.id)}
+                      aria-label={`${d.title} : ${state}${canGo ? ", afficher" : ""}`}
+                      aria-current={on || undefined}
+                      className="grid size-7 place-items-center rounded-full disabled:cursor-default"
+                    >
+                      {/* Diapo affichée : anneau clair autour du point, quel que soit son état. */}
+                      <span className={cn("size-3 rounded-full transition-[box-shadow,background-color] duration-200",
+                        d.state === "done" ? FILL[r.tone] : d.state === "skipped" ? "bg-line" : cn("border-2", on ? RING[r.tone] : "border-line"),
+                        on && "ring-2 ring-ink ring-offset-2 ring-offset-surface")} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="ml-auto font-num text-sm tabular-nums text-ink-soft">{r.count}</p>
+          </div>
+        ))}
+        {footer && <div className="pt-1">{footer}</div>}
       </div>
     </div>
   );

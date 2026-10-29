@@ -5,11 +5,13 @@ import { HEAT_FEELS_C } from "@/lib/weather/rules";
 import { TIRED_LINE, lateLine, routeHref, type CoachPlan, type SessionCondition } from "@/lib/coach/today";
 import { sessionFromProgram } from "@/lib/routes/session-fit";
 import { fmtDuration } from "@/lib/format";
-import { dayKey } from "@/lib/dates";
+import type { ReactNode } from "react";
+import { dayKey, shiftDay } from "@/lib/dates";
+import type { LiftSlide, LiftWeek } from "@/lib/data/lift-week";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { LiftActions, PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
-import { SessionCarousel } from "./session-carousel";
+import { SessionCarousel, type DotRow, type WeekDot } from "./session-carousel";
 
 /** « Bloc 1 · Semaine 2/4 · Reprise & VMA » : pied de la carte d'accueil, le nom du programme y tient sans tronquer le libellé du haut. */
 const blockLabel = (p: RunProgramView) =>
@@ -45,15 +47,39 @@ function upcomingAfter(p: RunProgramView, max = 5) {
 const pastOfWeek = (week: { sessions: SessionView[] } | undefined) =>
   (week?.sessions ?? []).filter((s) => s.status === "COMPLETED" || s.status === "SKIPPED");
 
-/** Séance passée de la semaine (diapo à gauche du jour) : lecture seule, lien vers la sortie si elle existe. */
-function PastSlide({ s }: { s: SessionView }) {
+const TZ = "Europe/Paris";
+const WEEKDAY = new Intl.DateTimeFormat("fr-FR", { weekday: "long", timeZone: "UTC" });
+/** « Hier », « Demain », « Samedi », « Semaine prochaine » : jour d'une diapo, vu d'aujourd'hui. */
+function dayLabel(day: string, today: string) {
+  const d = Math.round((Date.parse(day) - Date.parse(today)) / 864e5);
+  if (d === 0) return "Aujourd’hui";
+  if (d === -1) return "Hier";
+  if (d === 1) return "Demain";
+  const monday = shiftDay(today, -((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7));
+  if (day >= shiftDay(monday, 7)) return day < shiftDay(monday, 14) ? "Semaine prochaine" : "Plus tard";
+  const w = WEEKDAY.format(new Date(`${day}T12:00:00Z`));
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/** En-tête d'une diapo : « Mardi · fait », pastille Running / Muscu, badge éventuel. */
+function SlideHead({ when, sport, children }: { when: string; sport: "Running" | "Muscu"; children?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <p className="min-w-0 truncate text-label uppercase text-ink-mute">{when}</p>
+      <DayTag>{sport}</DayTag>
+      {children}
+    </div>
+  );
+}
+
+const SLIDE = "flex h-full flex-col rounded-tile bg-surface-2/60 p-3";
+
+/** Séance course passée de la semaine : lecture seule, lien vers la sortie si elle existe. */
+function PastSlide({ s, when }: { s: SessionView; when: string }) {
   const done = s.status === "COMPLETED";
   const body = (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-label uppercase text-ink-mute">Séance {s.orderInWeek} · {done ? "faite" : "passée"}</p>
-        {s.isKeySession && <KeyBadge />}
-      </div>
+      <SlideHead when={`${when} · ${done ? "fait" : "passée"}`} sport="Running">{s.isKeySession && <KeyBadge />}</SlideHead>
       <p className={cn("mt-1.5 text-xl font-bold leading-tight tracking-tight", !done && "text-ink-soft")}>{s.title}</p>
       <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">≈ {fmtDuration(s.durationS)}</p>
       {s.summary && <p className="mt-1.5 line-clamp-3 text-sm leading-snug text-ink-soft">{s.summary}</p>}
@@ -62,24 +88,52 @@ function PastSlide({ s }: { s: SessionView }) {
       )}
     </>
   );
-  const box = "flex h-full flex-col rounded-tile bg-surface-2/60 p-3";
   return s.activityId
-    ? <Link href={`/activities/${s.activityId}`} className={cn(box, "transition duration-150 ease-snappy active:scale-[0.985]")}>{body}</Link>
-    : <div className={box}>{body}</div>;
+    ? <Link href={`/activities/${s.activityId}`} className={cn(SLIDE, "transition duration-150 ease-snappy active:scale-[0.985]")}>{body}</Link>
+    : <div className={SLIDE}>{body}</div>;
 }
 
-/** « Cette semaine », « Semaine prochaine », « Semaine 5 ». */
-const whenLabel = (week: number, current: number) =>
-  week === current ? "Cette semaine" : week === current + 1 ? "Semaine prochaine" : `Semaine ${week}`;
+/** « +3 répétitions par rapport à la précédente » : le critère de progrès Lafay (total de l'exercice, ici de la séance). */
+const deltaLine = (d: number, kind: string) =>
+  d === 0 ? `Même total que la séance ${kind} précédente` : `${d > 0 ? "+" : "−"}${Math.abs(d)} répétition${Math.abs(d) > 1 ? "s" : ""} par rapport à la séance ${kind} précédente`;
 
-/** Aperçu d'une séance à venir (diapo du carrousel) : lecture seule, les actions restent sur la prochaine. */
-function UpcomingSlide({ s, current }: { s: SessionView; current: number }) {
+/** Séance de muscu de la semaine : faite (total, progrès, lien) ou à venir (exercices et cibles de la rotation). */
+function LiftSlideView({ l, when }: { l: LiftSlide; when: string }) {
+  if (l.state === "done") {
+    const kind = l.kind === "HAUT" ? "haut" : l.kind === "BAS" ? "bas" : "";
+    return (
+      <Link href={`/activities/${l.id}`} className={cn(SLIDE, "transition duration-150 ease-snappy active:scale-[0.985]")}>
+        <SlideHead when={`${when} · fait`} sport="Muscu" />
+        <p className="mt-1.5 text-xl font-bold leading-tight tracking-tight">{l.title}</p>
+        <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">{l.exercises} exercice{l.exercises > 1 ? "s" : ""} · {l.totalReps} répétitions</p>
+        {l.delta != null && <p className={cn("mt-1.5 text-sm leading-snug", l.delta > 0 ? "text-good" : "text-ink-soft")}>{deltaLine(l.delta, kind)}</p>}
+        <span className="mt-auto flex items-center gap-1 pt-3 text-sm font-semibold text-brand">Voir la séance<ChevronRight className="size-4" aria-hidden /></span>
+      </Link>
+    );
+  }
   return (
-    <div className="flex h-full flex-col rounded-tile bg-surface-2/60 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-label uppercase text-ink-mute">Ensuite · {whenLabel(s.weekNumber, current)}</p>
-        {s.isKeySession && <KeyBadge />}
-      </div>
+    <div className={SLIDE}>
+      <SlideHead when={when} sport="Muscu" />
+      <p className="mt-1.5 text-xl font-bold leading-tight tracking-tight">{l.title}</p>
+      {l.items.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {l.items.map((e) => (
+            <li key={e.code + e.name} className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-ink-soft">
+              <b className="mr-1 font-semibold text-ink">{e.code}</b>{e.name} <span className="font-num tabular-nums">{e.target}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-auto pt-3 text-xs text-ink-mute">Rotation : {l.kind === "HAUT" ? "le haut après le bas" : "le bas après le haut"}</p>
+    </div>
+  );
+}
+
+/** Séance course à venir : lecture seule, les actions restent sur celle du jour. */
+function UpcomingSlide({ s, when }: { s: SessionView; when: string }) {
+  return (
+    <div className={SLIDE}>
+      <SlideHead when={when} sport="Running">{s.isKeySession && <KeyBadge />}</SlideHead>
       <p className="mt-1.5 text-xl font-bold leading-tight tracking-tight">{s.title}</p>
       <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">≈ {fmtDuration(s.durationS)}</p>
       {s.summary && <p className="mt-1.5 line-clamp-3 text-sm leading-snug text-ink-soft">{s.summary}</p>}
@@ -113,109 +167,150 @@ function PlanFoot({ p }: { p: RunProgramView }) {
 }
 
 /**
- * Carte du jour de l'accueil : le conseil du coach et le programme course en UNE carte (style « Prochaine séance », halo Volt en haut à droite).
- * Course du programme à faire : titre, étapes, retard éventuel, Faite / Passer, séances suivantes au doigt, pied du programme.
- * Muscu, repos, séance faite ou footing hors programme : le conseil du coach, puis le pied du programme s'il y en a un.
+ * Carte du jour de l'accueil, devenue « Ta semaine » quand un programme course tourne : course et muscu dans un même carrousel,
+ * dans l'ordre des jours. Ce qui est fait à gauche, aujourd'hui (le conseil du coach, ou la séance du programme avec Faite / Passer),
+ * ce qui vient à droite : séances du programme course et muscu en rotation haut / bas (lib/coach/week-plan.ts).
+ * Deux rangées de pastilles (Running, Muscu) suivent la diapo affichée.
  * Météo : un seul pictogramme quand les conditions comptent (nuit, forte pluie, chaleur) ; créneau, météo et boucle sont dans « Prépare ta sortie ».
- * `c` null (coach indisponible, compte vide) : la prochaine séance du programme seule. Rien sans coach ni programme.
+ * Sans programme actif (ou en pause) : le conseil du coach seul, comme avant. `c` null : la prochaine séance du programme. Rien sans coach ni programme.
  */
-export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | null }) {
+export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView | null; lw?: LiftWeek | null }) {
   if (!c && !p) return null;
   const paused = p?.status === "PAUSED", n = p && !paused ? p.next : null;
   const r = c?.run;
   // Faite / Passer sur la séance du programme : quand c'est elle que le coach propose aujourd'hui (ou sans coach).
   const planRun = n && (!c || c.kind === "run") ? n : null;
   const week = p?.weeks.find((w) => w.number === p.current.number);
-  const past0 = p && !paused ? pastOfWeek(week) : [];
-  // Séance faite aujourd'hui : la diapo du coach (« Séance du jour faite ») la remplace et porte son point.
-  // Si plusieurs séances sont cochées aujourd'hui, celle qui porte la sortie du jour l'emporte (une coche à la main peut dater d'aujourd'hui).
-  const todays = c?.kind === "done" ? past0.filter((s) => s.completedDay === dayKey(new Date(), "Europe/Paris")) : [];
-  const doneToday = todays.find((s) => s.activityId) ?? todays.at(-1);
-  // Diapos dans l'ordre de la semaine : la diapo du jour prend la place de sa séance, sinon elle suit les séances passées.
-  const cut = doneToday ? past0.indexOf(doneToday) : past0.length;
-  const before = past0.slice(0, cut), after = doneToday ? past0.slice(cut + 1) : [];
-  const past = planRun ? past0 : before;
-  // Hors course du programme (muscu, repos, séance faite) : les séances à faire restent accessibles au doigt.
-  const upcoming = planRun && p ? upcomingAfter(p) : n && p ? [n, ...upcomingAfter(p, 4)] : [];
-  const swipe = !!p && !paused && (planRun ? true : !!c && past0.length + upcoming.length > 0);
   const vma = p?.pendingTest ? <div className="relative mt-4"><VmaTestPrompt sessionId={p.pendingTest.sessionId} /></div> : null;
   const cond = r?.condition ? CONDITION[r.condition] : null;
-  const label = c ? "Aujourd’hui" : paused ? "Programme en pause" : "Prochaine séance";
   const route = r?.routeHref ?? (n ? routeHref(Math.max(15, Math.round(n.durationS / 60)), sessionFromProgram(n)) : "/itineraires");
   const steps = r?.steps ?? planRun?.summary;
   const notes = r ? [r.tired && TIRED_LINE, r.late > 0 && lateLine(r.late)].filter((l): l is string => !!l) : [];
+  const swipe = !!p && !paused && (!!planRun || !!c);
 
+  const badges = (
+    <>
+      {planRun?.isKeySession ? <KeyBadge /> : c && c.kind !== "run" ? <DayTag>{c.tag}</DayTag> : null}
+      {cond && (
+        <span role="img" aria-label={cond.label} title={cond.label} className="grid size-6 shrink-0 place-items-center rounded-full bg-warn/15 text-warn">
+          <cond.icon className="size-3.5" strokeWidth={2.4} aria-hidden />
+        </span>
+      )}
+    </>
+  );
+  const programLink = (p || c?.kind === "lift") && (
+    <Link href={c?.kind === "lift" ? "/plan#muscu" : "/plan"} className="-my-3 inline-flex h-12 shrink-0 items-center text-sm font-semibold text-brand active:opacity-60">Programme</Link>
+  );
+  const prepare = (
+    <Link href={route} className="relative -mx-4 mt-4 flex min-h-12 touch-manipulation items-center gap-3 border-t border-line px-4 py-3 transition duration-150 ease-snappy active:bg-surface-2">
+      <Route className="size-5 shrink-0 text-ink-soft" aria-hidden />
+      <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">Prépare ta sortie</span>
+      <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
+    </Link>
+  );
+
+  if (swipe && p) {
+    const today = dayKey(new Date(), TZ), tomorrow = shiftDay(today, 1);
+    const past = pastOfWeek(week);
+    // Séance course faite aujourd'hui : la diapo du jour la remplace et porte sa pastille. Si plusieurs sont cochées aujourd'hui,
+    // celle qui porte la sortie du jour l'emporte (une coche à la main peut dater d'aujourd'hui).
+    const todays = c?.kind === "done" ? past.filter((s) => s.completedDay === today) : [];
+    const doneToday = todays.find((s) => s.activityId) ?? todays.at(-1);
+    const upcoming = planRun ? upcomingAfter(p) : n ? [n, ...upcomingAfter(p, 4)] : [];
+    // Muscu du jour (faite, ou proposée par le coach) : elle aussi portée par la diapo du jour.
+    const liftToday = (lw?.slides ?? []).filter((l) => l.day === today && (l.state === "done" ? c?.kind === "done" : c?.kind === "lift"));
+
+    type Item = { day: string; rank: number; dots: string[]; node: ReactNode };
+    const items: Item[] = [
+      ...past.filter((s) => s !== doneToday).map((s) => {
+        const day = s.completedDay ?? s.date;
+        return { day, rank: 0, dots: [s.id], node: <PastSlide key={s.id} s={s} when={dayLabel(day, today)} /> };
+      }),
+      ...upcoming.map((s) => {
+        const day = s.date < tomorrow ? tomorrow : s.date;
+        return { day, rank: 2, dots: [s.id], node: <UpcomingSlide key={s.id} s={s} when={dayLabel(day, today)} /> };
+      }),
+      ...(lw?.slides ?? []).filter((l) => !liftToday.includes(l)).map((l) => ({
+        day: l.day, rank: l.state === "done" ? 0.5 : 2.5, dots: [l.id], node: <LiftSlideView key={l.id} l={l} when={l.state === "planned" && l.nextWeek ? "Semaine prochaine" : dayLabel(l.day, today)} />,
+      })),
+      {
+        day: today, rank: 1, dots: [planRun?.id, doneToday?.id, ...liftToday.map((l) => l.id)].filter((id): id is string => !!id),
+        node: (
+          <div key="today">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="min-w-0 truncate text-label uppercase text-brand">Aujourd’hui</p>
+              {badges}
+            </div>
+            {planRun ? (
+              <div className="mt-1.5">
+                <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{planRun.title}</h2>
+                {steps && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{steps}</p>}
+                {notes.map((l) => <p key={l} className="mt-1.5 text-[15px] leading-snug text-ink-soft">{l}</p>)}
+                <div className="mt-5"><SessionActions id={planRun.id} variant="card" /></div>
+              </div>
+            ) : c && <CoachBody c={c} className="mt-1.5" />}
+          </div>
+        ),
+      },
+    ];
+    items.sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : x.rank - y.rank));
+    const start = items.findIndex((i) => i.rank === 1);
+
+    const rows: DotRow[] = [{
+      label: "Running", tone: "run", count: `${p.weekDone}/${p.sessionsPerWeek}`,
+      dots: (week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, state: s.status === "COMPLETED" ? "done" : s.status === "SKIPPED" ? "skipped" : "todo" })),
+    }];
+    if (lw) {
+      const mine = lw.slides.filter((l) => !(l.state === "planned" && l.nextWeek));
+      const dots: WeekDot[] = mine.map((l) => ({ id: l.id, title: l.title, state: l.state === "done" ? "done" : "todo" }));
+      // Cible pas encore couverte (plus de jour valable cette semaine) : pastilles vides, sans diapo.
+      for (let k = dots.length; k < lw.target; k++) dots.push({ id: `lift-free-${k}`, title: "Séance de muscu", state: "todo" });
+      rows.push({ label: "Muscu", tone: "lift", dots, count: `${lw.done}/${lw.target}` });
+    }
+
+    return (
+      <section aria-label="Ta semaine" className={cn(ui.card, "relative overflow-hidden p-4 pb-0")}>
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/[0.07] blur-3xl" />
+        <div className="relative flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-label uppercase text-brand">Ta semaine</p>
+          {programLink}
+        </div>
+        <SessionCarousel
+          className="relative mt-1.5"
+          slideDots={items.map((i) => i.dots)}
+          start={Math.max(0, start)}
+          rows={rows}
+          between={vma}
+          footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
+        >
+          {items.map((i) => i.node)}
+        </SessionCarousel>
+        {prepare}
+      </section>
+    );
+  }
+
+  const label = c ? "Aujourd’hui" : paused ? "Programme en pause" : "Prochaine séance";
   return (
     <section aria-label="Séance du jour" className={cn(ui.card, "relative overflow-hidden p-4 pb-0")}>
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-56 rounded-full bg-brand/[0.07] blur-3xl" />
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-label uppercase text-brand">{label}</p>
-          {planRun?.isKeySession ? <KeyBadge /> : c && c.kind !== "run" ? <DayTag>{c.tag}</DayTag> : null}
-          {cond && (
-            <span role="img" aria-label={cond.label} title={cond.label} className="grid size-6 shrink-0 place-items-center rounded-full bg-warn/15 text-warn">
-              <cond.icon className="size-3.5" strokeWidth={2.4} aria-hidden />
-            </span>
-          )}
+          {badges}
         </div>
-        {(p || c?.kind === "lift") && (
-          <Link href={c?.kind === "lift" ? "/plan#muscu" : "/plan"} className="-my-3 inline-flex h-12 shrink-0 items-center text-sm font-semibold text-brand active:opacity-60">Programme</Link>
-        )}
+        {programLink}
       </div>
-
-      {planRun && p ? (
-        <SessionCarousel
-          className="relative mt-1.5"
-          slideIds={[...past.map((s) => s.id), planRun.id, ...upcoming.map((s) => s.id)]}
-          start={past.length}
-          week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
-          between={vma}
-          footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
-          count={`${p.weekDone}/${p.sessionsPerWeek}`}
-        >
-          {past.map((s) => <PastSlide key={s.id} s={s} />)}
-          <div>
-            <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{planRun.title}</h2>
-            {steps && <p className="mt-2 text-[15px] leading-snug text-ink-soft">{steps}</p>}
-            {notes.map((l) => <p key={l} className="mt-1.5 text-[15px] leading-snug text-ink-soft">{l}</p>)}
-            <div className="mt-5"><SessionActions id={planRun.id} variant="card" /></div>
-          </div>
-          {upcoming.map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
-        </SessionCarousel>
-      ) : swipe && c && p ? (
-        <SessionCarousel
-          className="relative mt-1.5"
-          slideIds={[...before.map((s) => s.id), doneToday?.id ?? "today", ...after.map((s) => s.id), ...upcoming.map((s) => s.id)]}
-          start={before.length}
-          week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
-          between={vma}
-          footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
-          count={`${p.weekDone}/${p.sessionsPerWeek}`}
-        >
-          {before.map((s) => <PastSlide key={s.id} s={s} />)}
-          <CoachBody c={c} />
-          {after.map((s) => <PastSlide key={s.id} s={s} />)}
-          {upcoming.map((s) => <UpcomingSlide key={s.id} s={s} current={p.current.number} />)}
-        </SessionCarousel>
-      ) : (
-        <>
-          {c ? <CoachBody c={c} className="relative mt-1.5" /> : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
-          {paused && p && (
-            <div className="relative mt-4 space-y-3">
-              <p className="flex items-center gap-2 text-[15px] text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />{c ? "Programme en pause : il t’attend, reprends quand tu veux." : "Il t’attend, reprends quand tu veux."}</p>
-              <PauseToggle id={p.id} paused full />
-            </div>
-          )}
-          {vma}
-          {p && <PlanFoot p={p} />}
-        </>
+      {c ? <CoachBody c={c} className="relative mt-1.5" /> : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
+      {paused && p && (
+        <div className="relative mt-4 space-y-3">
+          <p className="flex items-center gap-2 text-[15px] text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />{c ? "Programme en pause : il t’attend, reprends quand tu veux." : "Il t’attend, reprends quand tu veux."}</p>
+          <PauseToggle id={p.id} paused full />
+        </div>
       )}
-
-      <Link href={route} className="relative -mx-4 mt-4 flex min-h-12 touch-manipulation items-center gap-3 border-t border-line px-4 py-3 transition duration-150 ease-snappy active:bg-surface-2">
-        <Route className="size-5 shrink-0 text-ink-soft" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">Prépare ta sortie</span>
-        <ChevronRight className="size-5 shrink-0 text-ink-mute" aria-hidden />
-      </Link>
+      {vma}
+      {p && <PlanFoot p={p} />}
+      {prepare}
     </section>
   );
 }
