@@ -177,11 +177,16 @@ export async function linkActivityToPlannedSession(a: { id: string; userId: stri
 const weekOfDay = (programId: string, key: string) =>
   prisma.programWeek.findFirst({ where: { programId, startDate: { lte: day(key), gt: new Date(+day(key) - 7 * 864e5) } }, select: { id: true, startDate: true } });
 
-export type WeekRun = { id: string; title: string; startedAt: string; distanceM: number; movingTimeS: number; linked: boolean };
+export type WeekRun = {
+  id: string; title: string; startedAt: string; distanceM: number; movingTimeS: number; linked: boolean;
+  /** Titre de l'autre séance que cette sortie valide déjà (la choisir l'y déplace) ; null si libre ou liée à celle-ci. */
+  linkedTo: string | null;
+};
 
 /**
- * Feuille « Valider avec… » d'une séance : les sorties course de sa semaine (lundi → dimanche, Paris) qui ne valident encore aucune séance,
- * plus celle qui valide déjà cette séance (linked). Null si la séance n'est pas à moi.
+ * Feuille « Valider avec… » d'une séance : toutes les sorties course de sa semaine (lundi → dimanche, Paris). Celle qui valide déjà
+ * cette séance est marquée `linked` ; celles qui en valident une autre portent son titre (`linkedTo`) et restent sélectionnables :
+ * linkActivityManually déplace la sortie et remet l'autre séance à faire. Null si la séance n'est pas à moi.
  */
 export async function runsForSession(userId: string, sessionId: string) {
   const s = await prisma.plannedSession.findFirst({ where: { id: sessionId, userId, sport: "RUN" }, select: { id: true, status: true, completedActivityId: true, week: { select: { startDate: true } } } });
@@ -190,14 +195,16 @@ export async function runsForSession(userId: string, sessionId: string) {
   const runs = await prisma.activity.findMany({
     where: {
       userId, type: "RUN", startedAt: { gte: new Date(+day(from) - 864e5), lt: new Date(+day(from) + 8 * 864e5) },
-      OR: [{ plannedSession: { is: null } }, ...(s.completedActivityId ? [{ id: s.completedActivityId }] : [])],
     },
     orderBy: { startedAt: "asc" },
-    select: { id: true, title: true, startedAt: true, distanceM: true, movingTimeS: true },
+    select: { id: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, plannedSession: { select: { id: true, title: true } } },
   });
   return {
     status: s.status, activityId: s.completedActivityId,
-    runs: runs.filter((r) => keys.has(dayKey(r.startedAt, TZ))).map((r): WeekRun => ({ ...r, startedAt: r.startedAt.toISOString(), linked: r.id === s.completedActivityId })),
+    runs: runs.filter((r) => keys.has(dayKey(r.startedAt, TZ))).map(({ plannedSession: ps, ...r }): WeekRun => ({
+      ...r, startedAt: r.startedAt.toISOString(), linked: r.id === s.completedActivityId,
+      linkedTo: ps && ps.id !== s.id ? ps.title : null,
+    })),
   };
 }
 
@@ -259,6 +266,8 @@ export type SessionView = {
   id: string; weekNumber: number; orderInWeek: number; kind: SessionKind; title: string; description: string | null; summary: string;
   durationS: number; isKeySession: boolean; status: SessionStatus; date: string; isNext: boolean; complianceScore: number | null;
   activityId: string | null; steps: ReturnType<typeof resolveSteps>;
+  /** Jour où la séance a été faite (AAAA-MM-JJ, Paris), null si pas faite. */
+  completedDay: string | null;
   /** Forme prévue de la séance (vignette de la page Programme) : zones d'allure des étapes, d'après la VMA du moment. */
   ribbon: RibbonSegment[];
 };
@@ -299,6 +308,7 @@ export async function getRunProgram(userId: string, now = new Date()): Promise<R
       summary: st ? summarizeRun(st, vmaKmh) : "", durationS: st ? estimateRun(st, vmaKmh).durationS : s.plannedDurationS ?? 0,
       status: s.status, date: s.date.toISOString().slice(0, 10), isNext: s.id === nextId, complianceScore: s.complianceScore,
       activityId: s.completedActivityId, steps, ribbon: planRibbon(steps, vmaKmh),
+      completedDay: s.status === "COMPLETED" && s.completedAt ? dayKey(s.completedAt, TZ) : null,
     };
   };
   const phaseOf = new Map(p.phases.map((ph) => [ph.id, ph]));
