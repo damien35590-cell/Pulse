@@ -258,7 +258,11 @@ export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView |
 
     const rows: DotRow[] = [{
       label: "Running", tone: "run", count: `${p.weekDone}/${p.sessionsPerWeek}`,
-      dots: (week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, state: s.status === "COMPLETED" ? "done" : s.status === "SKIPPED" ? "skipped" : "todo" })),
+      // Dans l'ordre des jours, comme les diapos (on ne fait pas toujours les séances dans l'ordre du programme).
+      dots: [...(week?.sessions ?? [])]
+        .map((s) => ({ s, day: s.status === "COMPLETED" ? (s.completedDay ?? s.date) : s.id === planRun?.id ? today : s.date < tomorrow && s.status === "PLANNED" ? tomorrow : s.date }))
+        .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.s.orderInWeek - b.s.orderInWeek))
+        .map(({ s }) => ({ id: s.id, title: s.title, state: s.status === "COMPLETED" ? "done" : s.status === "SKIPPED" ? "skipped" : "todo" })),
     }];
     if (lw) {
       const mine = lw.slides.filter((l) => !(l.state === "planned" && l.nextWeek));
