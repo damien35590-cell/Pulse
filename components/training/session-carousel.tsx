@@ -99,8 +99,10 @@ export function SessionCarousel({ children, slideIds, start = 0, week, between, 
                     aria-current={shown || undefined}
                     className="grid size-7 place-items-center rounded-full disabled:cursor-default"
                   >
-                    <span className={cn("size-3 rounded-full transition-colors duration-200",
-                      s.status === "COMPLETED" ? "bg-brand" : s.status === "SKIPPED" ? "bg-line" : shown ? "border-2 border-brand" : "border-2 border-line")} />
+                    {/* Séance affichée : anneau clair autour du point, quel que soit son état (faite, passée, à faire). */}
+                    <span className={cn("size-3 rounded-full transition-[box-shadow,background-color] duration-200",
+                      s.status === "COMPLETED" ? "bg-brand" : s.status === "SKIPPED" ? "bg-line" : shown ? "border-2 border-brand" : "border-2 border-line",
+                      shown && "ring-2 ring-ink ring-offset-2 ring-offset-surface")} />
                   </button>
                 </li>
               );

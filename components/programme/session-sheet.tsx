@@ -38,6 +38,7 @@ function RunLine({ r }: { r: WeekRun }) {
       <span className="block font-num text-sm tabular-nums text-ink-soft">
         {fmtKm(r.distanceM)} km · {fmtDuration(r.movingTimeS)}{pace ? ` · ${pace.value} ${pace.unit}` : ""}
       </span>
+      {r.linkedTo && <span className="block truncate text-xs text-ink-mute">Valide déjà « {r.linkedTo} » : la choisir l’y retire</span>}
     </span>
   );
 }
@@ -45,7 +46,8 @@ function RunLine({ r }: { r: WeekRun }) {
 export type TapSession = { id: string; title: string; date: string; status: SessionStatus; activityId: string | null };
 
 /**
- * Ligne de séance de la page Programme rendue touchable : ouvre « Valider avec… » (sorties course de la semaine pas encore reliées,
+ * Ligne de séance de la page Programme rendue touchable : ouvre « Valider avec… » (toutes les sorties course de la semaine, y compris
+ * celles qui valident une autre séance : les choisir les déplace,
  * « Faite sans activité enregistrée »), ou, pour une séance déjà faite, de quoi la détacher / la remettre à faire.
  */
 export function SessionTap({ s, children, className }: { s: TapSession; children: React.ReactNode; className?: string }) {
@@ -93,7 +95,7 @@ export function SessionTap({ s, children, className }: { s: TapSession; children
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-ink-mute">Aucune sortie course libre cette semaine.</p>
+          <p className="mt-2 text-sm text-ink-mute">Aucune sortie course cette semaine.</p>
         )}
         {err && <p role="alert" className="mt-3 text-sm font-medium text-bad">{err}</p>}
         <div className="mt-6 grid gap-2">

@@ -5,6 +5,7 @@ import { HEAT_FEELS_C } from "@/lib/weather/rules";
 import { TIRED_LINE, lateLine, routeHref, type CoachPlan, type SessionCondition } from "@/lib/coach/today";
 import { sessionFromProgram } from "@/lib/routes/session-fit";
 import { fmtDuration } from "@/lib/format";
+import { dayKey } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { LiftActions, PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
@@ -125,7 +126,10 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
   // Faite / Passer sur la séance du programme : quand c'est elle que le coach propose aujourd'hui (ou sans coach).
   const planRun = n && (!c || c.kind === "run") ? n : null;
   const week = p?.weeks.find((w) => w.number === p.current.number);
-  const past = p && !paused ? pastOfWeek(week) : [];
+  const past0 = p && !paused ? pastOfWeek(week) : [];
+  // Séance faite aujourd'hui : la diapo du coach (« Séance du jour faite ») la remplace et porte son point.
+  const doneToday = c?.kind === "done" ? past0.filter((s) => s.completedDay === dayKey(new Date(), "Europe/Paris")).at(-1) : undefined;
+  const past = doneToday ? past0.filter((s) => s.id !== doneToday.id) : past0;
   // Hors course du programme (muscu, repos, séance faite) : les séances à faire restent accessibles au doigt.
   const upcoming = planRun && p ? upcomingAfter(p) : n && p ? [n, ...upcomingAfter(p, 4)] : [];
   const swipe = !!p && !paused && (planRun ? true : !!c && past.length + upcoming.length > 0);
@@ -176,7 +180,7 @@ export function DayCard({ c, p }: { c: CoachPlan | null; p: RunProgramView | nul
       ) : swipe && c && p ? (
         <SessionCarousel
           className="relative mt-1.5"
-          slideIds={[...past.map((s) => s.id), "today", ...upcoming.map((s) => s.id)]}
+          slideIds={[...past.map((s) => s.id), doneToday?.id ?? "today", ...upcoming.map((s) => s.id)]}
           start={past.length}
           week={(week?.sessions ?? []).map((s) => ({ id: s.id, title: s.title, status: s.status }))}
           between={vma}
