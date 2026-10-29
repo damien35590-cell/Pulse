@@ -8,6 +8,8 @@ import { tap } from "@/lib/haptics";
 export type WeekDot = { id: string; title: string; state: "done" | "skipped" | "todo" };
 /** Une rangée de pastilles (« Running », « Muscu ») et son compteur (« 2/3 »). */
 export type DotRow = { label: string; tone: "run" | "lift"; dots: WeekDot[]; count: string };
+/** Pastilles d'une semaine : cette semaine (sans titre) ou la suivante (« Semaine prochaine »), avec sa ligne de pied. */
+export type DotGroup = { title?: string; rows: DotRow[]; footer?: ReactNode };
 
 const FILL = { run: "bg-brand", lift: "bg-ink/80" } as const;
 const RING = { run: "border-brand", lift: "border-ink/80" } as const;
@@ -18,23 +20,24 @@ const RING = { run: "border-brand", lift: "border-ink/80" } as const;
  * Les rangées de pastilles (en bas) servent d'indicateur : celles de la diapo affichée portent un anneau, quel que soit leur état,
  * et toucher une pastille amène le carrousel sur sa diapo.
  */
-export function SessionCarousel({ children, slideDots, start = 0, rows, between, footer, className }: {
+export function SessionCarousel({ children, slideDots, slideGroup, start = 0, groups, between, className }: {
   children: ReactNode;
   /** Pastilles de chaque diapo, dans l'ordre (une diapo peut en porter plusieurs, ou aucune). */
   slideDots: string[][];
   /** Diapo affichée à l'ouverture (index). */
   start?: number;
-  rows: DotRow[];
+  /** Semaine de chaque diapo (index dans `groups`) : les pastilles affichées sont celles de la semaine de la diapo. */
+  slideGroup: number[];
+  groups: DotGroup[];
   /** Contenu entre le carrousel et le pied (ex. invitation au test VMA). */
   between?: ReactNode;
-  /** Ligne sous les pastilles : semaine du programme. */
-  footer?: ReactNode;
   className?: string;
 }) {
   const slides = Children.toArray(children);
   const track = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(start);
   const shown = new Set(slideDots[active] ?? []);
+  const group = groups[slideGroup[active] ?? 0] ?? groups[0];
 
   // Ouverture sur la diapo du jour, sans animation.
   useLayoutEffect(() => {
@@ -85,7 +88,8 @@ export function SessionCarousel({ children, slideDots, start = 0, rows, between,
       {between}
 
       <div className="mt-4 space-y-1">
-        {rows.map((r) => (
+        {group.title && <p className="text-label uppercase text-brand">{group.title}</p>}
+        {group.rows.map((r) => (
           <div key={r.label} className="flex items-center gap-2">
             <p className="w-16 shrink-0 text-label uppercase text-ink-mute">{r.label}</p>
             <ol className="-my-2 flex items-center" aria-label={`${r.label} : séances de la semaine`}>
@@ -114,7 +118,7 @@ export function SessionCarousel({ children, slideDots, start = 0, rows, between,
             <p className="ml-auto font-num text-sm tabular-nums text-ink-soft">{r.count}</p>
           </div>
         ))}
-        {footer && <div className="pt-1">{footer}</div>}
+        {group.footer && <div className="pt-1">{group.footer}</div>}
       </div>
     </div>
   );

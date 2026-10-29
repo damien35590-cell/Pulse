@@ -11,7 +11,7 @@ import type { LiftSlide, LiftWeek } from "@/lib/data/lift-week";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { LiftActions, PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
-import { SessionCarousel, type DotRow, type WeekDot } from "./session-carousel";
+import { SessionCarousel, type DotGroup, type WeekDot } from "./session-carousel";
 
 /** « Bloc 1 · Semaine 2/4 · Reprise & VMA » : pied de la carte d'accueil, le nom du programme y tient sans tronquer le libellé du haut. */
 const blockLabel = (p: RunProgramView) =>
@@ -253,24 +253,46 @@ export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView |
         ),
       },
     ];
-    items.sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : x.rank - y.rank));
-    const start = items.findIndex((i) => i.rank === 1);
+    // Le carrousel s'arrête à la fin de la semaine prochaine : au-delà, la page Programme.
+    const nextMonday = shiftDay(today, 7 - ((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7));
+    const shown = items.filter((i) => i.day < shiftDay(nextMonday, 7));
+    shown.sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : x.rank - y.rank));
+    const start = shown.findIndex((i) => i.rank === 1);
 
-    const rows: DotRow[] = [{
-      label: "Running", tone: "run", count: `${p.weekDone}/${p.sessionsPerWeek}`,
+    // Pastilles de la semaine de la diapo affichée : cette semaine, ou la suivante dès qu'on y glisse (toujours une pastille entourée).
+    const runDots = (sessions: SessionView[]): WeekDot[] => [...sessions]
       // Dans l'ordre des jours, comme les diapos (on ne fait pas toujours les séances dans l'ordre du programme).
-      dots: [...(week?.sessions ?? [])]
-        .map((s) => ({ s, day: s.status === "COMPLETED" ? (s.completedDay ?? s.date) : s.id === planRun?.id ? today : s.date < tomorrow && s.status === "PLANNED" ? tomorrow : s.date }))
-        .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.s.orderInWeek - b.s.orderInWeek))
-        .map(({ s }) => ({ id: s.id, title: s.title, state: s.status === "COMPLETED" ? "done" : s.status === "SKIPPED" ? "skipped" : "todo" })),
-    }];
-    if (lw) {
-      const mine = lw.slides.filter((l) => !(l.state === "planned" && l.nextWeek));
-      const dots: WeekDot[] = mine.map((l) => ({ id: l.id, title: l.title, state: l.state === "done" ? "done" : "todo" }));
-      // Cible pas encore couverte (plus de jour valable cette semaine) : pastilles vides, sans diapo.
-      for (let k = dots.length; k < lw.target; k++) dots.push({ id: `lift-free-${k}`, title: "Séance de muscu", state: "todo" });
-      rows.push({ label: "Muscu", tone: "lift", dots, count: `${lw.done}/${lw.target}` });
-    }
+      .map((s) => ({ s, day: s.status === "COMPLETED" ? (s.completedDay ?? s.date) : s.id === planRun?.id ? today : s.date < tomorrow && s.status === "PLANNED" ? tomorrow : s.date }))
+      .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.s.orderInWeek - b.s.orderInWeek))
+      .map(({ s }) => ({ id: s.id, title: s.title, state: s.status === "COMPLETED" ? "done" : s.status === "SKIPPED" ? "skipped" : "todo" }));
+    const liftDots = (list: LiftSlide[], target: number, key: string): WeekDot[] => {
+      const dots: WeekDot[] = list.map((l) => ({ id: l.id, title: l.title, state: l.state === "done" ? "done" : "todo" }));
+      // Cible pas encore couverte (plus de jour valable) : pastilles vides, sans diapo.
+      for (let k = dots.length; k < target; k++) dots.push({ id: `lift-free-${key}-${k}`, title: "Séance de muscu", state: "todo" });
+      return dots;
+    };
+    const nextWeek = p.weeks.find((w) => w.number === p.current.number + 1);
+    const groups: DotGroup[] = [
+      {
+        rows: [
+          { label: "Running", tone: "run", count: `${p.weekDone}/${p.sessionsPerWeek}`, dots: runDots(week?.sessions ?? []) },
+          ...(lw ? [{ label: "Muscu", tone: "lift" as const, count: `${lw.done}/${lw.target}`, dots: liftDots(lw.slides.filter((l) => !(l.state === "planned" && l.nextWeek)), lw.target, "now") }] : []),
+        ],
+        footer: <p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>,
+      },
+      {
+        title: "Semaine prochaine",
+        rows: [
+          { label: "Running", tone: "run", count: `0/${p.sessionsPerWeek}`, dots: runDots(nextWeek?.sessions ?? []) },
+          ...(lw ? [{ label: "Muscu", tone: "lift" as const, count: `0/${lw.target}`, dots: liftDots(lw.slides.filter((l) => l.state === "planned" && l.nextWeek), lw.target, "next") }] : []),
+        ],
+        footer: nextWeek && (
+          <p className="truncate text-xs text-ink-mute">
+            Bloc {nextWeek.block} · Semaine {nextWeek.weekInBlock}/{p.blockWeeks} · {p.name}{nextWeek.isRecovery ? " · allégée" : ""}
+          </p>
+        ),
+      },
+    ];
 
     return (
       <section aria-label="Ta semaine" className={cn(ui.card, "relative overflow-hidden p-4 pb-0")}>
@@ -281,13 +303,13 @@ export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView |
         </div>
         <SessionCarousel
           className="relative mt-1.5"
-          slideDots={items.map((i) => i.dots)}
+          slideDots={shown.map((i) => i.dots)}
+          slideGroup={shown.map((i) => (i.day >= nextMonday ? 1 : 0))}
           start={Math.max(0, start)}
-          rows={rows}
+          groups={groups}
           between={vma}
-          footer={<p className="truncate text-xs text-ink-mute">{blockLabel(p)}</p>}
         >
-          {items.map((i) => i.node)}
+          {shown.map((i) => i.node)}
         </SessionCarousel>
         {prepare}
       </section>
