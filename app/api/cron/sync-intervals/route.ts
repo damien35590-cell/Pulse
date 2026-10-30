@@ -15,8 +15,8 @@ export const maxDuration = 60;
 /** Temps écoulé après lequel on ne démarre plus de ruban (la fonction est limitée à 60 s). */
 const RIBBON_BUDGET_MS = 40_000;
 export const dynamic = "force-dynamic";
-/** Passage de midi (doit rester identique à vercel.json) : synchros seulement, pas de sauvegarde Drive. */
-const NOON_SCHEDULE = "0 11 * * *";
+/** Passage de l'après-midi (14 h à Paris en hiver, après la course du midi ; doit rester identique à vercel.json) : synchros seulement, pas de sauvegarde Drive. */
+const DAY_SCHEDULE = "0 13 * * *";
 const same = (a: string, b: string) => timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
 
 /** Appelé une fois par jour par Vercel Cron (voir vercel.json). Vercel envoie « Authorization: Bearer <CRON_SECRET> ». */
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
     // Les synchros tournent en même temps ; si l'une échoue, les autres continuent.
     // Programme de course → calendrier Intervals.icu (→ Garmin) pour les 14 prochains jours.
-    const noon = req.headers.get("x-vercel-cron-schedule") === NOON_SCHEDULE;
+    const daytime = req.headers.get("x-vercel-cron-schedule") === DAY_SCHEDULE;
     const [intervals, googleFit, calendar] = await Promise.allSettled([
       syncIntervals(user.id, 3),
       syncGoogleFit(user.id, 3),
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     // Courses Strava APRÈS Google Fit : elles reprennent la ligne d'une même sortie détectée par Google Fit au lieu de la doubler.
     const [runs] = await Promise.allSettled([syncIntervalsRuns(user.id)]);
 
-    if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.replacedGoogleFit} remplaçant Google Fit, ${r.updated} mises à jour, ${r.traces} traces ajoutées${r.vma != null ? `, VMA ${r.vma} km/h` : ""}${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
+    if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.replacedGoogleFit} remplaçant Google Fit, ${r.updated} mises à jour${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
     else console.error("[cron] courses Strava", runs.reason);
 
     // Heure affichée sous « Synchroniser maintenant » (feuille « + ») : la nuit compte aussi.
@@ -85,7 +85,7 @@ export async function GET(req: Request) {
 
     // Sauvegarde de la muscu vers Google Drive : en dernier, à part, sans jamais faire échouer les synchros.
     let backup: { ok: boolean; date?: string; error?: string; skipped?: true } = { ok: true, skipped: true };
-    if (!noon) try {
+    if (!daytime) try {
       const b = await backupToDrive(user.id);
       console.log(`[cron] sauvegarde muscu ${b.date} : ${b.counts.activities} séances, ${b.deleted} ancien(s) fichier(s) supprimé(s)`);
       backup = { ok: true, date: b.date };
