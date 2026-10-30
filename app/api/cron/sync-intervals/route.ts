@@ -9,6 +9,8 @@ import { matchRaceActivities } from "@/lib/races/link";
 import { buildAllHabits } from "@/lib/habits/build";
 import { DriveAuthError, backupToDrive } from "@/lib/backup/drive-backup";
 import { sendToUser } from "@/lib/push/send";
+import { COOKIE_ALERT_BODY, isCookieError, sendAlert, staleStreamCount, streamsAlertBody } from "@/lib/notify/alerts";
+import { missingStreams } from "@/lib/sync/intervals-streams";
 import { BACKFILL_CAP, backfillRibbons, refreshHrMaxEstimate } from "@/lib/data/zone-ribbon";
 
 export const maxDuration = 60;
@@ -42,6 +44,15 @@ export async function GET(req: Request) {
 
     if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.replacedGoogleFit} remplaçant Google Fit, ${r.updated} mises à jour${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
     else console.error("[cron] courses Strava", runs.reason);
+
+    // Alertes Strava (cookie expiré, cartes en attente) : une par type et par 3 jours, sans jamais faire échouer le cron.
+    try {
+      if (runs.status === "rejected" && isCookieError(runs.reason)) await sendAlert(user.id, "alert-cookie", COOKIE_ALERT_BODY, "/import");
+      else if (runs.status === "fulfilled") {
+        const stale = staleStreamCount(await missingStreams(user.id));
+        if (stale > 0) await sendAlert(user.id, "alert-streams", streamsAlertBody(stale), "/import");
+      }
+    } catch (e) { console.error("[cron] alertes Strava", e); }
 
     // Heure affichée sous « Synchroniser maintenant » (feuille « + ») : la nuit compte aussi.
     if (intervals.status === "fulfilled" || runs.status === "fulfilled" || googleFit.status === "fulfilled") await prisma.user.update({ where: { id: user.id }, data: { lastSyncAt: new Date() } }).catch(() => {});
