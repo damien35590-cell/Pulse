@@ -168,10 +168,29 @@ export function bestDistanceIn(streams: IntervalsStream[], windowS: number): num
   return best > 0 ? Math.round(best) : null;
 }
 
+/** Le site refuse les courbes des sorties Strava aux clients qui ne ressemblent pas à son application web : on envoie les en-têtes d'un Chrome. */
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+const browserHeaders = (cookie: string, id: string): Record<string, string> => ({
+  Cookie: `i=${cookie}`,
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+  "User-Agent": BROWSER_UA,
+  Referer: `https://intervals.icu/activities/${encodeURIComponent(id)}`,
+  "Sec-Fetch-Site": "same-origin",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Dest": "empty",
+  "sec-ch-ua": '"Chromium";v="141", "Google Chrome";v="141", "Not?A_Brand";v="99"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+});
+
+class StreamsRefused extends Error {}
+
 async function fetchStreams(id: string, cookie: string): Promise<IntervalsStream[]> {
   const r = await fetch(`https://intervals.icu/api/activity/${encodeURIComponent(id)}/streams`, {
-    headers: authHeaders(cookie, "application/json"), cache: "no-store", signal: AbortSignal.timeout(20_000),
+    headers: browserHeaders(cookie, id), cache: "no-store", signal: AbortSignal.timeout(20_000),
   });
+  if (r.status === 401 || r.status === 403) throw new StreamsRefused(`courbes refusées (${r.status})`);
   if (!r.ok) throw new Error(`courbes indisponibles (${r.status})`);
   const body: unknown = await r.json();
   return Array.isArray(body) ? (body as IntervalsStream[]) : [];
@@ -226,7 +245,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
     })).map((k) => [`${k.source}:${k.externalId}`, k]),
   );
 
-  let traces = 0;
+  let traces = 0, refused = false; // un refus : plus d'autre tentative de courbes pendant ce passage
   // Du plus ancien au plus récent : l'ordre des records et des séances du programme suit celui des sorties.
   for (const a of [...runs].sort((x, y) => (startOf(x)?.getTime() ?? 0) - (startOf(y)?.getTime() ?? 0))) {
     const startedAt = startOf(a);
@@ -296,7 +315,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
       // Courbes : trace GPS (sauf tapis), altitude, cardio. Ajoutées à la ligne existante par le rattrapage de saveActivities.
       let points: TrackPoint[] = [];
       let streams: IntervalsStream[] | null = null;
-      if (!hasTrace && a.type !== "VirtualRun" && traces < MAX_TRACES_PER_RUN) {
+      if (!hasTrace && !refused && a.type !== "VirtualRun" && traces < MAX_TRACES_PER_RUN) {
         traces++;
         try {
           streams = await fetchStreams(a.id, cookie);
@@ -312,6 +331,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
             if (r.backfilled) out.traces++;
           }
         } catch (e) {
+          if (e instanceof StreamsRefused) refused = true;
           out.errors.push(`${a.id} : courbes, ${msg(e)}`);
         }
       }
