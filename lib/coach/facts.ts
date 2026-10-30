@@ -10,6 +10,8 @@ import { getStrengthAnalysis } from "../analytics/strength";
 import { frame, runNotes, strengthNotes, type CoachNote } from "../analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "../data/coach";
 import { restDrop, setsOf } from "../workout/hr";
+import { getRepsReviews, type ActivityReps } from "../data/reps";
+import { fmtPaceS } from "../format";
 import type { Period } from "../analysis/period";
 
 export type CoachScope = "all" | "RUN" | "WORKOUT";
@@ -31,6 +33,24 @@ async function strengthHeart(userId: string, period: Period, tz: string) {
   };
 }
 const notesOf = (l: CoachNote[]) => l.map((n) => `[${n.tone}] ${n.title} — ${n.body}`);
+
+/**
+ * Fractionné d'une sortie pour le coach : répétitions comptées face aux allures du programme, écarts déjà calculés (s/km, + = plus lent).
+ * Sans cible (sortie non reliée, séance sans allure) : seulement les allures des répétitions.
+ */
+export function repsFact(r: ActivityReps) {
+  const t = r.reps.find((x) => x.target)?.target;
+  return {
+    seance: r.session?.title ?? null,
+    repetitions: r.reps.length,
+    allures: r.reps.map((x) => fmtPaceS(x.paceS)),
+    ...(r.counts.rated ? {
+      allureCible: t ? fmtPaceS(t.mid) : null, vmaKmh: r.vmaKmh,
+      dansLaCible: r.counts.ok, tropLentes: r.counts.slow, tropRapides: r.counts.fast,
+      ecartsSKm: r.reps.map((x) => x.deltaS),
+    } : {}),
+  };
+}
 
 export async function getCoachFacts(userId: string, scope: CoachScope, period: Period, tz: string) {
   const { weeks, now, current } = period, todayKey = dayKey(new Date(), tz);
@@ -63,12 +83,13 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
     const [acts, goal, plans] = await Promise.all([
       prisma.activity.findMany({
         where: { userId, type: "RUN", startedAt: { gte: new Date(Date.parse(f.prevStart + "T00:00:00Z") - 864e5), lte: now } }, orderBy: { startedAt: "asc" },
-        select: { type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true, rpe: true, srpe: true },
+        select: { id: true, type: true, title: true, source: true, dedupeKey: true, load: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true, rpe: true, srpe: true, workReps: true },
       }),
       getRunGoal(userId), getPlanAdherence(userId, period.startKey, period.endKey, todayKey, "RUN"),
     ]);
     const runs = acts.filter((a) => !isCommute({ ...a })), inCur = (a: (typeof runs)[number]) => dayKey(a.startedAt, tz) >= f.startKey;
     const cur = runs.filter(inCur), prev = runs.filter((a) => !inCur(a) && dayKey(a.startedAt, tz) >= f.prevStart);
+    const last = cur.slice(-8), reps = await getRepsReviews(userId, last);
     const km = (l: typeof runs) => r1(l.reduce((s, a) => s + a.distanceM, 0) / 1000);
     const weekly = Array.from({ length: weeks }, (_, i) => {
       const mon = new Date(Date.parse(period.startKey + "T00:00:00Z") + i * 7 * 864e5).toISOString().slice(0, 10), sun = new Date(Date.parse(mon) + 6 * 864e5).toISOString().slice(0, 10);
@@ -80,7 +101,10 @@ export async function getCoachFacts(userId: string, scope: CoachScope, period: P
       resume: { sorties: cur.length, km: km(cur), tempsMin: Math.round(cur.reduce((s, a) => s + a.movingTimeS, 0) / 60), allureMoyenne: pace(cur.reduce((s, a) => s + a.movingTimeS, 0), cur.reduce((s, a) => s + a.distanceM, 0)) },
       periodePrecedente: { sorties: prev.length, km: km(prev) },
       parSemaine: weekly,
-      dernieresSorties: cur.slice(-8).map((a) => ({ jour: dayKey(a.startedAt, tz), km: r1(a.distanceM / 1000), allure: pace(a.movingTimeS, a.distanceM), fcMoy: a.avgHr ?? null, effortRessenti: a.rpe ?? null, chargeRessentie: a.srpe ?? null })),
+      dernieresSorties: last.map((a) => {
+        const r = reps.get(a.id);
+        return { jour: dayKey(a.startedAt, tz), km: r1(a.distanceM / 1000), allure: pace(a.movingTimeS, a.distanceM), fcMoy: a.avgHr ?? null, effortRessenti: a.rpe ?? null, chargeRessentie: a.srpe ?? null, ...(r ? { fractionne: repsFact(r) } : {}) };
+      }),
       objectif: goal ? { titre: goal.title, distanceKm: goal.distanceM ? r1(goal.distanceM / 1000) : null, tempsViseS: goal.targetTimeS, tempsPreditS: goal.predictedTimeS } : null,
       programmes: plans,
       cible: "2 à 3 sorties par semaine",
