@@ -42,10 +42,12 @@ const gDown = gapPace(down, 2000, 600)!;
 assert.ok(gDown > 300, `descente : ${gDown}`);
 near(gDown, 300 / gradeFactor(-0.05), 3, "descente 5 % (bords de trace lissés)");
 
-// Même côte montée puis descendue à allure brute constante : la descente (6 %, ~0,73× le coût du plat) est faite à un effort bas, le GAP est donc plus lent que le brut
+// Même côte montée puis descendue à allure brute constante : la montée (+6 %, ×1,37) coûte plus que la descente n'économise (−6 %, ×0,72),
+// le GAP est donc plus RAPIDE que le brut : 300 / moyenne des facteurs ≈ 287 s/km (comme le GAP de Strava sur une boucle vallonnée)
 const loop = run(4000, (m) => (m <= 2000 ? 0.06 : -0.06));
 const gLoop = gapPace(loop, 4000, 1200)!;
-assert.ok(gLoop > 300 && gLoop < 340, `boucle : ${gLoop}`);
+assert.ok(gLoop < 300, `boucle : ${gLoop}`);
+near(gLoop, 300 / ((gradeFactor(0.06) + gradeFactor(-0.06)) / 2), 4, "boucle ±6 %");
 
 // Pente aberrante (mur de 80 % sur 20 m) : bornée, pas d'explosion
 const wall = run(1000, (m) => (m > 500 && m <= 520 ? 0.8 : 0));
