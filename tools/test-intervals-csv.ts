@@ -1,6 +1,7 @@
 // Export CSV Intervals.icu (lib/sync/intervals-runs.ts) : champs entre guillemets, virgules et guillemets doublés, CRLF.
 import assert from "node:assert/strict";
-import { activitiesFromCsv, bestDistanceIn, parseCsv, pointsFromStreams, type IntervalsStream } from "@/lib/sync/intervals-runs";
+import { activitiesFromCsv, parseCsv } from "@/lib/sync/intervals-runs";
+import { bestDistanceIn, pointsFromStreams, type IntervalsStream } from "@/lib/sync/intervals-streams";
 
 assert.deepEqual(parseCsv('a,"b, c","d ""e"""\r\n1,,3\n'), [["a", "b, c", 'd "e"'], ["1", "", "3"]]);
 

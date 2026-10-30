@@ -3,11 +3,6 @@ import { ActivityType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findOverlapping, processActivity } from "@/lib/pipeline/post-import";
 import { GOOGLE_FIT_SOURCE } from "@/lib/sync/google-fit";
-import { saveActivities } from "@/lib/import/save";
-import { gpsOf } from "@/lib/import/build";
-import type { ParsedActivity, TrackPoint } from "@/lib/import/types";
-import { saveVmaMetric } from "@/lib/data/training";
-import { isValidVma, vmaFromHalfCooper } from "@/lib/training/vma";
 
 const RUN_TYPES = ["Run", "TrailRun", "VirtualRun"] as const;
 type RunType = (typeof RUN_TYPES)[number];
@@ -33,8 +28,7 @@ type IntervalsRun = IntervalsActivity & { type: RunType };
 
 export type RunSyncStats = {
   found: number; runs: number; created: number; updated: number;
-  withFile: number; duplicates: number; replacedGoogleFit: number;
-  traces: number; vma: number | null; errors: string[];
+  withFile: number; duplicates: number; replacedGoogleFit: number; errors: string[];
 };
 
 const CSV_URL = (athleteId: string) => `https://intervals.icu/api/athlete/${encodeURIComponent(athleteId)}/activities.csv`;
@@ -115,86 +109,9 @@ function sessionCookie(): string {
 /**
  * Cookie de session SEUL. L'API officielle (/api/v1) refuse les cookies et, avec la clé API, ne renvoie que des
  * coquilles vides pour les sorties Strava : on passe par l'export CSV du site, qui les contient en entier.
+ * Les courbes (/api/activity/{id}/streams), elles, sont refusées au serveur (401) : elles passent par Chrome.
  */
-const authHeaders = (cookie: string, accept = "text/csv"): Record<string, string> => ({ Cookie: `i=${cookie}`, Accept: accept });
-
-// ───────── Courbes (streams) d'une sortie ─────────
-
-/** Courbe d'une activité : `data` (latlng : latitudes, `data2` : longitudes). */
-export type IntervalsStream = { type: string; data?: (number | boolean | null)[] | null; data2?: (number | null)[] | null };
-
-const series = (streams: IntervalsStream[], type: string): (number | null)[] | null => {
-  const d = streams.find((x) => x.type === type)?.data;
-  return d ? d.map((v) => (typeof v === "number" && Number.isFinite(v) ? v : null)) : null;
-};
-
-/** Courbes Intervals → points datés (ms) au format des imports FIT/GPX : position, altitude, cardio, cadence, puissance. */
-export function pointsFromStreams(streams: IntervalsStream[], startMs: number): TrackPoint[] {
-  const time = series(streams, "time");
-  if (!time) return [];
-  const ll = streams.find((x) => x.type === "latlng"), lat = ll?.data ?? null, lng = ll?.data2 ?? null;
-  const alt = series(streams, "altitude"), hr = series(streams, "heartrate"), cad = series(streams, "cadence"), watts = series(streams, "watts");
-  const out: TrackPoint[] = [];
-  for (let i = 0; i < time.length; i++) {
-    const s = time[i];
-    if (s == null) continue;
-    const p: TrackPoint = { t: startMs + s * 1000 };
-    const la = lat?.[i], lo = lng?.[i];
-    if (typeof la === "number" && typeof lo === "number" && Number.isFinite(la) && Number.isFinite(lo) && !(la === 0 && lo === 0)) { p.lat = la; p.lng = lo; }
-    if (alt?.[i] != null) p.ele = alt[i]!;
-    if (hr?.[i] != null && hr[i]! > 0) p.hr = hr[i]!;
-    if (cad?.[i] != null && cad[i]! > 0) p.cad = cad[i]!;
-    if (watts?.[i] != null && watts[i]! > 0) p.power = watts[i]!;
-    out.push(p);
-  }
-  return out;
-}
-
-/** Plus grande distance (m) couverte en `windowS` secondes, d'après les courbes temps et distance cumulée. */
-export function bestDistanceIn(streams: IntervalsStream[], windowS: number): number | null {
-  const time = series(streams, "time"), dist = series(streams, "distance");
-  if (!time || !dist || time.length < 2) return null;
-  const last = time[time.length - 1];
-  if (last == null || last < windowS) return null;
-  let best = 0, j = 0;
-  for (let i = 0; i < time.length; i++) {
-    const ti = time[i], di = dist[i];
-    if (ti == null || di == null) continue;
-    if (j < i) j = i;
-    while (j + 1 < time.length && time[j + 1] != null && time[j + 1]! - ti <= windowS) j++;
-    const dj = dist[j];
-    if (dj != null) best = Math.max(best, dj - di);
-  }
-  return best > 0 ? Math.round(best) : null;
-}
-
-/** Le site refuse les courbes des sorties Strava aux clients qui ne ressemblent pas à son application web : on envoie les en-têtes d'un Chrome. */
-const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
-const browserHeaders = (cookie: string, id: string): Record<string, string> => ({
-  Cookie: `i=${cookie}`,
-  Accept: "application/json, text/plain, */*",
-  "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-  "User-Agent": BROWSER_UA,
-  Referer: `https://intervals.icu/activities/${encodeURIComponent(id)}`,
-  "Sec-Fetch-Site": "same-origin",
-  "Sec-Fetch-Mode": "cors",
-  "Sec-Fetch-Dest": "empty",
-  "sec-ch-ua": '"Chromium";v="141", "Google Chrome";v="141", "Not?A_Brand";v="99"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-});
-
-class StreamsRefused extends Error {}
-
-async function fetchStreams(id: string, cookie: string): Promise<IntervalsStream[]> {
-  const r = await fetch(`https://intervals.icu/api/activity/${encodeURIComponent(id)}/streams`, {
-    headers: browserHeaders(cookie, id), cache: "no-store", signal: AbortSignal.timeout(20_000),
-  });
-  if (r.status === 401 || r.status === 403) throw new StreamsRefused(`courbes refusées (${r.status})`);
-  if (!r.ok) throw new Error(`courbes indisponibles (${r.status})`);
-  const body: unknown = await r.json();
-  return Array.isArray(body) ? (body as IntervalsStream[]) : [];
-}
+const authHeaders = (cookie: string): Record<string, string> => ({ Cookie: `i=${cookie}`, Accept: "text/csv" });
 
 /** Id athlète : variable INTERVALS_ATHLETE_ID, sinon lu dans le cookie (« v2_i200227_… » → « i200227 »). */
 function athleteIdOf(cookie: string): string {
@@ -203,15 +120,11 @@ function athleteIdOf(cookie: string): string {
   return id;
 }
 
-/** Courbes téléchargées au plus par passage (budget de temps du cron) : le reste au passage suivant. */
-export const MAX_TRACES_PER_RUN = 6;
-
 /**
  * Courses (Run, TrailRun, VirtualRun) des `days` derniers jours SANS fichier d'origine (arrivées via Strava) :
- * 1. résumé (CSV) : création, ou reprise de la même sortie détectée par Google Fit, ou mise à jour ;
- * 2. courbes (trace GPS, altitude, cardio…) pour celles qui n'en ont pas encore, via le rattrapage de saveActivities ;
- * 3. pipeline (doublons, records sur la trace, badges, anecdote, séance du programme) ;
- * 4. test VMA du programme : VMA = meilleure distance sur 6 min / 100, enregistrée si pas encore saisie.
+ * résumé (CSV : une seule requête) → création, reprise de la même sortie détectée par Google Fit, ou mise à jour,
+ * puis pipeline (doublons, records, badges, anecdote, séance du programme) pour les nouvelles.
+ * Les courbes (trace, altitude, cardio) et la VMA des tests arrivent depuis Chrome : lib/sync/intervals-streams.ts.
  * Les courses avec fichier restent gérées par syncIntervals.
  */
 export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSyncStats> {
@@ -229,7 +142,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
 
   // Tout l'historique arrive (quelques centaines de lignes) : on garde la fenêtre des `days` derniers jours.
   const items = activitiesFromCsv(await res.text()).filter((a) => (startOf(a)?.getTime() ?? 0) >= since);
-  const out: RunSyncStats = { found: items.length, runs: 0, created: 0, updated: 0, withFile: 0, duplicates: 0, replacedGoogleFit: 0, traces: 0, vma: null, errors: [] };
+  const out: RunSyncStats = { found: items.length, runs: 0, created: 0, updated: 0, withFile: 0, duplicates: 0, replacedGoogleFit: 0, errors: [] };
 
   const runs = items.filter(isRun).filter((a) => {
     if (a.file_type) { out.withFile++; return false; }
@@ -241,11 +154,10 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
   const existing = new Map(
     (await prisma.activity.findMany({
       where: { userId: uid, externalId: { in: runs.map((a) => a.id) } },
-      select: { id: true, source: true, externalId: true, polyline: true, notes: true },
+      select: { id: true, source: true, externalId: true, notes: true },
     })).map((k) => [`${k.source}:${k.externalId}`, k]),
   );
 
-  let traces = 0, refused = false; // un refus : plus d'autre tentative de courbes pendant ce passage
   // Du plus ancien au plus récent : l'ordre des records et des séances du programme suit celui des sorties.
   for (const a of [...runs].sort((x, y) => (startOf(x)?.getTime() ?? 0) - (startOf(y)?.getTime() ?? 0))) {
     const startedAt = startOf(a);
@@ -269,12 +181,12 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
     ) as Prisma.ActivityUpdateInput;
 
     try {
-      let id: string, hasTrace: boolean, fresh = false;
+      let id: string, fresh = false;
       const known = existing.get(`${source}:${a.id}`);
       if (known) {
         await prisma.activity.update({ where: { id: known.id }, data: { ...update, ...(known.notes || !note ? {} : { notes: note }) } });
         out.updated++;
-        ({ id } = known); hasTrace = !!known.polyline;
+        ({ id } = known);
       } else {
         // Même sortie détectée automatiquement par Google Fit : la version Strava fait foi. On reprend sa ligne
         // (ressenti, notes, séance du programme restent) sans toucher à son dedupeKey « gfit-… » (la synchro Google Fit ne la recrée pas).
@@ -283,7 +195,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
         const gfit = overlaps.length
           ? await prisma.activity.findFirst({
               where: { id: { in: overlaps.map((o) => o.id) }, source: GOOGLE_FIT_SOURCE },
-              select: { id: true, titleEdited: true, notes: true, polyline: true },
+              select: { id: true, titleEdited: true, notes: true },
             })
           : null;
         if (gfit) {
@@ -296,7 +208,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
             },
           });
           out.replacedGoogleFit++;
-          id = gfit.id; hasTrace = !!gfit.polyline; fresh = true;
+          id = gfit.id; fresh = true;
         } else {
           const row = await prisma.activity.upsert({
             where: { userId_source_externalId: { userId: uid, source, externalId: a.id } },
@@ -308,62 +220,18 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
             select: { id: true },
           });
           out.created++;
-          id = row.id; hasTrace = false; fresh = true;
+          id = row.id; fresh = true;
         }
       }
 
-      // Courbes : trace GPS (sauf tapis), altitude, cardio. Ajoutées à la ligne existante par le rattrapage de saveActivities.
-      let points: TrackPoint[] = [];
-      let streams: IntervalsStream[] | null = null;
-      if (!hasTrace && !refused && a.type !== "VirtualRun" && traces < MAX_TRACES_PER_RUN) {
-        traces++;
-        try {
-          streams = await fetchStreams(a.id, cookie);
-          points = pointsFromStreams(streams, +startedAt);
-          if (points.length > 1) {
-            const parsed: ParsedActivity = {
-              dedupeKey: `${source}-${a.id}`, externalId: a.id, source: "strava", fileName: `intervals-${a.id}`,
-              type: "RUN", title, startedAt: startedAt.toISOString(),
-              distanceM: summary.distanceM, movingTimeS: summary.movingTimeS, elapsedTimeS: summary.elapsedTimeS ?? summary.movingTimeS,
-              elevationGainM: summary.elevationGainM, points,
-            };
-            const r = await saveActivities(uid, [parsed]);
-            if (r.backfilled) out.traces++;
-          }
-        } catch (e) {
-          if (e instanceof StreamsRefused) refused = true;
-          out.errors.push(`${a.id} : courbes, ${msg(e)}`);
-        }
-      }
-
-      // Pipeline : à la création / reprise, ou quand la trace vient d'arriver (records sur 5 et 10 km, ruban de zones…).
-      if (fresh || points.length > 1) {
-        const r = await processActivity(id, { points: gpsOf({ points } as ParsedActivity) });
-        id = r.activityId ?? id;
-      }
-
-      // Test VMA (demi-Cooper) du programme : distance des 6 meilleures minutes, si la VMA n'a pas déjà été saisie pour cette sortie.
-      const vma = streams ? await halfCooperVma(uid, id, streams, startedAt) : null;
-      if (vma != null) out.vma = vma;
+      // Pipeline à la création ou à la reprise (séance du programme, records, anecdote).
+      if (fresh) await processActivity(id);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") { out.duplicates++; continue; }
       out.errors.push(`${a.id} : ${msg(e)}`);
     }
   }
 
-  if (out.created || out.replacedGoogleFit || out.traces) { revalidatePath("/"); revalidatePath("/activities"); revalidatePath("/vous"); revalidatePath("/analysis"); revalidatePath("/plan"); }
+  if (out.created || out.replacedGoogleFit) { revalidatePath("/"); revalidatePath("/activities"); revalidatePath("/vous"); revalidatePath("/analysis"); revalidatePath("/plan"); }
   return out;
-}
-
-/** Sortie rattachée à un test VMA du programme et sans VMA déjà enregistrée pour elle : VMA = meilleure distance sur 6 min / 100. */
-async function halfCooperVma(uid: string, activityId: string, streams: IntervalsStream[], startedAt: Date): Promise<number | null> {
-  const test = await prisma.plannedSession.findFirst({ where: { userId: uid, kind: "VMA_TEST", completedActivityId: activityId }, select: { id: true } });
-  if (!test) return null;
-  if (await prisma.athleteMetric.findFirst({ where: { userId: uid, type: "VMA_KMH", activityId }, select: { id: true } })) return null;
-  const d = bestDistanceIn(streams, 360);
-  if (d == null) return null;
-  const vma = vmaFromHalfCooper(d);
-  if (!isValidVma(vma)) return null;
-  await saveVmaMetric(uid, vma, "TEST", { measuredAt: startedAt, activityId, note: `Demi-Cooper lu sur la trace : ${d} m en 6 min` });
-  return vma;
 }
