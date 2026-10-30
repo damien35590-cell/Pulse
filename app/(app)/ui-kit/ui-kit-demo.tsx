@@ -6,7 +6,7 @@ import { SPORT_SHORT } from "@/lib/sports";
 import { ui } from "@/lib/ui";
 import { fmtClock, fmtNum } from "@/lib/format";
 import { setTheme } from "@/lib/theme";
-import { HR_MAX, artDemo, fitness, goal, hrBands, liftSession, nextRace, profileOf, recent, rideWeather, routeSuggestion, runs, today, tracks, week, workout } from "@/lib/mock/ui-kit";
+import { HR_MAX, artDemo, fitness, goal, hrBands, liftSession, nextRace, profileOf, recent, rideWeather, routeSuggestion, runs, today, tracks, week, workout, workRepsDemo } from "@/lib/mock/ui-kit";
 import { activityStyle } from "@/lib/activity-style";
 import { PulseLogo, PulseMark } from "@/components/brand/logo";
 import { TopBar } from "@/components/layout/top-bar";
@@ -27,6 +27,7 @@ import { ZoneRibbon } from "@/components/art/zone-ribbon";
 import { EffortStrip } from "@/components/art/effort-strip";
 import { SetBars } from "@/components/art/set-bars";
 import { Splits } from "@/components/activity/splits";
+import { WorkReps } from "@/components/activity/work-reps";
 import { RpePicker } from "@/components/activity/rpe-picker";
 import { ShareActivity } from "@/components/activity/share-activity";
 import { sessionRpe } from "@/lib/load";
@@ -203,6 +204,8 @@ function RunDetail({ run, back }: { run: (typeof runs)[number]; back: () => void
             <Splits splits={run.splits} />
           </div>
         </Section>
+
+        <WorkReps review={workRepsDemo} sessionTitle="VMA courte · 8 × 400 m" />
 
         <Section title="Parcours" action={<span className="text-xs text-ink-mute">{run.id === "footing" ? "Aller simple" : "Boucle"}</span>}>
           <div className={cn(ui.card, "overflow-hidden")}>

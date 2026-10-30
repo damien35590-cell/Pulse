@@ -6,6 +6,7 @@ import { gpsOf } from "@/lib/import/build";
 import type { ParsedActivity, TrackPoint } from "@/lib/import/types";
 import { saveVmaMetric } from "@/lib/data/training";
 import { isValidVma, vmaFromHalfCooper } from "@/lib/training/vma";
+import { isRepSession, workRepsOf, type IcuInterval } from "@/lib/training/reps";
 
 /**
  * Courbes des sorties Strava (trace GPS, altitude, cardio…). Intervals.icu les refuse au serveur : un script Tampermonkey
@@ -65,7 +66,10 @@ export function bestDistanceIn(streams: IntervalsStream[], windowS: number): num
   return best > 0 ? Math.round(best) : null;
 }
 
-/** Sorties récentes sans trace ni série : ce que le script doit aller chercher (tapis sans cardio : sorties de la liste après 14 jours). */
+/**
+ * Sorties récentes sans trace ni série : ce que le script doit aller chercher (tapis sans cardio : sorties de la liste après 14 jours).
+ * `key` : la sortie réalise une séance clé ou fractionnée du programme ; le script lit alors aussi son découpage (/intervals).
+ */
 export async function missingStreams(uid: string) {
   const rows = await prisma.activity.findMany({
     where: {
@@ -73,19 +77,20 @@ export async function missingStreams(uid: string) {
       polyline: null, stream: { is: null }, startedAt: { gte: new Date(Date.now() - STREAM_WINDOW_DAYS * 864e5) },
     },
     orderBy: { startedAt: "asc" },
-    select: { externalId: true, startedAt: true },
+    select: { externalId: true, startedAt: true, plannedSession: { select: { kind: true, isKeySession: true } } },
   });
-  return rows.flatMap((r) => (r.externalId ? [{ externalId: r.externalId, startedAt: r.startedAt.toISOString() }] : []));
+  return rows.flatMap((r) => (r.externalId ? [{ externalId: r.externalId, startedAt: r.startedAt.toISOString(), key: isRepSession(r.plannedSession) }] : []));
 }
 
-export type StreamsResult = { activityId: string; points: number; gps: boolean; backfilled: number; vma: number | null };
+export type StreamsResult = { activityId: string; points: number; gps: boolean; backfilled: number; vma: number | null; reps: number | null };
 
 /**
  * Courbes reçues pour une sortie déjà dans Pulse : trace, altitude et série cardio ajoutées par le rattrapage de saveActivities,
  * puis pipeline (records 5/10 km sur la trace, ruban de zones…) et, pour un test VMA, VMA = meilleure distance sur 6 min / 100.
+ * Découpage d'Intervals reçu (séance clé) : répétitions WORK enregistrées dans Activity.workReps (`reps` = leur nombre, null sans découpage).
  * Renvoie null si la sortie est inconnue.
  */
-export async function applyStreams(uid: string, externalId: string, streams: IntervalsStream[]): Promise<StreamsResult | null> {
+export async function applyStreams(uid: string, externalId: string, streams: IntervalsStream[], intervals?: IcuInterval[] | null): Promise<StreamsResult | null> {
   const a = await prisma.activity.findFirst({
     where: { userId: uid, externalId, source: { in: STREAM_SOURCES } },
     select: { id: true, title: true, startedAt: true, distanceM: true, movingTimeS: true, elapsedTimeS: true, elevationGainM: true },
@@ -105,8 +110,10 @@ export async function applyStreams(uid: string, externalId: string, streams: Int
     if (backfilled) await processActivity(a.id, { points: gps });
   }
   const vma = await halfCooperVma(uid, a.id, streams, a.startedAt);
-  if (backfilled || vma != null) { revalidatePath("/"); revalidatePath("/activities"); revalidatePath(`/activities/${a.id}`); revalidatePath("/plan"); }
-  return { activityId: a.id, points: points.length, gps: gps.length > 1, backfilled, vma };
+  const work = intervals ? workRepsOf(intervals) : null;
+  if (work) await prisma.activity.update({ where: { id: a.id }, data: { workReps: work } });
+  if (backfilled || vma != null || work) { revalidatePath("/"); revalidatePath("/activities"); revalidatePath(`/activities/${a.id}`); revalidatePath("/plan"); }
+  return { activityId: a.id, points: points.length, gps: gps.length > 1, backfilled, vma, reps: work ? work.reps.length : null };
 }
 
 /** Sortie rattachée à un test VMA du programme et sans VMA déjà enregistrée pour elle : VMA = meilleure distance sur 6 min / 100. */

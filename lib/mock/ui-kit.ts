@@ -16,6 +16,7 @@ import { encodePolyline } from "@/lib/polyline";
 import { simplifyTrack } from "@/lib/map/track";
 import { zoneRibbon } from "@/lib/art/zone-ribbon";
 import { setGroups } from "@/lib/art/set-bars";
+import { reviewReps, targetPace } from "@/lib/training/reps";
 
 export const HR_MAX = 191;
 const HR_BOUNDS = bounds(HR_MAX, HR_PCT); // [115, 134, 153, 172, 181]
@@ -283,3 +284,9 @@ export const rideWeather: RideWeather = {
   uvMax: 1.2, cloudMean: 55, isDay: true, sunrise: Date.parse("2026-10-18T06:24:00Z"), sunset: Date.parse("2026-10-18T16:52:00Z"),
   rain48hMm: 14, coolest: null,
 };
+
+/** Fractionné « 8 × 400 m » à 95–100 % d'une VMA de 15 km/h (cible 4:06 /km), découpage Intervals.icu fictif. */
+export const workRepsDemo = reviewReps(
+  { v: 1, reps: [[97, 168], [98, 172], [99, 174], [96, 175], [101, 176], [103, 177], [99, 178], [93, 181]].map(([t, hr], i) => ({ s: 900 + i * 180, d: 400, t, hr })) },
+  [targetPace(15, 95, 100)], 15,
+);

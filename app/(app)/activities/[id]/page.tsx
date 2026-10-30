@@ -45,6 +45,8 @@ import { getGear } from "@/lib/data/gear";
 import { selectableGear } from "@/lib/gear";
 import { CompareActivity, type Comparable } from "@/components/activity/compare-activity";
 import { isCommute } from "@/lib/routes/estimate";
+import { getActivityReps } from "@/lib/data/reps";
+import { WorkReps } from "@/components/activity/work-reps";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
@@ -62,7 +64,7 @@ function feelingToInt(feeling: string | null): number | null {
 }
 
 /**
- * Fiche d'activité. Ordre : tête (carte, titre, chiffres, comparaison) → note du coach → allure par km → fréquence cardiaque
+ * Fiche d'activité. Ordre : tête (carte, titre, chiffres, comparaison) → séance du programme → fractionné → note du coach → allure par km → fréquence cardiaque
  * → altitude → ressenti, puis « Partager » en bas, dans la zone du pouce.
  */
 export default async function ActivityPage({ params }: { params: { id: string } }) {
@@ -91,6 +93,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const planned = a.type === "RUN" ? await prisma.plannedSession.findFirst({ where: { completedActivityId: a.id, userId: s.user.id }, select: { id: true, title: true, description: true, isKeySession: true } }) : null;
   // Sortie course qui ne valide aucune séance : séances encore à faire de sa semaine, pour la rattacher à la main.
   const linkable = a.type === "RUN" && !planned ? await sessionsForRun(s.user.id, a) : [];
+  // Fractionné : répétitions reçues d'Intervals.icu, comparées aux allures de la séance reliée.
+  const reps = a.type === "RUN" && a.workReps != null ? await getActivityReps(s.user.id, a) : null;
   const route = a.polyline ? decodePolyline(a.polyline) : [];
   const raw = (a.trackPoints as TP[] | null) ?? [];
   const t0 = raw[0]?.t ?? 0;
@@ -173,6 +177,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
                 </div>
               </Section>
             )}
+            {reps && <WorkReps review={reps} sessionTitle={reps.session?.title} />}
             {note && (
               <section aria-label="Note du coach" className={cn(ui.card, "flex gap-3 p-4")}>
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><MessageSquareText className="size-4" aria-hidden /></span>

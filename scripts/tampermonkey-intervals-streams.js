@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Pulse · courbes des sorties Strava depuis Intervals.icu
 // @namespace    pulse-bay-eight
-// @version      1.0.0
-// @description  À l'ouverture d'intervals.icu (au plus toutes les 12 h) : demande à Pulse les sorties sans trace, lit leurs courbes dans la session du navigateur et les envoie à Pulse.
+// @version      1.1.0
+// @description  À l'ouverture d'intervals.icu (au plus toutes les 12 h) : demande à Pulse les sorties sans trace, lit leurs courbes (et le découpage des séances clés) dans la session du navigateur et les envoie à Pulse.
 // @match        https://intervals.icu/*
 // @run-at       document-idle
 // @noframes
@@ -16,7 +16,9 @@
 /*
  * Pourquoi ici : Intervals.icu refuse au serveur de Pulse (401) les courbes des sorties venues de Strava,
  * mais les donne au navigateur connecté. Côté Pulse : app/api/sync/streams/route.ts, lib/sync/intervals-streams.ts.
- * Discrétion : au plus un passage toutes les 12 h, seulement les sorties qui manquent (6 au plus), espacées de quelques secondes.
+ * Séances clés du programme (`key` dans la liste de Pulse) : leur découpage (/api/activity/{id}/intervals) part dans le même envoi,
+ * pour comparer chaque répétition à son allure cible (lib/training/reps.ts).
+ * Discrétion : au plus un passage toutes les 12 h, seulement les sorties qui manquent (6 au plus), chaque requête à Intervals espacée de 2 à 5 s.
  * Le secret (PULSE_STREAM_SECRET, dans Vercel) est demandé une fois et gardé dans Tampermonkey, jamais dans ce fichier.
  * Menu Tampermonkey : « Synchroniser maintenant » (ignore le délai de 12 h) et « Changer le secret ».
  */
@@ -59,6 +61,14 @@
   }
 
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const gap = () => pause(2000 + Math.random() * 3000);
+
+  /** GET JSON sur Intervals.icu avec la session du navigateur ; null si refusé. */
+  async function icu(path) {
+    const r = await fetch(path, { credentials: "include", headers: { Accept: "application/json" } });
+    if (!r.ok) { log(path, "indisponible", r.status); return null; }
+    return r.json();
+  }
 
   function toast(text) {
     const el = document.createElement("div");
@@ -77,22 +87,37 @@
     const missing = ((list && list.missing) || []).slice(0, MAX_PER_RUN);
     if (!missing.length) { log("rien à envoyer"); if (force) toast("Pulse : tout est à jour"); return; }
 
-    let sent = 0, vma = null;
+    let sent = 0, vma = null, reps = 0;
     for (const [i, m] of missing.entries()) {
-      if (i) await pause(2000 + Math.random() * 3000);
+      if (i) await gap();
       try {
-        const r = await fetch("/api/activity/" + encodeURIComponent(m.externalId) + "/streams", { credentials: "include", headers: { Accept: "application/json" } });
-        if (!r.ok) { log(m.externalId, "courbes indisponibles", r.status); continue; }
-        const streams = await r.json();
-        const res = await pulse("POST", { externalId: m.externalId, streams });
+        const base = "/api/activity/" + encodeURIComponent(m.externalId);
+        const streams = await icu(base + "/streams");
+        if (!streams) continue;
+        let intervals = null;
+        if (m.key) {
+          await gap();
+          const iv = await icu(base + "/intervals").catch((e) => { log(m.externalId, "découpage illisible", e.message); return null; });
+          if (iv && Array.isArray(iv.icu_intervals)) intervals = { icu_intervals: iv.icu_intervals };
+        }
+        let res;
+        try {
+          res = await pulse("POST", intervals ? { externalId: m.externalId, streams, intervals } : { externalId: m.externalId, streams });
+        } catch (e) {
+          // Découpage refusé par Pulse (format inattendu) : les courbes partent quand même.
+          if (!intervals || !/^intervals/.test(e.message)) throw e;
+          log(m.externalId, "découpage refusé", e.message);
+          res = await pulse("POST", { externalId: m.externalId, streams });
+        }
         sent++;
         if (res && res.vma != null) vma = res.vma;
+        if (res && res.reps) reps += res.reps;
         log(m.externalId, "envoyée", res);
       } catch (e) {
         log(m.externalId, "échec", e.message);
       }
     }
-    if (sent) toast("Pulse : " + sent + " sortie(s) complétée(s)" + (vma != null ? " · VMA " + vma + " km/h" : ""));
+    if (sent) toast("Pulse : " + sent + " sortie(s) complétée(s)" + (reps ? " · " + reps + " répétition(s)" : "") + (vma != null ? " · VMA " + vma + " km/h" : ""));
   }
 
   GM_registerMenuCommand("Pulse : synchroniser maintenant", () => run(true).catch((e) => toast("Pulse : " + e.message)));

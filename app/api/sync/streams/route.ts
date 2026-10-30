@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { applyStreams, missingStreams, type IntervalsStream } from "@/lib/sync/intervals-streams";
+import { parseIntervals, type IcuInterval } from "@/lib/training/reps";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -9,8 +10,9 @@ export const dynamic = "force-dynamic";
 /**
  * Courbes des sorties Strava envoyées depuis Chrome par scripts/tampermonkey-intervals-streams.js
  * (Intervals.icu les refuse au serveur). Protégé par « Authorization: Bearer <PULSE_STREAM_SECRET> ».
- *   GET  → sorties récentes de Pulse sans trace : [{ externalId, startedAt }]
- *   POST { externalId, streams } → trace, altitude, cardio, records, VMA d'un test demi-Cooper
+ *   GET  → sorties récentes de Pulse sans trace : [{ externalId, startedAt, key }] (key : séance clé, découpage attendu)
+ *   POST { externalId, streams, intervals? } → trace, altitude, cardio, records, VMA d'un test demi-Cooper ;
+ *        intervals = réponse de /api/activity/{id}/intervals (séances clés) → répétitions du fractionné. Invalide : 400 « intervals… », rien d'écrit.
  */
 
 const same = (a: string, b: string) => timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
@@ -28,10 +30,10 @@ async function authorize(req: Request): Promise<{ uid: string } | { error: NextR
 
 const MAX_POINTS = 50_000; // ~14 h à 1 Hz
 
-/** Corps attendu : { externalId: string, streams: [{ type, data, data2? }] } (réponse brute de /api/activity/{id}/streams). */
-function parseBody(body: unknown): { externalId: string; streams: IntervalsStream[] } | string {
+/** Corps attendu : { externalId: string, streams: [{ type, data, data2? }], intervals?: { icu_intervals } } (réponses brutes d'Intervals). */
+function parseBody(body: unknown): { externalId: string; streams: IntervalsStream[]; intervals: IcuInterval[] | null } | string {
   if (!body || typeof body !== "object") return "corps JSON attendu";
-  const { externalId, streams } = body as { externalId?: unknown; streams?: unknown };
+  const { externalId, streams, intervals } = body as { externalId?: unknown; streams?: unknown; intervals?: unknown };
   if (typeof externalId !== "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(externalId)) return "externalId invalide";
   if (!Array.isArray(streams) || !streams.length) return "streams attendu (tableau non vide)";
   const out: IntervalsStream[] = [];
@@ -44,7 +46,9 @@ function parseBody(body: unknown): { externalId: string; streams: IntervalsStrea
     out.push({ type, data: (data as IntervalsStream["data"]) ?? null, data2: (data2 as IntervalsStream["data2"]) ?? null });
   }
   if (!out.some((s) => s.type === "time")) return "stream « time » absent";
-  return { externalId, streams: out };
+  const ivs = intervals == null ? null : parseIntervals(intervals);
+  if (typeof ivs === "string") return ivs;
+  return { externalId, streams: out, intervals: ivs };
 }
 
 export async function GET(req: Request) {
@@ -68,9 +72,9 @@ export async function POST(req: Request) {
     const parsed = parseBody(body);
     if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
 
-    const res = await applyStreams(auth.uid, parsed.externalId, parsed.streams);
+    const res = await applyStreams(auth.uid, parsed.externalId, parsed.streams, parsed.intervals);
     if (!res) return NextResponse.json({ error: "sortie inconnue dans Pulse" }, { status: 404 });
-    console.log(`[sync/streams] ${parsed.externalId} : ${res.points} points${res.gps ? ", trace GPS" : ""}, ${res.backfilled} ajout(s)${res.vma != null ? `, VMA ${res.vma} km/h` : ""}`);
+    console.log(`[sync/streams] ${parsed.externalId} : ${res.points} points${res.gps ? ", trace GPS" : ""}, ${res.backfilled} ajout(s)${res.vma != null ? `, VMA ${res.vma} km/h` : ""}${res.reps != null ? `, ${res.reps} répétition(s)` : ""}`);
     return NextResponse.json({ ok: true, ...res });
   } catch (e) {
     console.error("[sync/streams] réception", e);
