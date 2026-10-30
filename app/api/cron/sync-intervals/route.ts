@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncIntervals } from "@/lib/sync/intervals";
+import { syncIntervalsRuns } from "@/lib/sync/intervals-runs";
 import { syncProgramToIntervals } from "@/lib/sync/intervals-calendar";
 import { syncGoogleFit } from "@/lib/sync/google-fit";
 import { matchRaceActivities } from "@/lib/races/link";
@@ -14,6 +15,8 @@ export const maxDuration = 60;
 /** Temps écoulé après lequel on ne démarre plus de ruban (la fonction est limitée à 60 s). */
 const RIBBON_BUDGET_MS = 40_000;
 export const dynamic = "force-dynamic";
+/** Passage de midi (doit rester identique à vercel.json) : synchros seulement, pas de sauvegarde Drive. */
+const NOON_SCHEDULE = "0 11 * * *";
 const same = (a: string, b: string) => timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
 
 /** Appelé une fois par jour par Vercel Cron (voir vercel.json). Vercel envoie « Authorization: Bearer <CRON_SECRET> ». */
@@ -28,14 +31,16 @@ export async function GET(req: Request) {
 
     // Les synchros tournent en même temps ; si l'une échoue, les autres continuent.
     // Programme de course → calendrier Intervals.icu (→ Garmin) pour les 14 prochains jours.
-    const [intervals, googleFit, calendar] = await Promise.allSettled([
+    const noon = req.headers.get("x-vercel-cron-schedule") === NOON_SCHEDULE;
+    const [intervals, runs, googleFit, calendar] = await Promise.allSettled([
       syncIntervals(user.id, 3),
+      syncIntervalsRuns(user.id, 3),
       syncGoogleFit(user.id, 3),
       syncProgramToIntervals(user.id, 14),
     ]);
 
     // Heure affichée sous « Synchroniser maintenant » (feuille « + ») : la nuit compte aussi.
-    if (intervals.status === "fulfilled" || googleFit.status === "fulfilled") await prisma.user.update({ where: { id: user.id }, data: { lastSyncAt: new Date() } }).catch(() => {});
+    if (intervals.status === "fulfilled" || runs.status === "fulfilled" || googleFit.status === "fulfilled") await prisma.user.update({ where: { id: user.id }, data: { lastSyncAt: new Date() } }).catch(() => {});
 
     const report = (r: PromiseSettledResult<unknown>) =>
       r.status === "fulfilled"
@@ -75,8 +80,8 @@ export async function GET(req: Request) {
     }
 
     // Sauvegarde de la muscu vers Google Drive : en dernier, à part, sans jamais faire échouer les synchros.
-    let backup: { ok: boolean; date?: string; error?: string };
-    try {
+    let backup: { ok: boolean; date?: string; error?: string; skipped?: true } = { ok: true, skipped: true };
+    if (!noon) try {
       const b = await backupToDrive(user.id);
       console.log(`[cron] sauvegarde muscu ${b.date} : ${b.counts.activities} séances, ${b.deleted} ancien(s) fichier(s) supprimé(s)`);
       backup = { ok: true, date: b.date };
@@ -88,9 +93,9 @@ export async function GET(req: Request) {
         .catch((err) => console.error("[cron] notification de sauvegarde", err));
     }
 
-    const failed = intervals.status === "rejected" || googleFit.status === "rejected" || calendar.status === "rejected";
+    const failed = intervals.status === "rejected" || runs.status === "rejected" || googleFit.status === "rejected" || calendar.status === "rejected";
     return NextResponse.json(
-      { intervals: report(intervals), googleFit: report(googleFit), calendar: report(calendar), races, ribbons, habits, backup },
+      { intervals: report(intervals), runs: report(runs), googleFit: report(googleFit), calendar: report(calendar), races, ribbons, habits, backup },
       { status: failed ? 502 : 200 }
     );
   } catch (e) {
