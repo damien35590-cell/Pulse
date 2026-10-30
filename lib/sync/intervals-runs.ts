@@ -2,17 +2,15 @@ import { revalidatePath } from "next/cache";
 import { ActivityType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { processActivity } from "@/lib/pipeline/post-import";
-import { BASE } from "@/lib/sync/intervals";
 
 const RUN_TYPES = ["Run", "TrailRun", "VirtualRun"] as const;
 type RunType = (typeof RUN_TYPES)[number];
 
-/** Champs utiles de GET /athlete/{id}/activities. */
+/** Colonnes utiles de l'export CSV /api/athlete/{id}/activities.csv (celui du site, accepté avec le cookie). */
 type IntervalsActivity = {
   id: string;
   type?: string | null;
   name?: string | null;
-  source?: string | null; // "STRAVA", "GARMIN_CONNECT", "UPLOAD"…
   file_type?: string | null;
   start_date?: string | null; // UTC
   start_date_local?: string | null;
@@ -23,19 +21,73 @@ type IntervalsActivity = {
   average_heartrate?: number | null;
   max_heartrate?: number | null;
   calories?: number | null;
-  _note?: string | null; // présent sur les coquilles vides Strava que l'API filtre
 };
 type IntervalsRun = IntervalsActivity & { type: RunType };
 
 export type RunSyncStats = {
   found: number; runs: number; created: number; updated: number;
-  withFile: number; stubs: number; duplicates: number; errors: string[];
+  withFile: number; duplicates: number; errors: string[];
 };
 
-const day = (d: Date) => d.toISOString().slice(0, 10);
+const CSV_URL = (athleteId: string) => `https://intervals.icu/api/athlete/${encodeURIComponent(athleteId)}/activities.csv`;
 const int = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? Math.round(n) : null);
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isRun = (a: IntervalsActivity): a is IntervalsRun => (RUN_TYPES as readonly string[]).includes(a.type ?? "");
+
+/** CSV (RFC 4180) : champs entre guillemets, virgules et guillemets doublés à l'intérieur, fins de ligne CRLF ou LF. */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], field = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.some((f) => f !== "")) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  row.push(field);
+  if (row.some((f) => f !== "")) rows.push(row);
+  return rows;
+}
+
+const num = (s: string | undefined) => {
+  if (s == null || s.trim() === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Lignes du CSV → activités (colonnes repérées par leur nom d'en-tête). */
+export function activitiesFromCsv(text: string): IntervalsActivity[] {
+  const [head, ...rows] = parseCsv(text);
+  if (!head) return [];
+  const col = new Map(head.map((h, i) => [h.trim(), i]));
+  if (!col.has("id") || !col.has("type")) throw new Error("Export CSV Intervals.icu inattendu (colonnes id/type absentes)");
+  const str = (r: string[], k: string) => { const i = col.get(k); const v = i == null ? "" : (r[i] ?? "").trim(); return v || null; };
+  const n = (r: string[], k: string) => { const i = col.get(k); return i == null ? null : num(r[i]); };
+  return rows.map((r) => ({
+    id: str(r, "id") ?? "",
+    type: str(r, "type"),
+    name: str(r, "name"),
+    file_type: str(r, "file_type"),
+    start_date: str(r, "start_date"),
+    start_date_local: str(r, "start_date_local"),
+    distance: n(r, "distance"),
+    moving_time: n(r, "moving_time"),
+    elapsed_time: n(r, "elapsed_time"),
+    total_elevation_gain: n(r, "total_elevation_gain"),
+    average_heartrate: n(r, "average_heartrate"),
+    max_heartrate: n(r, "max_heartrate"),
+    calories: n(r, "calories"),
+  })).filter((a) => a.id);
+}
 
 function startOf(a: IntervalsActivity): Date | null {
   const s = a.start_date;
@@ -52,10 +104,10 @@ function sessionCookie(): string {
 }
 
 /**
- * Cookie de session SEUL : avec la clé API (Basic), Intervals.icu traite la requête comme un accès API
- * et renvoie des coquilles vides pour les sorties Strava (`_note`).
+ * Cookie de session SEUL. L'API officielle (/api/v1) refuse les cookies et, avec la clé API, ne renvoie que des
+ * coquilles vides pour les sorties Strava : on passe par l'export CSV du site, qui les contient en entier.
  */
-const authHeaders = (cookie: string): Record<string, string> => ({ Cookie: `i=${cookie}`, Accept: "application/json" });
+const authHeaders = (cookie: string): Record<string, string> => ({ Cookie: `i=${cookie}`, Accept: "text/csv" });
 
 /** Id athlète : variable INTERVALS_ATHLETE_ID, sinon lu dans le cookie (« v2_i200227_… » → « i200227 »). */
 function athleteIdOf(cookie: string): string {
@@ -72,26 +124,20 @@ function athleteIdOf(cookie: string): string {
 export async function syncIntervalsRuns(uid: string, days = 3): Promise<RunSyncStats> {
   const cookie = sessionCookie();
   const athleteId = athleteIdOf(cookie);
-  const now = Date.now();
-  const oldest = day(new Date(now - days * 864e5));
-  const newest = day(new Date(now + 864e5));
+  const since = Date.now() - days * 864e5;
 
-  const res = await fetch(`${BASE}/athlete/${encodeURIComponent(athleteId)}/activities?oldest=${oldest}&newest=${newest}`, {
+  const res = await fetch(CSV_URL(athleteId), {
     headers: authHeaders(cookie),
     cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(25_000),
   });
   if (res.status === 401 || res.status === 403) throw new Error(`Intervals.icu refuse l'accès (${res.status}) : cookie « i » expiré, reconnecte-toi sur intervals.icu et remplace INTERVALS_SESSION_COOKIE`);
   if (!res.ok) throw new Error(`Intervals.icu a répondu ${res.status}`);
 
-  const body: unknown = await res.json();
-  if (!Array.isArray(body)) throw new Error("Réponse Intervals.icu inattendue (tableau attendu)");
-  const items = body as IntervalsActivity[];
+  // Tout l'historique arrive (quelques centaines de lignes) : on garde la fenêtre des `days` derniers jours.
+  const items = activitiesFromCsv(await res.text()).filter((a) => (startOf(a)?.getTime() ?? 0) >= since);
 
-  const out: RunSyncStats = {
-    found: items.length, runs: 0, created: 0, updated: 0,
-    withFile: 0, stubs: items.filter((a) => a._note != null).length, duplicates: 0, errors: [],
-  };
+  const out: RunSyncStats = { found: items.length, runs: 0, created: 0, updated: 0, withFile: 0, duplicates: 0, errors: [] };
 
   const runs = items.filter(isRun).filter((a) => {
     if (a.file_type) { out.withFile++; return false; }
@@ -110,7 +156,8 @@ export async function syncIntervalsRuns(uid: string, days = 3): Promise<RunSyncS
   for (const a of runs) {
     const startedAt = startOf(a);
     if (!startedAt) { out.errors.push(`${a.id} : date de départ absente`); continue; }
-    const source = a.source === "STRAVA" ? "strava" : "intervals"; // "strava" + id Strava = même clé que l'import d'archive
+    // Id numérique = id Strava (même clé que l'import d'archive) ; sinon id propre à Intervals (« i123… »).
+    const source = /^\d+$/.test(a.id) ? "strava" : "intervals";
     const summary = {
       distanceM: a.distance ?? 0,
       movingTimeS: int(a.moving_time) ?? 0,
