@@ -96,3 +96,24 @@ const neutral = { ...ins, tone: "neutral" as const, text: "Dans ta moyenne habit
 assert.equal(insightLine({ pace: neutral, chips: [] }), null);
 assert.deepEqual(insightLine({ pace: neutral, chips: ["Record sur 5 km"] }), { text: "Record sur 5 km", tone: "neutral" });
 console.log("phrase du fil : ok");
+
+// ── Allure ajustée au dénivelé : une sortie vallonnée se compare en GAP ──
+{
+  // Comparables à plat à 5:30/km ; la sortie du jour est 25 s/km plus lente en brut (5:55) mais en côte : GAP 5:28.
+  const flats = [run({ id: "g1", pace: 330 }), run({ id: "g2", pace: 330 }), run({ id: "g3", pace: 330 })];
+  const hilly = run({ id: "gme", startedAt: T, pace: 355, gapPaceS: 328 });
+  const raw = paceInsight({ ...hilly, gapPaceS: null }, flats)!;
+  assert.equal(raw.diffS, 25, "sans GAP : écart brut");
+  assert.equal(raw.adjusted, false);
+  const adj = paceInsight(hilly, flats)!;
+  assert.equal(adj.diffS, -2, "avec GAP : 328 contre 330 s/km");
+  assert.equal(adj.tone, "neutral");
+  assert.equal(adj.adjusted, true);
+  assert.match(adj.basis, /ajustées au dénivelé/);
+  // Un comparable vallonné est lu en GAP, un comparable à plat en allure brute
+  const mixed = [run({ id: "m1", pace: 345, gapPaceS: 330 }), run({ id: "m2", pace: 330 }), run({ id: "m3", pace: 330 })];
+  assert.equal(paceInsight(hilly, mixed)!.diffS, -2, "comparable vallonné en GAP");
+  // Sortie à plat (pas de GAP) : comparaison brute inchangée, même face à un comparable vallonné
+  assert.equal(paceInsight(run({ id: "flatme", startedAt: T, pace: 340 }), mixed)!.diffS, 340 - (345 + 330 + 330) / 3, "cible à plat : brut");
+  console.log("allure ajustée : ok");
+}

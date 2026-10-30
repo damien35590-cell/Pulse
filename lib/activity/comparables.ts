@@ -15,6 +15,8 @@ export type Candidate = {
   movingTimeS: number;
   avgHr?: number | null;
   rpe?: number | null;
+  /** Allure ajustée au dénivelé (s/km), si la sortie est vallonnée avec GPS (Activity.gapPaceS, lib/run/gap.ts). */
+  gapPaceS?: number | null;
   /** Séance du programme réalisée par cette activité. */
   planned?: { kind: string; isKeySession: boolean } | null;
   race?: boolean;
@@ -58,6 +60,11 @@ export const median = (xs: number[]) => {
 };
 
 const paceSKm = (a: Candidate) => a.movingTimeS / (a.distanceM / 1000);
+/**
+ * Allure comparée : l'allure ajustée si elle existe (sortie vallonnée avec GPS), sinon l'allure brute (à plat, GAP ≈ brute).
+ * Quand la sortie comparée est vallonnée (`adjusted`), toutes les sorties sont lues ainsi : 10 s/km de plus sur une côte n'est pas un coup de mou.
+ */
+const comparePace = (a: Candidate) => a.gapPaceS ?? paceSKm(a);
 const usable = (a: Candidate) => a.distanceM >= 500 && a.movingTimeS > 0;
 
 /** Sorties du même sport dans les 90 jours qui précèdent `target` (lui exclu). */
@@ -93,6 +100,8 @@ export type PaceInsight = {
   delta: string;
   /** « Comparé à 5 footings des 90 derniers jours » */
   basis: string;
+  /** Écart calculé sur l'allure ajustée au dénivelé (sortie vallonnée). */
+  adjusted: boolean;
   count: number;
 };
 
@@ -110,9 +119,14 @@ export function paceInsight(target: Candidate, pool: Candidate[], ctx: ClassCont
   if (!PACE_SPORTS.has(target.type)) return null;
   const comps = selectComparables(target, pool, ctx);
   if (comps.length < MIN_COMPARABLES) return null;
-  const avg = comps.reduce((s, c) => s + paceSKm(c), 0) / comps.length;
+  const adjusted = target.gapPaceS != null, pace = adjusted ? comparePace : paceSKm;
+  const avg = comps.reduce((s, c) => s + pace(c), 0) / comps.length;
   const noun = sessionNoun(target.type, sessionClass(target, ctx));
-  return { ...paceWording(paceSKm(target) - avg, noun), basis: `Comparé à ${comps.length} ${noun} des ${WINDOW_DAYS} derniers jours`, count: comps.length };
+  return {
+    ...paceWording(pace(target) - avg, noun),
+    basis: `Comparé à ${comps.length} ${noun} des ${WINDOW_DAYS} derniers jours${adjusted ? ", allures ajustées au dénivelé" : ""}`,
+    count: comps.length, adjusted,
+  };
 }
 
 const RECORDS = [["BEST_HALF", "semi-marathon"], ["BEST_10K", "10 km"], ["BEST_5K", "5 km"]] as const;
