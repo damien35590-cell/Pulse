@@ -1,6 +1,6 @@
 // Export CSV Intervals.icu (lib/sync/intervals-runs.ts) : champs entre guillemets, virgules et guillemets doublés, CRLF.
 import assert from "node:assert/strict";
-import { activitiesFromCsv, parseCsv } from "@/lib/sync/intervals-runs";
+import { activitiesFromCsv, bestDistanceIn, parseCsv, pointsFromStreams, type IntervalsStream } from "@/lib/sync/intervals-runs";
 
 assert.deepEqual(parseCsv('a,"b, c","d ""e"""\r\n1,,3\n'), [["a", "b, c", 'd "e"'], ["1", "", "3"]]);
 
@@ -18,4 +18,30 @@ assert.equal(run.file_type, null);
 assert.equal(ride.file_type, "fit");
 assert.equal(ride.average_heartrate, null);
 assert.throws(() => activitiesFromCsv("foo,bar\n1,2\n"));
+
+// Commentaire Strava (colonne description), sur plusieurs lignes.
+const [withNote] = activitiesFromCsv('id,type,description\n42,Run,"6\' à fond,\npuis retour au calme"\n');
+assert.equal(withNote.description, "6' à fond,\npuis retour au calme");
+
+// Courbes → points datés : latlng en data/data2, (0,0) écarté, cardio seulement s'il est là.
+const streams: IntervalsStream[] = [
+  { type: "time", data: [0, 1, 2] },
+  { type: "latlng", data: [48.1, 0, 48.1002], data2: [-1.63, 0, -1.6302] },
+  { type: "altitude", data: [50, 51, null] },
+  { type: "heartrate", data: [0, 140, 150] },
+];
+const pts = pointsFromStreams(streams, 1_000_000);
+assert.deepEqual(pts.map((p) => p.t), [1_000_000, 1_001_000, 1_002_000]);
+assert.equal(pts[0].lat, 48.1);
+assert.equal(pts[1].lat, undefined);
+assert.equal(pts[0].hr, undefined);
+assert.equal(pts[2].hr, 150);
+assert.equal(pts[2].ele, undefined);
+
+// Demi-Cooper : meilleure distance sur 6 min. 10 min de trot à 3 m/s, puis 6 min à 4 m/s, puis 3 min de trot.
+const time: number[] = [], dist: number[] = [];
+let d = 0;
+for (let t = 0; t <= 19 * 60; t++) { time.push(t); dist.push(d); d += t >= 600 && t < 960 ? 4 : 3; }
+assert.equal(bestDistanceIn([{ type: "time", data: time }, { type: "distance", data: dist }], 360), 1440);
+assert.equal(bestDistanceIn([{ type: "time", data: [0, 100] }, { type: "distance", data: [0, 300] }], 360), null, "sortie plus courte que 6 min");
 console.log("export CSV Intervals : ok");

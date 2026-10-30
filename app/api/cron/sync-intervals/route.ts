@@ -32,14 +32,15 @@ export async function GET(req: Request) {
     // Les synchros tournent en même temps ; si l'une échoue, les autres continuent.
     // Programme de course → calendrier Intervals.icu (→ Garmin) pour les 14 prochains jours.
     const noon = req.headers.get("x-vercel-cron-schedule") === NOON_SCHEDULE;
-    const [intervals, runs, googleFit, calendar] = await Promise.allSettled([
+    const [intervals, googleFit, calendar] = await Promise.allSettled([
       syncIntervals(user.id, 3),
-      syncIntervalsRuns(user.id, 3),
       syncGoogleFit(user.id, 3),
       syncProgramToIntervals(user.id, 14),
     ]);
+    // Courses Strava APRÈS Google Fit : elles reprennent la ligne d'une même sortie détectée par Google Fit au lieu de la doubler.
+    const [runs] = await Promise.allSettled([syncIntervalsRuns(user.id)]);
 
-    if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.replacedGoogleFit} remplaçant Google Fit, ${r.updated} mises à jour${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
+    if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.replacedGoogleFit} remplaçant Google Fit, ${r.updated} mises à jour, ${r.traces} traces ajoutées${r.vma != null ? `, VMA ${r.vma} km/h` : ""}${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
     else console.error("[cron] courses Strava", runs.reason);
 
     // Heure affichée sous « Synchroniser maintenant » (feuille « + ») : la nuit compte aussi.
