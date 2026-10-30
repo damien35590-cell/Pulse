@@ -1,7 +1,8 @@
 /**
  * Allure ajustée au dénivelé (GAP, « grade-adjusted pace ») : l'allure qu'on tiendrait à effort égal sur du plat.
  * Modèle de coût énergétique de Minetti et al. (2002) : C(i) = 155,4 i⁵ − 30,4 i⁴ − 43,3 i³ + 46,3 i² + 19,5 i + 3,6 (J/kg/m, i = pente en fraction).
- * Une montée coûte plus qu'un plat (facteur > 1) : le temps passé dessus est ramené à du plat en le divisant par ce facteur.
+ * Chaque mètre parcouru à la pente i « vaut » facteur(i) mètres de plat : GAP = temps en mouvement / distance plat équivalente.
+ * Le coût étant convexe, une boucle montée-descente à allure constante donne un GAP plus RAPIDE que l'allure brute (comme Strava).
  * Fonctions pures (tests : tools/test-gap.ts). Valeur mémorisée : Activity.gapPaceS (lib/pipeline/post-import.ts).
  */
 
@@ -48,8 +49,8 @@ export function smoothElevation(cum: number[], ele: number[], windowM = GAP_SMOO
 }
 
 /**
- * Facteur de temps de la trace : Σ(temps / facteur de pente) / Σ temps, pondéré par le temps en mouvement.
- * < 1 sur une trace qui monte (GAP plus rapide que l'allure brute), > 1 si elle descend, 1 à plat. Null sans GPS ni altitude exploitables.
+ * Rapport GAP / allure brute : distance réelle / distance plat équivalente = Σ d / Σ (d × facteur de pente), sur les segments en mouvement.
+ * < 1 sur une trace qui monte ou qui monte et redescend (GAP plus rapide), > 1 sur une descente douce, 1 à plat. Null sans GPS ni altitude exploitables.
  */
 export function gapRatio(points: GapPoint[]): number | null {
   const pts = points.filter((p) => p.lat != null && p.lng != null && p.ele != null && Number.isFinite(p.ele)) as Required<GapPoint>[];
@@ -65,14 +66,14 @@ export function gapRatio(points: GapPoint[]): number | null {
     while (b + 1 < pts.length && cum[b + 1] <= cum[i] + GAP_SLOPE_SPAN_M) b++;
     return cum[b] > cum[a] ? (ele[b] - ele[a]) / (cum[b] - cum[a]) : 0;
   };
-  let time = 0, flat = 0;
+  let dist = 0, flat = 0;
   for (let i = 1; i < pts.length; i++) {
     const d = cum[i] - cum[i - 1], dt = (pts[i].t - pts[i - 1].t) / 1000;
     if (!(dt > 0) || (dt > PAUSE_S && d < PAUSE_M) || d < MIN_SEG_M) continue;
-    time += dt;
-    flat += dt / gradeFactor(grade(i));
+    dist += d;
+    flat += d * gradeFactor(grade(i));
   }
-  return time > 0 ? flat / time : null;
+  return dist > 0 && flat > 0 ? dist / flat : null;
 }
 
 /** Allure ajustée (s/km) d'une sortie : allure en mouvement × facteur de la trace. Null si la trace ne permet pas le calcul. */
