@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { ActivityType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { processActivity } from "@/lib/pipeline/post-import";
-import { BASE, headers as apiKeyHeaders } from "@/lib/sync/intervals";
+import { BASE } from "@/lib/sync/intervals";
 
 const RUN_TYPES = ["Run", "TrailRun", "VirtualRun"] as const;
 type RunType = (typeof RUN_TYPES)[number];
@@ -44,11 +44,24 @@ function startOf(a: IntervalsActivity): Date | null {
   return Number.isFinite(t) ? new Date(t) : null;
 }
 
-/** Clé API (Basic « API_KEY:<clé> ») + cookie de session web « i ». */
-function authHeaders(): Record<string, string> {
+/** Valeur du cookie de session web « i » (sans le préfixe « i= »). */
+function sessionCookie(): string {
   const raw = process.env.INTERVALS_SESSION_COOKIE?.trim();
   if (!raw) throw new Error("INTERVALS_SESSION_COOKIE manquant dans Vercel");
-  return { ...apiKeyHeaders(), Cookie: raw.startsWith("i=") ? raw : `i=${raw}`, Accept: "application/json" };
+  return raw.replace(/^i=/, "");
+}
+
+/**
+ * Cookie de session SEUL : avec la clé API (Basic), Intervals.icu traite la requête comme un accès API
+ * et renvoie des coquilles vides pour les sorties Strava (`_note`).
+ */
+const authHeaders = (cookie: string): Record<string, string> => ({ Cookie: `i=${cookie}`, Accept: "application/json" });
+
+/** Id athlète : variable INTERVALS_ATHLETE_ID, sinon lu dans le cookie (« v2_i200227_… » → « i200227 »). */
+function athleteIdOf(cookie: string): string {
+  const id = process.env.INTERVALS_ATHLETE_ID?.trim() || /^v\d+_(i\d+)_/.exec(cookie)?.[1];
+  if (!id) throw new Error("Id athlète Intervals.icu introuvable (INTERVALS_ATHLETE_ID ou cookie « i »)");
+  return id;
 }
 
 /**
@@ -57,17 +70,18 @@ function authHeaders(): Record<string, string> {
  * Les courses avec fichier restent gérées par syncIntervals (trace GPS complète).
  */
 export async function syncIntervalsRuns(uid: string, days = 3): Promise<RunSyncStats> {
-  const athleteId = process.env.INTERVALS_ATHLETE_ID?.trim() || "0";
+  const cookie = sessionCookie();
+  const athleteId = athleteIdOf(cookie);
   const now = Date.now();
   const oldest = day(new Date(now - days * 864e5));
   const newest = day(new Date(now + 864e5));
 
   const res = await fetch(`${BASE}/athlete/${encodeURIComponent(athleteId)}/activities?oldest=${oldest}&newest=${newest}`, {
-    headers: authHeaders(),
+    headers: authHeaders(cookie),
     cache: "no-store",
     signal: AbortSignal.timeout(20_000),
   });
-  if (res.status === 401 || res.status === 403) throw new Error(`Intervals.icu refuse l'accès (${res.status}) : clé API ou cookie « i » expiré`);
+  if (res.status === 401 || res.status === 403) throw new Error(`Intervals.icu refuse l'accès (${res.status}) : cookie « i » expiré, reconnecte-toi sur intervals.icu et remplace INTERVALS_SESSION_COOKIE`);
   if (!res.ok) throw new Error(`Intervals.icu a répondu ${res.status}`);
 
   const body: unknown = await res.json();
