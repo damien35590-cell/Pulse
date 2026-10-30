@@ -16,15 +16,15 @@ type Props = {
   large?: boolean;
   /** Le titre est affiché ailleurs dans la page (ex. fiche d'activité) : il n'apparaît dans la barre qu'une fois cet élément passé sous elle. Remplace `large`. */
   collapseAt?: React.RefObject<HTMLElement>;
-  /** Barre transparente posée sur un visuel plein cadre (carte) tant que `collapseAt` est sous elle, avec un léger dégradé pour la lisibilité. */
-  overlay?: boolean;
+  /** Barre transparente sans dégradé tant que `collapseAt` est sous elle : laisse voir un fond teinté posé derrière la tête de page (fiche de muscu). */
+  transparent?: boolean;
 };
 
 const backCls =
   "grid size-12 place-items-center rounded-full text-ink select-none touch-manipulation transition duration-150 ease-snappy active:scale-90 active:bg-surface-2";
 
 /** En-tête collant : safe area du haut, fond flouté une fois la page défilée, grand titre repliable. */
-export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, large = true, collapseAt, overlay = false }: Props) {
+export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, large = true, collapseAt, transparent = false }: Props) {
   const heading = large && !collapseAt;
   const [compact, setCompact] = useState(!heading && !collapseAt);
   const bar = useRef<HTMLElement>(null);
@@ -40,7 +40,7 @@ export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, l
     return () => io.disconnect();
   }, [heading, collapseAt]);
 
-  const floating = overlay && !compact;
+  const floating = transparent && !compact;
   const showTitle = heading || !!collapseAt;
 
   return (
@@ -53,9 +53,6 @@ export function TopBar({ title, subtitle, back, backLabel = "Retour", actions, l
           compact ? "bg-bg/85 shadow-[0_1px_0_0_rgb(var(--line))] backdrop-blur-xl backdrop-saturate-150" : floating ? "bg-transparent" : "bg-bg",
         )}
       >
-        {overlay && (
-          <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 top-0 h-[calc(100%_+_2rem)] bg-gradient-to-b from-bg/80 via-bg/40 to-transparent transition-opacity duration-200", floating ? "opacity-100" : "opacity-0")} />
-        )}
         <div className="relative flex h-14 items-center gap-1">
           {typeof back === "string" ? (
             <Link href={back} onPointerDown={() => tap(6)} aria-label={backLabel} className={backCls}>

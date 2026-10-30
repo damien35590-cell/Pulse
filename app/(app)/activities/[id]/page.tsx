@@ -16,7 +16,6 @@ import { isAverageStory } from "@/lib/activity/comparables";
 import { kmSplits } from "@/lib/activity/splits";
 import { heartRate } from "@/lib/activity/heart";
 import { cleanHrSeries, restDrop, setsOf, toSecondSeries } from "@/lib/workout/hr";
-import type { SetDetail } from "@/lib/exercises";
 import { getActivityNote } from "@/lib/coach/activity-note";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -38,7 +37,11 @@ import { DetachSession } from "@/components/training/program-actions";
 import { isVirtual } from "@/lib/art/card";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
-import { SetsLine } from "@/components/workout/hard-mark";
+import { CodeBadge } from "@/components/workout/catalog-bits";
+import { ExerciseBars, SetBars } from "@/components/art/set-bars";
+import { setGroups } from "@/lib/art/set-bars";
+import { getSessionReview } from "@/lib/data/strength-review";
+import { sessionTotals, type ExerciseReview } from "@/lib/workout/session-review";
 import { AttachRun } from "@/components/programme/session-sheet";
 import { sessionsForRun } from "@/lib/data/training";
 import { getGear } from "@/lib/data/gear";
@@ -53,6 +56,51 @@ export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
 type TP = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
 
+const CHIP_TONE = { good: "bg-good/15 text-good", warn: "bg-warn/15 text-warn", neutral: "" } as const;
+/** « +6 », « −2 s », « ±0 » : écart de total avec la dernière fois. */
+const signed = (n: number, timed: boolean) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n)}${timed ? " s" : ""}`;
+/** Secondes au chrono, en à-côté des répétitions : « 90 s », « 12 min ». */
+const chrono = (s: number) => (s < 600 ? `${s} s` : `${Math.round(s / 60)} min`);
+
+/** Carte d'un exercice de muscu : code, nom, variante, cible ; séries réelles face à la cible ; total et écart avec la dernière fois ; état Lafay. */
+function ExerciseCard({ r }: { r: ExerciseReview }) {
+  const hr = r.sets.some((s) => s.hrPeak != null);
+  return (
+    <li className={cn(ui.card, "p-4")}>
+      <div className="flex items-start gap-3">
+        {r.code && <CodeBadge code={r.code} className="h-10 min-w-10 bg-act-strength-soft text-act-strength" />}
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-tight text-ink">{r.title}</p>
+          {r.subtitle && <p className="mt-0.5 text-sm leading-snug text-ink-soft">{r.subtitle}</p>}
+          <p className="mt-1 font-num text-sm tabular-nums text-ink-mute">{r.targetText}</p>
+        </div>
+        <dl className="shrink-0">
+          <Metric
+            size="md" align="end" label="Total" value={r.total} unit={r.timed ? "s" : "reps"}
+            hint={r.delta != null && <Delta tone={r.delta > 0 ? "good" : r.delta < 0 ? "bad" : "neutral"}>{signed(r.delta, r.timed)}</Delta>}
+          />
+        </dl>
+      </div>
+      {r.sets.length > 0 && <ExerciseBars className="mt-3" sets={r.sets} target={r.target} timed={r.timed} />}
+      {r.loads && <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">Charges : {r.loads}</p>}
+      {hr && (
+        <ol className="mt-1">
+          {r.sets.map((s, i) => s.hrPeak != null && (
+            <li key={i} className="font-num text-xs tabular-nums text-ink-mute">S{i + 1} · pic {s.hrPeak}{s.hrEndRest != null ? ` · récup ${s.hrEndRest}` : ""}</li>
+          ))}
+        </ol>
+      )}
+      {(r.status || r.next) && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {r.status && <span className={cn(ui.chip, CHIP_TONE[r.status.tone])}>{r.status.label}</span>}
+          {r.next && <p className="text-sm text-ink-soft">{r.next}</p>}
+        </div>
+      )}
+      {r.comment && <p className="mt-2 text-sm text-ink-soft">{r.comment}</p>}
+    </li>
+  );
+}
+
 function feelingToInt(feeling: string | null): number | null {
   switch (feeling) {
     case "GREAT": return 1;
@@ -65,7 +113,7 @@ function feelingToInt(feeling: string | null): number | null {
 }
 
 /**
- * Fiche d'activité. Ordre : tête (carte, titre, chiffres, comparaison) → séance du programme → fractionné → note du coach → allure par km → fréquence cardiaque
+ * Fiche d'activité. Ordre : tête (titre, carte, chiffres, comparaison ; muscu : barres de la séance) → séance du programme → fractionné → note du coach → allure par km → fréquence cardiaque
  * → altitude → ressenti, puis « Partager » en bas, dans la zone du pouce.
  */
 export default async function ActivityPage({ params }: { params: { id: string } }) {
@@ -114,12 +162,16 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   // Muscu avec ceinture cardio : série enregistrée à la séance (Activity.hrSeries). Rien sans elle.
   const lift = a.hrSeries != null ? heartRate(toSecondSeries(cleanHrSeries(a.hrSeries)), zones.hrMax) : null;
   const drop = lift ? restDrop(setsOf(a.exercises.map((e) => e.setsDetail))) : null;
+  // Muscu : bilan par exercice (dernière fois, règle Lafay) en une requête d'historique, et barres de la séance (mêmes données que le fil).
+  const review = a.exercises.length ? await getSessionReview(s.user.id, a) : [];
+  const totals = review.length ? sessionTotals(review) : null;
+  const groups = a.type === "WORKOUT" ? setGroups(a.exercises, Infinity) : [];
   // Allure par km : course et rando avec GPS horodaté (FC du km lue dans la trace).
   const splits = (a.type === "RUN" || a.type === "HIKE") ? kmSplits(raw.filter((p) => p.lat != null && p.lng != null) as { lat: number; lng: number; t: number; hr?: number }[]) : [];
 
   // Allure ajustée au dénivelé : course avec trace GPS (altitude) et au moins 50 m de D+.
   const gap = a.type === "RUN" ? gapIfHilly(raw, a) : null;
-  const { icon: SportIcon, fg: sportFg, dot: sportSolid } = activityStyle(a.type);
+  const { icon: SportIcon, fg: sportFg, soft: sportSoft, dot: sportSolid } = activityStyle(a.type);
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const w = a.weather as { tempC?: number | null; precipMm?: number | null } | null;
   const insight = await getActivityInsight(s.user.id, a.id, TZ, zones.hrMax);
@@ -132,6 +184,12 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   type M = { label: string; value: string; unit?: string; hint?: React.ReactNode };
   const metrics = ([
     hasDist && { label: "Durée", value: fmtClock(a.movingTimeS) },
+    // Muscu : exercices, séries faites, répétitions ; les secondes des exercices au chrono à part (jamais additionnées aux reps).
+    totals && { label: "Exercices", value: String(totals.exercises) },
+    totals && { label: "Séries", value: String(totals.sets) },
+    totals && (totals.reps > 0 || !totals.seconds
+      ? { label: "Répétitions", value: fmtNum(totals.reps, 0), hint: totals.seconds > 0 ? `+ ${chrono(totals.seconds)} au chrono` : undefined }
+      : { label: "Au chrono", value: String(totals.seconds), unit: "s" }),
     pace && { label: pace.label, value: pace.value, unit: pace.unit, hint: insight.pace && <Delta tone={insight.pace.tone}>{insight.pace.delta}</Delta> },
     pace && gap != null && { label: "Allure GAP", value: fmtPaceS(gap), unit: pace.unit, hint: "ajustée au dénivelé" },
     hasDist && a.elevationGainM > 0 && { label: "D+", value: fmtNum(a.elevationGainM, 0), unit: "m" },
@@ -152,6 +210,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         points={points}
         gain={a.elevationGainM > 0 ? a.elevationGainM : undefined}
         elevationColor={sportFg}
+        tint={a.type === "WORKOUT" ? "from-act-strength-soft" : undefined}
         meta={
           <div className="flex items-center gap-3">
             <span className={cn("grid size-10 shrink-0 place-items-center rounded-tile text-bg", sportSolid)}><SportIcon className="size-5" strokeWidth={2.2} aria-hidden /></span>
@@ -184,31 +243,18 @@ export default async function ActivityPage({ params }: { params: { id: string } 
             {reps && <WorkReps review={reps} sessionTitle={reps.session?.title} />}
             {note && (
               <section aria-label="Note du coach" className={cn(ui.card, "flex gap-3 p-4")}>
-                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-soft"><MessageSquareText className="size-4" aria-hidden /></span>
+                {/* Muscu : pastille teintée du sport, la tête de fiche n'ayant pas de carte pour porter la couleur. */}
+                <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", a.type === "WORKOUT" ? cn(sportSoft, sportFg) : "bg-surface-2 text-ink-soft")}><MessageSquareText className="size-4" aria-hidden /></span>
                 <div className="min-w-0">
                   <p className={ui.label}>Coach</p>
                   <p className="mt-1 leading-snug text-ink">{note}</p>
                 </div>
               </section>
             )}
-            {a.exercises.length > 0 && (
+            {review.length > 0 && (
               <Section title="Exercices">
-                <ul className={cn(ui.card, "divide-y divide-line")}>
-                  {a.exercises.map((e) => (
-                    <li key={e.id} className="px-4 py-3">
-                      <p className="font-semibold text-ink">{e.name}</p>
-                      <p className="text-sm text-ink-soft">{e.sets} × {e.reps}{e.loadKg != null ? ` à ${fmtNum(e.loadKg)} kg` : ""}{e.restS != null ? `, repos ${e.restS} s` : ""}</p>
-                      {Array.isArray(e.setsDetail) && <p className="font-num text-sm tabular-nums text-ink">Réel : <SetsLine items={(e.setsDetail as SetDetail[]).map((s) => ({ text: `${s.done ? "" : "✗"}${s.reps}${s.loadKg != null && s.loadKg !== e.loadKg ? ` (${fmtNum(s.loadKg)} kg)` : ""}`, hard: s.hard }))} /></p>}
-                      {Array.isArray(e.setsDetail) && (e.setsDetail as SetDetail[]).some((s) => s.hrPeak != null) && (
-                        <ol className="mt-0.5">
-                          {(e.setsDetail as SetDetail[]).map((s, i) => s.hrPeak != null && (
-                            <li key={i} className="font-num text-xs tabular-nums text-ink-mute">S{i + 1} · pic {s.hrPeak}{s.hrEndRest != null ? ` · récup ${s.hrEndRest}` : ""}</li>
-                          ))}
-                        </ol>
-                      )}
-                      {e.comment && <p className="mt-1 text-sm text-ink-soft">{e.comment}</p>}
-                    </li>
-                  ))}
+                <ul className="space-y-3">
+                  {review.map((r) => <ExerciseCard key={r.id} r={r} />)}
                 </ul>
                 {a.type === "WORKOUT" && <SaveTemplateButton activityId={a.id} defaultName={a.title} />}
               </Section>
@@ -276,6 +322,11 @@ export default async function ActivityPage({ params }: { params: { id: string } 
           <dl className="mt-4 grid grid-cols-3 gap-3">
             {more.map((m) => <Metric key={m.label} size="sm" label={m.label} value={m.value} unit={m.unit} />)}
           </dl>
+        )}
+        {groups.length > 0 && (
+          <div className={cn(ui.card, "mt-5 overflow-hidden")}>
+            <SetBars size="detail" groups={groups} />
+          </div>
         )}
         {insight.pace || insight.chips.length > 0 ? (
           <div className="mt-5 space-y-3 border-t border-line pt-4">
