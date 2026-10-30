@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { decodePolyline } from "@/lib/polyline";
 import { isSoftActivity, SPORTS } from "@/lib/sports";
 import { activityStyle } from "@/lib/activity-style";
-import { fmtClock, fmtKm, fmtNum, fmtPace, fmtWhenShort } from "@/lib/format";
+import { fmtClock, fmtKm, fmtNum, fmtPace, fmtPaceS, fmtWhenShort } from "@/lib/format";
 import { ActivityHero } from "@/components/activity/activity-hero";
 import { Delta, Metric } from "@/components/ui/metric";
 import { Section } from "@/components/ui/section";
@@ -46,6 +46,7 @@ import { selectableGear } from "@/lib/gear";
 import { CompareActivity, type Comparable } from "@/components/activity/compare-activity";
 import { isCommute } from "@/lib/routes/estimate";
 import { getActivityReps } from "@/lib/data/reps";
+import { gapIfHilly } from "@/lib/run/gap";
 import { WorkReps } from "@/components/activity/work-reps";
 
 export const dynamic = "force-dynamic";
@@ -116,6 +117,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   // Allure par km : course et rando avec GPS horodaté (FC du km lue dans la trace).
   const splits = (a.type === "RUN" || a.type === "HIKE") ? kmSplits(raw.filter((p) => p.lat != null && p.lng != null) as { lat: number; lng: number; t: number; hr?: number }[]) : [];
 
+  // Allure ajustée au dénivelé : course avec trace GPS (altitude) et au moins 50 m de D+.
+  const gap = a.type === "RUN" ? gapIfHilly(raw, a) : null;
   const { icon: SportIcon, fg: sportFg, dot: sportSolid } = activityStyle(a.type);
   const pace = fmtPace(a.distanceM, a.movingTimeS, a.type);
   const w = a.weather as { tempC?: number | null; precipMm?: number | null } | null;
@@ -130,6 +133,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const metrics = ([
     hasDist && { label: "Durée", value: fmtClock(a.movingTimeS) },
     pace && { label: pace.label, value: pace.value, unit: pace.unit, hint: insight.pace && <Delta tone={insight.pace.tone}>{insight.pace.delta}</Delta> },
+    pace && gap != null && { label: "Allure GAP", value: fmtPaceS(gap), unit: pace.unit, hint: "ajustée au dénivelé" },
     hasDist && a.elevationGainM > 0 && { label: "D+", value: fmtNum(a.elevationGainM, 0), unit: "m" },
     a.avgHr && { label: "FC moy.", value: String(a.avgHr), unit: "bpm" },
     a.avgPower && { label: "Puiss. moy.", value: String(a.avgPower), unit: "W" },

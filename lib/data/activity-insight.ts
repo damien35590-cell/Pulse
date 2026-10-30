@@ -10,11 +10,11 @@ import { exerciseCode } from "@/lib/art/set-bars";
 
 const DAY = 86_400_000;
 const select = {
-  id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, avgHr: true, rpe: true, kind: true, templateId: true,
+  id: true, type: true, startedAt: true, distanceM: true, movingTimeS: true, gapPaceS: true, avgHr: true, rpe: true, kind: true, templateId: true,
   plannedSession: { select: { kind: true, isKeySession: true } }, raceEvent: { select: { id: true } },
 } as const;
 
-type Row = { id: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number; avgHr: number | null; rpe: number | null; kind: string | null; templateId: string | null; plannedSession: { kind: string; isKeySession: boolean } | null; raceEvent: { id: string } | null };
+type Row = { id: string; type: string; startedAt: Date; distanceM: number; movingTimeS: number; gapPaceS: number | null; avgHr: number | null; rpe: number | null; kind: string | null; templateId: string | null; plannedSession: { kind: string; isKeySession: boolean } | null; raceEvent: { id: string } | null };
 const toCandidate = (r: Row): Candidate & Pick<Row, "kind" | "templateId"> => ({ ...r, planned: r.plannedSession, race: !!r.raceEvent });
 
 export type ActivityInsight = { pace: PaceInsight | null; chips: string[]; /** Genre de séance (même classement que la comparaison). */ cls?: SessionClass; /** Muscu : phrase de contexte de la carte (strengthLine). */ strength?: InsightLine; /** Rang dans la semaine (1 = première sortie) : dernier recours pour la phrase d'une carte d'endurance. */ weekRank?: number };
