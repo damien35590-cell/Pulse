@@ -1,7 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { ActivityType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { processActivity } from "@/lib/pipeline/post-import";
+import { findOverlapping, processActivity } from "@/lib/pipeline/post-import";
+import { GOOGLE_FIT_SOURCE } from "@/lib/sync/google-fit";
 
 const RUN_TYPES = ["Run", "TrailRun", "VirtualRun"] as const;
 type RunType = (typeof RUN_TYPES)[number];
@@ -26,7 +27,7 @@ type IntervalsRun = IntervalsActivity & { type: RunType };
 
 export type RunSyncStats = {
   found: number; runs: number; created: number; updated: number;
-  withFile: number; duplicates: number; errors: string[];
+  withFile: number; duplicates: number; replacedGoogleFit: number; errors: string[];
 };
 
 const CSV_URL = (athleteId: string) => `https://intervals.icu/api/athlete/${encodeURIComponent(athleteId)}/activities.csv`;
@@ -137,7 +138,7 @@ export async function syncIntervalsRuns(uid: string, days = 3): Promise<RunSyncS
   // Tout l'historique arrive (quelques centaines de lignes) : on garde la fenêtre des `days` derniers jours.
   const items = activitiesFromCsv(await res.text()).filter((a) => (startOf(a)?.getTime() ?? 0) >= since);
 
-  const out: RunSyncStats = { found: items.length, runs: 0, created: 0, updated: 0, withFile: 0, duplicates: 0, errors: [] };
+  const out: RunSyncStats = { found: items.length, runs: 0, created: 0, updated: 0, withFile: 0, duplicates: 0, replacedGoogleFit: 0, errors: [] };
 
   const runs = items.filter(isRun).filter((a) => {
     if (a.file_type) { out.withFile++; return false; }
@@ -173,6 +174,36 @@ export async function syncIntervalsRuns(uid: string, days = 3): Promise<RunSyncS
     ) as Prisma.ActivityUpdateInput;
 
     try {
+      // Même sortie détectée automatiquement par Google Fit : la version Strava (montre/appli de course) fait foi.
+      // On reprend la ligne Google Fit (ressenti, notes, séance du programme, trace restent) en y versant les chiffres Strava,
+      // sans toucher à son dedupeKey « gfit-… » pour que la synchro Google Fit ne la recrée pas.
+      if (!known.has(`${source}:${a.id}`)) {
+        const span = { startedAt, movingTimeS: summary.movingTimeS, elapsedTimeS: summary.elapsedTimeS };
+        const overlaps = await findOverlapping(uid, span);
+        const gfit = overlaps.length
+          ? await prisma.activity.findFirst({
+              where: { id: { in: overlaps.map((o) => o.id) }, source: GOOGLE_FIT_SOURCE },
+              select: { id: true, titleEdited: true },
+            })
+          : null;
+        if (gfit) {
+          await prisma.activity.update({
+            where: { id: gfit.id },
+            data: {
+              ...update,
+              type: ActivityType.RUN,
+              startedAt,
+              source,
+              externalId: a.id,
+              ...(gfit.titleEdited ? {} : { title: (a.name?.trim() || "Running").slice(0, 120) }),
+            },
+          });
+          out.replacedGoogleFit++;
+          await processActivity(gfit.id);
+          continue;
+        }
+      }
+
       const row = await prisma.activity.upsert({
         where: { userId_source_externalId: { userId: uid, source, externalId: a.id } },
         create: {
