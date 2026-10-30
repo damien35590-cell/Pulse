@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       syncProgramToIntervals(user.id, 14),
     ]);
 
-    if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.updated} mises à jour, ${r.stubs} coquilles vides${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
+    if (runs.status === "fulfilled") { const r = runs.value; console.log(`[cron] courses Strava : ${r.found} activités, ${r.runs} courses, ${r.created} créées, ${r.updated} mises à jour${r.errors.length ? `, erreurs : ${r.errors.join(" | ")}` : ""}`); }
     else console.error("[cron] courses Strava", runs.reason);
 
     // Heure affichée sous « Synchroniser maintenant » (feuille « + ») : la nuit compte aussi.
