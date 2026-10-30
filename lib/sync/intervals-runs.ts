@@ -3,6 +3,7 @@ import { ActivityType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findOverlapping, processActivity } from "@/lib/pipeline/post-import";
 import { GOOGLE_FIT_SOURCE } from "@/lib/sync/google-fit";
+import { refreshLoad } from "@/lib/data/load";
 
 const RUN_TYPES = ["Run", "TrailRun", "VirtualRun"] as const;
 type RunType = (typeof RUN_TYPES)[number];
@@ -23,6 +24,7 @@ type IntervalsActivity = {
   max_heartrate?: number | null;
   calories?: number | null;
   description?: string | null; // commentaire Strava
+  icu_rpe?: number | null; // effort perçu saisi dans Strava (1 à 10)
 };
 type IntervalsRun = IntervalsActivity & { type: RunType };
 
@@ -33,6 +35,8 @@ export type RunSyncStats = {
 
 const CSV_URL = (athleteId: string) => `https://intervals.icu/api/athlete/${encodeURIComponent(athleteId)}/activities.csv`;
 const int = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? Math.round(n) : null);
+/** Effort perçu Strava → RPE de Pulse (entier de 1 à 10), sinon null. */
+export const rpeOf = (v: number | null | undefined) => (v != null && Number.isFinite(v) && v >= 1 && v <= 10 ? Math.round(v) : null);
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isRun = (a: IntervalsActivity): a is IntervalsRun => (RUN_TYPES as readonly string[]).includes(a.type ?? "");
 
@@ -89,6 +93,7 @@ export function activitiesFromCsv(text: string): IntervalsActivity[] {
     max_heartrate: n(r, "max_heartrate"),
     calories: n(r, "calories"),
     description: str(r, "description"),
+    icu_rpe: n(r, "icu_rpe"),
   })).filter((a) => a.id);
 }
 
@@ -154,7 +159,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
   const existing = new Map(
     (await prisma.activity.findMany({
       where: { userId: uid, externalId: { in: runs.map((a) => a.id) } },
-      select: { id: true, source: true, externalId: true, notes: true },
+      select: { id: true, source: true, externalId: true, notes: true, rpe: true },
     })).map((k) => [`${k.source}:${k.externalId}`, k]),
   );
 
@@ -166,6 +171,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
     const source = /^\d+$/.test(a.id) ? "strava" : "intervals";
     const title = (a.name?.trim() || "Running").slice(0, 120);
     const note = a.description?.trim() || null;
+    const rpe = rpeOf(a.icu_rpe); // effort Strava : seulement si Pulse n'en a pas (ta saisie dans Pulse reste prioritaire)
     const summary = {
       distanceM: a.distance ?? 0,
       movingTimeS: int(a.moving_time) ?? 0,
@@ -184,7 +190,9 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
       let id: string, fresh = false;
       const known = existing.get(`${source}:${a.id}`);
       if (known) {
-        await prisma.activity.update({ where: { id: known.id }, data: { ...update, ...(known.notes || !note ? {} : { notes: note }) } });
+        const addRpe = known.rpe == null && rpe != null;
+        await prisma.activity.update({ where: { id: known.id }, data: { ...update, ...(known.notes || !note ? {} : { notes: note }), ...(addRpe ? { rpe } : {}) } });
+        if (addRpe) await refreshLoad(known.id); // charge ressentie (RPE × minutes) et charge d'entraînement
         out.updated++;
         ({ id } = known);
       } else {
@@ -195,7 +203,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
         const gfit = overlaps.length
           ? await prisma.activity.findFirst({
               where: { id: { in: overlaps.map((o) => o.id) }, source: GOOGLE_FIT_SOURCE },
-              select: { id: true, titleEdited: true, notes: true },
+              select: { id: true, titleEdited: true, notes: true, rpe: true },
             })
           : null;
         if (gfit) {
@@ -205,6 +213,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
               ...update, type: ActivityType.RUN, startedAt, source, externalId: a.id,
               ...(gfit.titleEdited ? {} : { title }),
               ...(gfit.notes || !note ? {} : { notes: note }),
+              ...(gfit.rpe == null && rpe != null ? { rpe } : {}),
             },
           });
           out.replacedGoogleFit++;
@@ -214,7 +223,7 @@ export async function syncIntervalsRuns(uid: string, days = 14): Promise<RunSync
             where: { userId_source_externalId: { userId: uid, source, externalId: a.id } },
             create: {
               user: { connect: { id: uid } }, type: ActivityType.RUN, title, startedAt, source, externalId: a.id,
-              dedupeKey: `${source}-${a.id}`, notes: note, ...summary,
+              dedupeKey: `${source}-${a.id}`, notes: note, rpe, ...summary,
             },
             update,
             select: { id: true },

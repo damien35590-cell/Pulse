@@ -1,6 +1,6 @@
 // Export CSV Intervals.icu (lib/sync/intervals-runs.ts) : champs entre guillemets, virgules et guillemets doublés, CRLF.
 import assert from "node:assert/strict";
-import { activitiesFromCsv, parseCsv } from "@/lib/sync/intervals-runs";
+import { activitiesFromCsv, parseCsv, rpeOf } from "@/lib/sync/intervals-runs";
 import { bestDistanceIn, pointsFromStreams, type IntervalsStream } from "@/lib/sync/intervals-streams";
 
 assert.deepEqual(parseCsv('a,"b, c","d ""e"""\r\n1,,3\n'), [["a", "b, c", 'd "e"'], ["1", "", "3"]]);
@@ -45,4 +45,13 @@ let d = 0;
 for (let t = 0; t <= 19 * 60; t++) { time.push(t); dist.push(d); d += t >= 600 && t < 960 ? 4 : 3; }
 assert.equal(bestDistanceIn([{ type: "time", data: time }, { type: "distance", data: dist }], 360), 1440);
 assert.equal(bestDistanceIn([{ type: "time", data: [0, 100] }, { type: "distance", data: [0, 300] }], 360), null, "sortie plus courte que 6 min");
+// Effort perçu Strava (colonne icu_rpe) → RPE 1 à 10.
+const [withRpe] = activitiesFromCsv("id,type,icu_rpe\n42,Run,8\n");
+assert.equal(withRpe.icu_rpe, 8);
+assert.equal(rpeOf(8), 8);
+assert.equal(rpeOf(7.6), 8);
+assert.equal(rpeOf(0), null);
+assert.equal(rpeOf(11), null);
+assert.equal(rpeOf(null), null);
+
 console.log("export CSV Intervals : ok");
