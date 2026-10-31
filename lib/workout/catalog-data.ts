@@ -36,9 +36,38 @@ export const DEFAULT_EQUIPMENT: Equipment[] = [
   'aucun', 'chaises', 'support', 'meuble-haut', 'mur', 'table', 'barres-dips', 'barre-traction', 'baton',
 ];
 
-export type Muscle =
-  | 'pectoraux' | 'epaules' | 'triceps' | 'biceps' | 'dos' | 'lombaires' | 'trapezes' | 'cou'
-  | 'abdominaux' | 'obliques' | 'cuisses' | 'fessiers' | 'ischios' | 'mollets' | 'colonne';
+/** Muscles dessinés sur la carte du corps (components/body/body-map.tsx) ; libellés français dans lib/workout/body.ts. */
+export type MuscleId =
+  | 'chest' | 'front_delts' | 'side_delts' | 'rear_delts' | 'biceps' | 'triceps' | 'forearms'
+  | 'abs' | 'obliques' | 'traps' | 'lats' | 'upper_back' | 'lower_back'
+  | 'glutes' | 'quads' | 'hamstrings' | 'adductors' | 'calves' | 'neck';
+
+/** Principaux : moteurs du mouvement. Secondaires : synergistes et stabilisateurs qui travaillent nettement. */
+export interface Muscles { primary: MuscleId[]; secondary: MuscleId[] }
+const mu = (primary: MuscleId[], secondary: MuscleId[] = []): Muscles => ({ primary, secondary });
+
+// Muscles partagés par une famille ; une variante qui sollicite autre chose a les siens.
+const PUSH = mu(['chest'], ['triceps', 'front_delts', 'abs']);          // pompes mains larges ou largeur d'épaules
+const PUSH_CLOSE = mu(['chest', 'triceps'], ['front_delts', 'abs']);    // pompes mains serrées
+const PUSH_DECLINE = mu(['chest', 'front_delts'], ['triceps', 'abs']);  // pieds hauts, rotation autour des épaules
+const DIPS = mu(['chest', 'triceps'], ['front_delts']);
+const CHIN_UP = mu(['lats', 'biceps'], ['upper_back', 'forearms']);     // tractions supination, prise serrée ou neutre
+const PULL_WIDE = mu(['lats'], ['upper_back', 'biceps', 'forearms']);   // tractions prise large
+const ROW_UNDER = mu(['upper_back', 'lats', 'biceps'], ['rear_delts', 'forearms']);
+const ROW_OVER = mu(['upper_back', 'lats'], ['rear_delts', 'traps', 'biceps', 'forearms']);
+const SINGLE_LEG = mu(['quads', 'glutes'], ['hamstrings', 'adductors']);
+const SIDE_SQUAT = mu(['quads', 'adductors', 'glutes'], ['hamstrings']);
+const WALL_SIT = mu(['quads'], ['glutes']);
+const PIKE = mu(['front_delts', 'triceps'], ['side_delts', 'chest']);
+const TRICEPS_EXT = mu(['triceps'], ['abs']);
+const SIDE_BEND = mu(['obliques'], ['lower_back']);
+const ONE_ARM = mu(['chest', 'triceps', 'front_delts'], ['abs', 'obliques']);
+const ROTATION = mu(['obliques'], ['abs']);
+const NECK = mu(['neck']);
+const CRUNCH = mu(['abs'], ['obliques']);
+const BENCH = mu(['chest'], ['triceps', 'front_delts']);
+const CURL = mu(['biceps'], ['forearms']);
+const LUNGE = mu(['quads', 'glutes'], ['hamstrings', 'adductors']);
 
 /** reps = répétitions ; time = maintien ou durée en secondes (chrono au lieu du compteur). */
 export type ExerciseMode = 'reps' | 'time';
@@ -51,7 +80,7 @@ export interface CatalogExercise {
   subtitle?: string;          // ce qui distingue la variante, en quelques mots
   source: ExerciseSource;
   level?: 1 | 2 | 3 | 4;      // barres de difficulté du livre (1 débutant → 4 haut niveau)
-  muscles: Muscle[];
+  muscles: Muscles;
   equipment: Equipment[];
   mode: ExerciseMode;
   unilateral?: boolean;       // saisie par côté (droite / gauche)
@@ -157,179 +186,179 @@ const L = (e: Omit<CatalogExercise, 'id' | 'source' | 'family'> & { code: string
 
 export const LAFAY_EXERCISES: CatalogExercise[] = [
   // A — Pompes
-  L({ code: 'A', name: 'Pompes', subtitle: 'Au sol, mains larges', level: 1, muscles: ['pectoraux', 'triceps', 'epaules'], equipment: ['aucun'], mode: 'reps', bookPage: 138,
+  L({ code: 'A', name: 'Pompes', subtitle: 'Au sol, mains larges', level: 1, muscles: PUSH, equipment: ['aucun'], mode: 'reps', bookPage: 138,
     description: 'Mains au sol à presque deux fois la largeur des épaules, corps gainé de la tête aux pieds. Descendre jusqu\'à frôler le sol avec la poitrine, remonter bras tendus. Ventre rentré, ne jamais cambrer.' }),
-  L({ code: 'A1', name: 'Pompes', subtitle: 'Mains et pieds sur des chaises', level: 2, muscles: ['pectoraux', 'triceps', 'epaules'], equipment: ['chaises'], mode: 'reps', bookPage: 139,
+  L({ code: 'A1', name: 'Pompes', subtitle: 'Mains et pieds sur des chaises', level: 2, muscles: PUSH, equipment: ['chaises'], mode: 'reps', bookPage: 139,
     description: 'Mains écartées sur deux chaises, pieds sur une troisième à la même hauteur. Descendre le plus bas possible sans forcer l\'épaule, remonter bras tendus. Corps droit en permanence.' }),
-  L({ code: 'A2', name: 'Pompes pieds surélevés', subtitle: 'Mains sur chaises, pieds à ~1 m', level: 2, muscles: ['pectoraux', 'epaules', 'triceps'], equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 140,
+  L({ code: 'A2', name: 'Pompes pieds surélevés', subtitle: 'Mains sur chaises, pieds à ~1 m', level: 2, muscles: PUSH_DECLINE, equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 140,
     description: 'Mains larges sur deux chaises, pieds posés sur un meuble d\'environ 1 m. Descendre puis remonter en gardant le corps rigide. Si 1 m est trop dur, commencer à 60 cm et monter par paliers.' }),
-  L({ code: 'A3', name: 'Pompes serrées', subtitle: 'Mains sur support de 45 cm', level: 1, muscles: ['pectoraux', 'triceps'], equipment: ['support'], mode: 'reps', bookPage: 141,
+  L({ code: 'A3', name: 'Pompes serrées', subtitle: 'Mains sur support de 45 cm', level: 1, muscles: PUSH_CLOSE, equipment: ['support'], mode: 'reps', bookPage: 141,
     description: 'Mains à 40 cm l\'une de l\'autre sur un support de 45 cm (deux chaises côte à côte), pieds au sol. Toucher le support avec la poitrine, remonter. Le corps reste droit.' }),
-  L({ code: 'A4', name: 'Pompes serrées', subtitle: 'Mains sur support de 35 cm', level: 2, muscles: ['pectoraux', 'triceps'], equipment: ['support'], mode: 'reps', bookPage: 142,
+  L({ code: 'A4', name: 'Pompes serrées', subtitle: 'Mains sur support de 35 cm', level: 2, muscles: PUSH_CLOSE, equipment: ['support'], mode: 'reps', bookPage: 142,
     description: 'Même technique qu\'A3 avec un support plus bas (35 cm). Poitrine au contact du support à chaque répétition, ventre rentré.' }),
-  L({ code: 'A5', name: 'Pompes serrées', subtitle: 'Mains sur support de 25 cm', level: 2, muscles: ['pectoraux', 'triceps'], equipment: ['support'], mode: 'reps', bookPage: 142,
+  L({ code: 'A5', name: 'Pompes serrées', subtitle: 'Mains sur support de 25 cm', level: 2, muscles: PUSH_CLOSE, equipment: ['support'], mode: 'reps', bookPage: 142,
     description: 'Même technique qu\'A3 avec un support de 25 cm. Garder le même écart de mains et un corps parfaitement aligné.' }),
-  L({ code: 'A6', name: 'Pompes serrées', subtitle: 'Mains et pieds à même hauteur', level: 2, muscles: ['pectoraux', 'triceps'], equipment: ['support'], mode: 'reps', bookPage: 142,
+  L({ code: 'A6', name: 'Pompes serrées', subtitle: 'Mains et pieds à même hauteur', level: 2, muscles: PUSH_CLOSE, equipment: ['support'], mode: 'reps', bookPage: 142,
     description: 'Mains et pieds sur deux supports de même hauteur (15 cm minimum), mains serrées. Descendre poitrine entre les mains, remonter. Corps bien droit, aucune cambrure.' }),
-  L({ code: 'A7', name: 'Pompes', subtitle: 'Mains largeur d\'épaules, pieds surélevés', level: 2, muscles: ['pectoraux', 'triceps', 'epaules'], equipment: ['chaises'], mode: 'reps', bookPage: 143,
+  L({ code: 'A7', name: 'Pompes', subtitle: 'Mains largeur d\'épaules, pieds surélevés', level: 2, muscles: PUSH, equipment: ['chaises'], mode: 'reps', bookPage: 143,
     description: 'Comme A1 mais mains à la largeur des épaules. Descendre profondément entre les chaises, remonter bras tendus.' }),
-  L({ code: 'A8', name: 'Pompes', subtitle: 'Mains largeur d\'épaules, pieds au sol', level: 1, muscles: ['pectoraux'], equipment: ['chaises'], mode: 'reps', bookPage: 144,
+  L({ code: 'A8', name: 'Pompes', subtitle: 'Mains largeur d\'épaules, pieds au sol', level: 1, muscles: PUSH, equipment: ['chaises'], mode: 'reps', bookPage: 144,
     description: 'Mains sur deux chaises à la largeur des épaules, pieds au sol. Descendre le plus bas possible, cible le bas des pectoraux.' }),
-  L({ code: 'A9', name: 'Pompes très serrées', subtitle: 'Mains sur 20 cm, pieds sur chaise', level: 3, muscles: ['triceps', 'pectoraux', 'epaules'], equipment: ['support', 'chaises'], mode: 'reps', bookPage: 145,
+  L({ code: 'A9', name: 'Pompes très serrées', subtitle: 'Mains sur 20 cm, pieds sur chaise', level: 3, muscles: mu(['triceps', 'chest'], ['front_delts', 'abs']), equipment: ['support', 'chaises'], mode: 'reps', bookPage: 145,
     description: 'Mains à 15 cm maximum sur un support de 20 cm, pieds sur une chaise. Toucher le support avec le haut de la poitrine, remonter. Corps droit.' }),
-  L({ code: 'A10', name: 'Pompes circulaires', subtitle: 'Rotation autour des épaules', level: 2, muscles: ['epaules', 'pectoraux', 'triceps'], equipment: ['chaises'], mode: 'reps', bookPage: 146,
+  L({ code: 'A10', name: 'Pompes circulaires', subtitle: 'Rotation autour des épaules', level: 2, muscles: PUSH_DECLINE, equipment: ['chaises'], mode: 'reps', bookPage: 146,
     description: 'Position d\'A7. Au lieu de descendre droit, faire tourner le corps autour de l\'axe des épaules tout en fléchissant et tendant les bras.' }),
-  L({ code: 'A11', name: 'Pompes circulaires', subtitle: 'Rotation en sens inverse', level: 2, muscles: ['epaules', 'pectoraux', 'triceps'], equipment: ['chaises'], mode: 'reps', bookPage: 147,
+  L({ code: 'A11', name: 'Pompes circulaires', subtitle: 'Rotation en sens inverse', level: 2, muscles: PUSH_DECLINE, equipment: ['chaises'], mode: 'reps', bookPage: 147,
     description: 'Comme A10, cercle dans l\'autre sens. Mouvement continu et contrôlé.' }),
-  L({ code: 'A12', name: 'Pompes serrées pieds hauts', subtitle: 'Mains sur chaises, pieds à 1 m–1,10 m', level: 3, muscles: ['pectoraux', 'triceps', 'epaules'], equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 148,
+  L({ code: 'A12', name: 'Pompes serrées pieds hauts', subtitle: 'Mains sur chaises, pieds à 1 m–1,10 m', level: 3, muscles: mu(['chest', 'triceps', 'front_delts'], ['abs']), equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 148,
     description: 'Deux chaises côte à côte, mains à 40 cm, pieds sur un meuble d\'1 m à 1,10 m. Descendre poitrine au contact, remonter. Corps droit.' }),
 
   // B — Dips
-  L({ code: 'B', name: 'Dips', subtitle: 'Amplitude complète', level: 2, muscles: ['pectoraux', 'epaules', 'triceps'], equipment: ['barres-dips'], mode: 'reps', bookPage: 149,
+  L({ code: 'B', name: 'Dips', subtitle: 'Amplitude complète', level: 2, muscles: DIPS, equipment: ['barres-dips'], mode: 'reps', bookPage: 149,
     description: 'En appui sur les barres parallèles, pieds décollés (jambes pliées si besoin). Descendre en flexion complète, remonter bras tendus.' }),
-  L({ code: 'B1', name: 'Dips', subtitle: 'Demi-amplitude', level: 1, muscles: ['pectoraux', 'epaules', 'triceps'], equipment: ['barres-dips'], mode: 'reps', bookPage: 150,
+  L({ code: 'B1', name: 'Dips', subtitle: 'Demi-amplitude', level: 1, muscles: DIPS, equipment: ['barres-dips'], mode: 'reps', bookPage: 150,
     description: 'Partir bras tendus et descendre seulement jusqu\'à ce que les bras soient parallèles au sol, puis remonter. Ne pas descendre plus bas.' }),
-  L({ code: 'B2', name: 'Dips', subtitle: 'Partie moyenne, rapide', level: 2, muscles: ['pectoraux', 'epaules'], equipment: ['barres-dips'], mode: 'reps', bookPage: 151,
+  L({ code: 'B2', name: 'Dips', subtitle: 'Partie moyenne, rapide', level: 2, muscles: DIPS, equipment: ['barres-dips'], mode: 'reps', bookPage: 151,
     description: 'Autour de la position bras parallèles : descendre un peu en dessous, remonter un peu au-dessus, sans jamais tendre ni descendre à fond. Le plus vite possible.' }),
 
   // C — Tractions supination et tirages
-  L({ code: 'C', name: 'Tractions', subtitle: 'Supination, amplitude complète', level: 2, muscles: ['dos', 'biceps'], equipment: ['barre-traction'], mode: 'reps', bookPage: 152,
+  L({ code: 'C', name: 'Tractions', subtitle: 'Supination, amplitude complète', level: 2, muscles: CHIN_UP, equipment: ['barre-traction'], mode: 'reps', bookPage: 152,
     description: 'Mains largeur d\'épaules, paumes vers soi, suspendu bras tendus. Monter le menton au-dessus de la barre, redescendre bras tendus.' }),
-  L({ code: 'C1', name: 'Tractions', subtitle: 'Moitié haute', level: 1, muscles: ['dos', 'biceps'], equipment: ['barre-traction'], mode: 'reps', bookPage: 153,
+  L({ code: 'C1', name: 'Tractions', subtitle: 'Moitié haute', level: 1, muscles: CHIN_UP, equipment: ['barre-traction'], mode: 'reps', bookPage: 153,
     description: 'Sauter pour démarrer menton au-dessus de la barre. Descendre jusqu\'aux bras parallèles au sol, remonter. Sans barre : remplacer par C5.' }),
-  L({ code: 'C2', name: 'Tractions', subtitle: 'Partie moyenne, rapide', level: 2, muscles: ['dos', 'biceps'], equipment: ['barre-traction'], mode: 'reps', bookPage: 154,
+  L({ code: 'C2', name: 'Tractions', subtitle: 'Partie moyenne, rapide', level: 2, muscles: CHIN_UP, equipment: ['barre-traction'], mode: 'reps', bookPage: 154,
     description: 'Comme C1 en descendant un peu plus bas et en remontant un peu plus haut, sans tendre les bras ni passer le menton. Le plus vite possible.' }),
-  L({ code: 'C3', name: 'Tractions', subtitle: 'Deux tiers du mouvement', level: 2, muscles: ['dos', 'biceps'], equipment: ['barre-traction'], mode: 'reps', bookPage: 155,
+  L({ code: 'C3', name: 'Tractions', subtitle: 'Deux tiers du mouvement', level: 2, muscles: CHIN_UP, equipment: ['barre-traction'], mode: 'reps', bookPage: 155,
     description: 'Technique de C sur les deux tiers de l\'amplitude : descendre assez bas sans tendre complètement les bras.' }),
-  L({ code: 'C4', name: 'Tirage sous table', subtitle: 'Paumes vers soi, jambes repliées', level: 1, muscles: ['dos', 'biceps'], equipment: ['table'], mode: 'reps', bookPage: 156,
+  L({ code: 'C4', name: 'Tirage sous table', subtitle: 'Paumes vers soi, jambes repliées', level: 1, muscles: ROW_UNDER, equipment: ['table'], mode: 'reps', bookPage: 156,
     description: 'Allongé sous une table ou une barre basse, pieds rapprochés sous les fesses, genoux écartés. Tirer jusqu\'à toucher la barre avec le bas des pectoraux, haut du dos cambré, tête neutre.' }),
-  L({ code: 'C5', name: 'Tirage sous table', subtitle: 'Paumes vers soi, jambes tendues', level: 2, muscles: ['dos', 'biceps'], equipment: ['table'], mode: 'reps', bookPage: 157,
+  L({ code: 'C5', name: 'Tirage sous table', subtitle: 'Paumes vers soi, jambes tendues', level: 2, muscles: ROW_UNDER, equipment: ['table'], mode: 'reps', bookPage: 157,
     description: 'Comme C4, jambes tendues devant soi, talons au sol. Corps gainé, poitrine vers la barre.' }),
-  L({ code: 'C6', name: 'Tirage sous table', subtitle: 'Paumes vers soi, pieds sur chaise', level: 3, muscles: ['dos', 'biceps'], equipment: ['table', 'chaises'], mode: 'reps', bookPage: 158,
+  L({ code: 'C6', name: 'Tirage sous table', subtitle: 'Paumes vers soi, pieds sur chaise', level: 3, muscles: ROW_UNDER, equipment: ['table', 'chaises'], mode: 'reps', bookPage: 158,
     description: 'Comme C4, pieds posés sur une chaise d\'environ 45 cm. Corps aligné du talon aux épaules.' }),
-  L({ code: 'C7', name: 'Tirage sous table', subtitle: 'Paumes vers l\'avant, jambes repliées', level: 1, muscles: ['dos'], equipment: ['table'], mode: 'reps', bookPage: 159,
+  L({ code: 'C7', name: 'Tirage sous table', subtitle: 'Paumes vers l\'avant, jambes repliées', level: 1, muscles: ROW_OVER, equipment: ['table'], mode: 'reps', bookPage: 159,
     description: 'Comme C4 en prise pronation. Cible l\'épaisseur du haut du dos.' }),
-  L({ code: 'C8', name: 'Tirage sous table', subtitle: 'Paumes vers l\'avant, jambes tendues', level: 2, muscles: ['dos'], equipment: ['table'], mode: 'reps', bookPage: 160,
+  L({ code: 'C8', name: 'Tirage sous table', subtitle: 'Paumes vers l\'avant, jambes tendues', level: 2, muscles: ROW_OVER, equipment: ['table'], mode: 'reps', bookPage: 160,
     description: 'Jambes de C5, mains de C7. Tirer la poitrine vers la barre sans casser la ligne du corps.' }),
-  L({ code: 'C9', name: 'Tirage sous table', subtitle: 'Paumes vers l\'avant, pieds sur chaise', level: 3, muscles: ['dos'], equipment: ['table', 'chaises'], mode: 'reps', bookPage: 161,
+  L({ code: 'C9', name: 'Tirage sous table', subtitle: 'Paumes vers l\'avant, pieds sur chaise', level: 3, muscles: ROW_OVER, equipment: ['table', 'chaises'], mode: 'reps', bookPage: 161,
     description: 'Jambes de C6, mains de C7. Version la plus dure du tirage horizontal.' }),
 
   // D
-  L({ code: 'D', name: 'Dips entre deux chaises', subtitle: 'Talons sur une chaise', level: 1, muscles: ['triceps'], equipment: ['chaises'], mode: 'reps', bookPage: 162,
+  L({ code: 'D', name: 'Dips entre deux chaises', subtitle: 'Talons sur une chaise', level: 1, muscles: mu(['triceps'], ['front_delts', 'chest']), equipment: ['chaises'], mode: 'reps', bookPage: 162,
     description: 'Mains agrippées aux bords d\'une chaise derrière soi, talons sur une autre chaise à environ 1 m, jambes légèrement pliées. Descendre le plus bas possible, remonter bras tendus.' }),
 
   // E — Flexions de jambes
-  L({ code: 'E', name: 'Flexion sur une jambe', subtitle: 'Petite amplitude, tenu au cadre de porte', level: 1, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 163,
+  L({ code: 'E', name: 'Flexion sur une jambe', subtitle: 'Petite amplitude, tenu au cadre de porte', level: 1, muscles: SINGLE_LEG, equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 163,
     description: 'Debout dans un cadre de porte, mains posées du bout des doigts à hauteur de taille. Sur une jambe, petite flexion bien au-dessus de la parallèle, remonter jambe tendue. Une jambe entière puis l\'autre.' }),
-  L({ code: 'E1', name: 'Flexion sur une jambe', subtitle: 'Jusqu\'à la parallèle', level: 2, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 164,
+  L({ code: 'E1', name: 'Flexion sur une jambe', subtitle: 'Jusqu\'à la parallèle', level: 2, muscles: SINGLE_LEG, equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 164,
     description: 'Même position qu\'E, l\'autre jambe levée devant soi. Descendre jusqu\'à cuisse parallèle au sol, remonter sans tirer avec les bras.' }),
-  L({ code: 'E2', name: 'Flexion sur une jambe', subtitle: 'Amplitude complète', level: 3, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 165,
+  L({ code: 'E2', name: 'Flexion sur une jambe', subtitle: 'Amplitude complète', level: 3, muscles: SINGLE_LEG, equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 165,
     description: 'Technique d\'E1 en descendant le plus bas possible, puis remonter jusqu\'à jambe tendue.' }),
-  L({ code: 'E3', name: 'Flexion sur une jambe', subtitle: 'Partie moyenne, rapide', level: 2, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 166,
+  L({ code: 'E3', name: 'Flexion sur une jambe', subtitle: 'Partie moyenne, rapide', level: 2, muscles: SINGLE_LEG, equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 166,
     description: 'Descendre un peu sous la position moyenne et remonter sans tendre la jambe. Très vite, sans jamais se relever complètement.' }),
-  L({ code: 'E4', name: 'Flexions latérales jambes écartées', subtitle: 'Alterné droite / gauche, durée', level: 1, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'time', bookPage: 167,
+  L({ code: 'E4', name: 'Flexions latérales jambes écartées', subtitle: 'Alterné droite / gauche, durée', level: 1, muscles: SIDE_SQUAT, equipment: ['aucun'], mode: 'time', bookPage: 167,
     description: 'Debout jambes très écartées, plier une jambe en gardant l\'autre tendue, descendre au plus bas, remonter, puis changer de côté. Objectif : 3 minutes sans pause.' }),
-  L({ code: 'E5', name: 'Flexions latérales jambes écartées', subtitle: 'Un côté à la fois, durée', level: 2, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'time', unilateral: true, bookPage: 168,
+  L({ code: 'E5', name: 'Flexions latérales jambes écartées', subtitle: 'Un côté à la fois, durée', level: 2, muscles: SIDE_SQUAT, equipment: ['aucun'], mode: 'time', unilateral: true, bookPage: 168,
     description: 'Comme E4 mais toujours sur la même jambe. Objectif : 3 minutes d\'un côté, repos 1 min 30 maximum, puis l\'autre côté.' }),
-  L({ code: 'E6', name: 'Squat trois positions', subtitle: 'Pieds serrés, moyens, très écartés', level: 2, muscles: ['cuisses', 'fessiers'], equipment: ['aucun'], mode: 'time', bookPage: 169,
+  L({ code: 'E6', name: 'Squat trois positions', subtitle: 'Pieds serrés, moyens, très écartés', level: 2, muscles: mu(['quads', 'glutes'], ['adductors', 'hamstrings']), equipment: ['aucun'], mode: 'time', bookPage: 169,
     description: 'Squats profonds avec 2 s de maintien en bas : 1 min pieds joints, 1 min pieds écartés pointes ouvertes, 1 min jambes très écartées, sans pause.' }),
-  L({ code: 'E7', name: 'Flexion sur une jambe dos au mur', subtitle: 'Deux tiers du mouvement', level: 3, muscles: ['cuisses', 'fessiers'], equipment: ['mur'], mode: 'reps', unilateral: true, bookPage: 170,
+  L({ code: 'E7', name: 'Flexion sur une jambe dos au mur', subtitle: 'Deux tiers du mouvement', level: 3, muscles: SINGLE_LEG, equipment: ['mur'], mode: 'reps', unilateral: true, bookPage: 170,
     description: 'Dos à un mur, descendre bien sous la parallèle sans plier complètement la jambe. Les mains touchent le mur une fraction de seconde pour l\'équilibre, la cuisse fait le travail.' }),
 
   // F — Squat sauté et isométrie
-  L({ code: 'F', name: 'Squat sauté', level: 1, muscles: ['cuisses', 'mollets'], equipment: ['aucun'], mode: 'reps', bookPage: 171,
+  L({ code: 'F', name: 'Squat sauté', level: 1, muscles: mu(['quads', 'glutes'], ['calves', 'hamstrings']), equipment: ['aucun'], mode: 'reps', bookPage: 171,
     description: 'Sauter le plus verticalement possible, atterrir sur l\'avant du pied en amortissant jusqu\'aux cuisses parallèles, et rebondir aussitôt. Plafond : 4 × 20, ensuite sauter plus haut.' }),
-  L({ code: 'F1', name: 'Chaise contre le mur', subtitle: 'Maintien', level: 2, muscles: ['cuisses'], equipment: ['mur'], mode: 'time', bookPage: 172,
+  L({ code: 'F1', name: 'Chaise contre le mur', subtitle: 'Maintien', level: 2, muscles: WALL_SIT, equipment: ['mur'], mode: 'time', bookPage: 172,
     description: 'Dos plaqué au mur, cuisses parallèles au sol. Tenir le plus longtemps possible. Objectif : 3 minutes.' }),
-  L({ code: 'F2', name: 'Position du cavalier', subtitle: 'Maintien jambes écartées', level: 2, muscles: ['cuisses', 'mollets'], equipment: ['aucun'], mode: 'time', bookPage: 173,
+  L({ code: 'F2', name: 'Position du cavalier', subtitle: 'Maintien jambes écartées', level: 2, muscles: mu(['quads', 'glutes'], ['adductors', 'calves']), equipment: ['aucun'], mode: 'time', bookPage: 173,
     description: 'Debout jambes écartées, dos droit, cuisses presque parallèles au sol. Tenir. Objectif : 3 minutes d\'affilée.' }),
-  L({ code: 'F3', name: 'Chaise sur une jambe', subtitle: 'Maintien unilatéral', level: 3, muscles: ['cuisses'], equipment: ['mur'], mode: 'time', unilateral: true, bookPage: 174,
+  L({ code: 'F3', name: 'Chaise sur une jambe', subtitle: 'Maintien unilatéral', level: 3, muscles: WALL_SIT, equipment: ['mur'], mode: 'time', unilateral: true, bookPage: 174,
     description: 'Comme F1, une seule jambe au sol, la cheville de l\'autre posée sur le genou. Objectif : 3 minutes par jambe.' }),
 
   // G, H
-  L({ code: 'G', name: 'Crunch', level: 1, muscles: ['abdominaux'], equipment: ['aucun'], mode: 'reps', bookPage: 175,
+  L({ code: 'G', name: 'Crunch', level: 1, muscles: CRUNCH, equipment: ['aucun'], mode: 'reps', bookPage: 175,
     description: 'Allongé, cuisses à angle droit. S\'enrouler en rapprochant la poitrine du bassin sans décoller le bas du dos. Souffler et rentrer le ventre en montant.' }),
-  L({ code: 'H', name: 'Relevés de genoux suspendu', level: 2, muscles: ['abdominaux'], equipment: ['barre-traction'], mode: 'reps', bookPage: 176,
+  L({ code: 'H', name: 'Relevés de genoux suspendu', level: 2, muscles: mu(['abs'], ['obliques', 'forearms']), equipment: ['barre-traction'], mode: 'reps', bookPage: 176,
     description: 'Suspendu à la barre, ramener les genoux pliés vers la poitrine, ventre rentré. Redescendre jusqu\'aux cuisses parallèles au sol, sans relâcher le ventre.' }),
 
   // I — Tractions pronation
-  L({ code: 'I', name: 'Tractions prise large', subtitle: 'Nuque à la barre, petite amplitude', level: 2, muscles: ['dos'], equipment: ['barre-traction'], mode: 'reps', bookPage: 177,
+  L({ code: 'I', name: 'Tractions prise large', subtitle: 'Nuque à la barre, petite amplitude', level: 2, muscles: PULL_WIDE, equipment: ['barre-traction'], mode: 'reps', bookPage: 177,
     description: 'Prise pronation à presque deux fois la largeur des épaules. Démarrer nuque contre la barre (sauter), descendre à peine et remonter, très vite. Barre longue à 1,80 m minimum.' }),
-  L({ code: 'I1', name: 'Tractions prise large', subtitle: 'Jusqu\'aux bras parallèles', level: 2, muscles: ['dos'], equipment: ['barre-traction'], mode: 'reps', bookPage: 178,
+  L({ code: 'I1', name: 'Tractions prise large', subtitle: 'Jusqu\'aux bras parallèles', level: 2, muscles: PULL_WIDE, equipment: ['barre-traction'], mode: 'reps', bookPage: 178,
     description: 'Comme I, descendre jusqu\'aux bras parallèles au sol, jamais plus bas, et remonter le plus vite possible.' }),
-  L({ code: 'I2', name: 'Tractions prise large', subtitle: 'Complète, nuque à la barre', level: 3, muscles: ['dos'], equipment: ['barre-traction'], mode: 'reps', bookPage: 179,
+  L({ code: 'I2', name: 'Tractions prise large', subtitle: 'Complète, nuque à la barre', level: 3, muscles: PULL_WIDE, equipment: ['barre-traction'], mode: 'reps', bookPage: 179,
     description: 'Position d\'I1, descendre bras tendus puis remonter jusqu\'au contact de la nuque avec la barre.' }),
-  L({ code: 'I3', name: 'Tractions pronation', subtitle: 'Mains largeur d\'épaules', level: 2, muscles: ['dos', 'biceps'], equipment: ['barre-traction'], mode: 'reps', bookPage: 180,
+  L({ code: 'I3', name: 'Tractions pronation', subtitle: 'Mains largeur d\'épaules', level: 2, muscles: CHIN_UP, equipment: ['barre-traction'], mode: 'reps', bookPage: 180,
     description: 'Technique de C avec les paumes vers l\'avant. Amplitude au choix selon le besoin : complète, moitié ou deux tiers.' }),
-  L({ code: 'I4', name: 'Tractions prise large', subtitle: 'Complète, menton au-dessus', level: 3, muscles: ['dos'], equipment: ['barre-traction'], mode: 'reps', bookPage: 181,
+  L({ code: 'I4', name: 'Tractions prise large', subtitle: 'Complète, menton au-dessus', level: 3, muscles: PULL_WIDE, equipment: ['barre-traction'], mode: 'reps', bookPage: 181,
     description: 'Comme I2 mais en passant le menton au-dessus de la barre, devant. Ne pas basculer la tête en arrière pour gagner les derniers centimètres.' }),
-  L({ code: 'I5', name: 'Tractions prise neutre', subtitle: 'Paumes face à face', level: 2, muscles: ['dos', 'biceps'], equipment: ['barre-traction'], mode: 'reps', bookPage: 182,
+  L({ code: 'I5', name: 'Tractions prise neutre', subtitle: 'Paumes face à face', level: 2, muscles: CHIN_UP, equipment: ['barre-traction'], mode: 'reps', bookPage: 182,
     description: 'Paumes face à face (poignées, sangles ou anneaux). Descendre bras tendus, monter le menton au-dessus.' }),
-  L({ code: 'I6', name: 'Tirage sous table', subtitle: 'Prise neutre', level: 1, muscles: ['dos'], equipment: ['table'], mode: 'reps', bookPage: 183,
+  L({ code: 'I6', name: 'Tirage sous table', subtitle: 'Prise neutre', level: 1, muscles: mu(['upper_back', 'lats'], ['biceps', 'rear_delts', 'forearms']), equipment: ['table'], mode: 'reps', bookPage: 183,
     description: 'Technique de C4, paumes face à face (bords d\'une table). Jambes repliées, puis tendues, puis pieds surélevés au-delà de 15 répétitions.' }),
-  L({ code: 'I7', name: 'Tractions prise large', subtitle: 'Deux tiers du mouvement', level: 3, muscles: ['dos'], equipment: ['barre-traction'], mode: 'reps', bookPage: 184,
+  L({ code: 'I7', name: 'Tractions prise large', subtitle: 'Deux tiers du mouvement', level: 3, muscles: PULL_WIDE, equipment: ['barre-traction'], mode: 'reps', bookPage: 184,
     description: 'Comme I1 sur les deux tiers : descendre jusqu\'aux bras presque tendus.' }),
-  L({ code: 'I8', name: 'Tirage sous table', subtitle: 'Prise large pronation', level: 1, muscles: ['dos'], equipment: ['table'], mode: 'reps', bookPage: 185,
+  L({ code: 'I8', name: 'Tirage sous table', subtitle: 'Prise large pronation', level: 1, muscles: mu(['upper_back', 'rear_delts'], ['lats', 'biceps', 'traps']), equipment: ['table'], mode: 'reps', bookPage: 185,
     description: 'Technique de C4, mains à deux fois la largeur des épaules, paumes vers l\'avant.' }),
 
   // J — Pompes piquées
-  L({ code: 'J', name: 'Pompes piquées pieds surélevés', subtitle: 'Mains larges', level: 3, muscles: ['epaules', 'pectoraux'], equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 186,
+  L({ code: 'J', name: 'Pompes piquées pieds surélevés', subtitle: 'Mains larges', level: 3, muscles: PIKE, equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 186,
     description: 'Mains larges sur deux chaises, pieds sur un support d\'1 m, fesses vers le plafond (corps plié). Descendre la tête entre les mains, remonter. Cible les épaules.' }),
-  L({ code: 'J1', name: 'Pompes piquées pieds surélevés', subtitle: 'Mains un peu plus larges que les épaules', level: 3, muscles: ['epaules', 'pectoraux'], equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 187,
+  L({ code: 'J1', name: 'Pompes piquées pieds surélevés', subtitle: 'Mains un peu plus larges que les épaules', level: 3, muscles: PIKE, equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 187,
     description: 'Comme J, mains plus rapprochées. Passer à J1 au-delà de 15 répétitions à J.' }),
-  L({ code: 'J2', name: 'Pompes piquées pieds surélevés', subtitle: 'Sur les poings, mains larges', level: 3, muscles: ['epaules', 'pectoraux'], equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 188,
+  L({ code: 'J2', name: 'Pompes piquées pieds surélevés', subtitle: 'Sur les poings, mains larges', level: 3, muscles: PIKE, equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 188,
     description: 'J sur les poings alignés, une serviette pliée sous les poings si le support est dur.' }),
-  L({ code: 'J3', name: 'Pompes piquées pieds surélevés', subtitle: 'Sur les poings, mains rapprochées', level: 3, muscles: ['epaules', 'pectoraux'], equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 189,
+  L({ code: 'J3', name: 'Pompes piquées pieds surélevés', subtitle: 'Sur les poings, mains rapprochées', level: 3, muscles: PIKE, equipment: ['chaises', 'meuble-haut'], mode: 'reps', bookPage: 189,
     description: 'J1 sur les poings.' }),
 
   // K — Triceps
-  L({ code: 'K', name: 'Extension triceps au sol', subtitle: 'Coudes au sol, amplitude réglable', level: 1, muscles: ['triceps'], equipment: ['aucun'], mode: 'reps', bookPage: 190,
+  L({ code: 'K', name: 'Extension triceps au sol', subtitle: 'Coudes au sol, amplitude réglable', level: 1, muscles: TRICEPS_EXT, equipment: ['aucun'], mode: 'reps', bookPage: 190,
     description: 'Coudes au sol écartés largeur d\'épaules, mains à plat un peu en avant de la tête. Tendre les bras sans décoller les paumes. Amplitude 1/3, 1/2, 2/3 ou complète ; coudes serrés.' }),
-  L({ code: 'K1', name: 'Extension triceps à la table', subtitle: 'Pieds à ~1,30 m', level: 2, muscles: ['triceps'], equipment: ['table'], mode: 'reps', bookPage: 191,
+  L({ code: 'K1', name: 'Extension triceps à la table', subtitle: 'Pieds à ~1,30 m', level: 2, muscles: TRICEPS_EXT, equipment: ['table'], mode: 'reps', bookPage: 191,
     description: 'Mains sur le bord d\'une table ou barre à 1 m, sur la pointe des pieds à environ 1,30 m. Flexion complète des bras puis extension, sans à-coups. 20 répétitions : support plus bas.' }),
-  L({ code: 'K2', name: 'Extension triceps au mur', subtitle: 'Hauteur des mains réglable', level: 1, muscles: ['triceps'], equipment: ['mur'], mode: 'reps', bookPage: 192,
+  L({ code: 'K2', name: 'Extension triceps au mur', subtitle: 'Hauteur des mains réglable', level: 1, muscles: mu(['triceps']), equipment: ['mur'], mode: 'reps', bookPage: 192,
     description: 'Face au mur, mains à environ 1,50 m, sur la pointe des pieds. Fléchir jusqu\'à toucher le mur avec la tête et les avant-bras, revenir. 15 répétitions à la 1re série : mains 10 cm plus bas.' }),
-  L({ code: 'K3', name: 'Extension triceps prise supination', subtitle: 'Barre basse entre deux chaises', level: 4, muscles: ['triceps'], equipment: ['chaises', 'table'], mode: 'reps', bookPage: 194,
+  L({ code: 'K3', name: 'Extension triceps prise supination', subtitle: 'Barre basse entre deux chaises', level: 4, muscles: TRICEPS_EXT, equipment: ['chaises', 'table'], mode: 'reps', bookPage: 194,
     description: 'Comme K1, paumes tournées vers soi sur une barre ou une sangle à 45 cm du sol, chaises calées contre un mur.' }),
 
   // L à Z
-  L({ code: 'L', name: 'Pompes en rotation', subtitle: 'Alterné droite / gauche', level: 2, muscles: ['pectoraux', 'epaules', 'triceps'], equipment: ['aucun'], mode: 'reps', bookPage: 195,
+  L({ code: 'L', name: 'Pompes en rotation', subtitle: 'Alterné droite / gauche', level: 2, muscles: mu(['chest', 'triceps'], ['front_delts', 'abs']), equipment: ['aucun'], mode: 'reps', bookPage: 195,
     description: 'Départ de pompe A. Descendre en basculant le poids sur le bras droit qui fléchit, remonter, puis à gauche. Descendre le plus bas possible.' }),
-  L({ code: 'M', name: 'Extension lombaire sur support', level: 2, muscles: ['lombaires'], equipment: ['meuble-haut'], mode: 'reps', bookPage: 196,
+  L({ code: 'M', name: 'Extension lombaire sur support', level: 2, muscles: mu(['lower_back'], ['glutes', 'hamstrings']), equipment: ['meuble-haut'], mode: 'reps', bookPage: 196,
     description: 'Allongé sur le ventre sur un support d\'environ 1,10 m, hanches qui dépassent, pieds calés. Descendre le buste puis remonter jusqu\'à l\'horizontale, dos droit.' }),
-  L({ code: 'M1', name: 'Good morning au poids du corps', level: 1, muscles: ['lombaires', 'ischios'], equipment: ['aucun'], mode: 'reps', bookPage: 197,
+  L({ code: 'M1', name: 'Good morning au poids du corps', level: 1, muscles: mu(['hamstrings', 'lower_back'], ['glutes']), equipment: ['aucun'], mode: 'reps', bookPage: 197,
     description: 'Debout jambes légèrement pliées, bras dans le prolongement du buste. Se pencher jusqu\'au buste parallèle au sol, remonter. Ne jamais arrondir le dos.' }),
-  L({ code: 'N', name: 'Flexion latérale sur support', level: 3, muscles: ['obliques'], equipment: ['support'], mode: 'reps', unilateral: true, bookPage: 198,
+  L({ code: 'N', name: 'Flexion latérale sur support', level: 3, muscles: SIDE_BEND, equipment: ['support'], mode: 'reps', unilateral: true, bookPage: 198,
     description: 'Couché sur le côté sur un support de 40 cm minimum, buste dans le vide à partir des hanches, pieds calés. Descendre le buste sur le côté puis remonter le plus haut possible.' }),
-  L({ code: 'N1', name: 'Flexion latérale au sol', level: 1, muscles: ['obliques'], equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 199,
+  L({ code: 'N1', name: 'Flexion latérale au sol', level: 1, muscles: SIDE_BEND, equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 199,
     description: 'Allongé sur le côté sur un tapis, monter le buste le plus haut possible sans à-coups.' }),
-  L({ code: 'O', name: 'Crunch avec rotation', level: 2, muscles: ['abdominaux', 'obliques'], equipment: ['aucun'], mode: 'reps', bookPage: 200,
+  L({ code: 'O', name: 'Crunch avec rotation', level: 2, muscles: mu(['abs', 'obliques']), equipment: ['aucun'], mode: 'reps', bookPage: 200,
     description: 'Sur le dos, jambes pliées, pieds à plat. Se relever en tournant pour amener le coude vers le genou opposé. Les épaules ne retouchent pas le sol.' }),
-  L({ code: 'P', name: 'Relevé de buste', level: 2, muscles: ['abdominaux'], equipment: ['aucun'], mode: 'reps', bookPage: 201,
+  L({ code: 'P', name: 'Relevé de buste', level: 2, muscles: CRUNCH, equipment: ['aucun'], mode: 'reps', bookPage: 201,
     description: 'Sur le dos, jambes fléchies. Se relever jusqu\'à toucher les cuisses, redescendre sans reposer les épaules. Aide des bras au début, puis mains derrière la tête au-delà de 15.' }),
-  L({ code: 'Q', name: 'Pompes à un bras', subtitle: 'Main sur une chaise', level: 3, muscles: ['epaules', 'triceps', 'pectoraux'], equipment: ['chaises'], mode: 'reps', unilateral: true, bookPage: 202,
+  L({ code: 'Q', name: 'Pompes à un bras', subtitle: 'Main sur une chaise', level: 3, muscles: ONE_ARM, equipment: ['chaises'], mode: 'reps', unilateral: true, bookPage: 202,
     description: 'Une main sur une chaise, jambes tendues et écartées. Descendre le plus bas possible, l\'épaule arrive à hauteur de la main. Ne pas reculer les fesses.' }),
-  L({ code: 'Q1', name: 'Pompes à un bras', subtitle: 'Main sur support de 25 cm', level: 4, muscles: ['epaules', 'triceps', 'pectoraux'], equipment: ['support'], mode: 'reps', unilateral: true, bookPage: 203,
+  L({ code: 'Q1', name: 'Pompes à un bras', subtitle: 'Main sur support de 25 cm', level: 4, muscles: ONE_ARM, equipment: ['support'], mode: 'reps', unilateral: true, bookPage: 203,
     description: 'Comme Q, corps le plus droit possible : la jambe du côté de l\'appui dans le prolongement, l\'autre à l\'équerre pour l\'équilibre.' }),
-  L({ code: 'Q2', name: 'Pompes à un bras', subtitle: 'Au sol', level: 4, muscles: ['epaules', 'triceps', 'pectoraux'], equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 204,
+  L({ code: 'Q2', name: 'Pompes à un bras', subtitle: 'Au sol', level: 4, muscles: ONE_ARM, equipment: ['aucun'], mode: 'reps', unilateral: true, bookPage: 204,
     description: 'Technique de Q1 au sol, sans support.' }),
-  L({ code: 'R', name: 'Abaissement des épaules', level: 2, muscles: ['trapezes', 'cou'], equipment: ['barres-dips'], mode: 'reps', bookPage: 205,
+  L({ code: 'R', name: 'Abaissement des épaules', level: 2, muscles: mu(['traps'], ['lats']), equipment: ['barres-dips'], mode: 'reps', bookPage: 205,
     description: 'En appui bras tendus sur les barres parallèles, pieds décollés. Hausser les épaules puis les abaisser au maximum : le corps monte. Lent et concentré.' }),
-  L({ code: 'S', name: 'Nuque sur banc', level: 2, muscles: ['cou'], equipment: ['banc'], mode: 'reps', bookPage: 206,
+  L({ code: 'S', name: 'Nuque sur banc', level: 2, muscles: NECK, equipment: ['banc'], mode: 'reps', bookPage: 206,
     description: 'Allongé sur un banc ou une chaise, tête dans le vide. Laisser descendre la tête en arrière sans forcer, remonter menton vers la poitrine. Deux séries, 40 s de repos.' }),
-  L({ code: 'T', name: 'Rotations du buste assis', level: 1, muscles: ['obliques', 'abdominaux'], equipment: ['baton'], mode: 'time', bookPage: 207,
+  L({ code: 'T', name: 'Rotations du buste assis', level: 1, muscles: ROTATION, equipment: ['baton'], mode: 'time', bookPage: 207,
     description: 'Assis, pieds calés, bâton derrière les épaules. Rotations droite-gauche le plus loin possible sans forcer la colonne. Respirer librement.' }),
-  L({ code: 'U', name: 'Enroulement de colonne', level: 1, muscles: ['abdominaux', 'colonne'], equipment: ['aucun'], mode: 'time', bookPage: 208,
+  L({ code: 'U', name: 'Enroulement de colonne', level: 1, muscles: mu(['abs'], ['lower_back']), equipment: ['aucun'], mode: 'time', bookPage: 208,
     description: 'Sur le dos, jambes presque tendues au-dessus du ventre. Enrouler la colonne pour passer les pieds au-dessus de la tête. Serviette sous les épaules.' }),
-  L({ code: 'V', name: 'Essuie-glace', level: 2, muscles: ['obliques', 'colonne'], equipment: ['aucun'], mode: 'time', bookPage: 209,
+  L({ code: 'V', name: 'Essuie-glace', level: 2, muscles: ROTATION, equipment: ['aucun'], mode: 'time', bookPage: 209,
     description: 'Sur le dos, jambes presque tendues à la verticale, bassin ramené vers la tête. Basculer les jambes d\'un côté à l\'autre sans creuser les reins. Objectif : 3 minutes.' }),
-  L({ code: 'W', name: 'Mollets sur une jambe', level: 2, muscles: ['mollets'], equipment: ['support'], mode: 'reps', unilateral: true, bookPage: 210,
+  L({ code: 'W', name: 'Mollets sur une jambe', level: 2, muscles: mu(['calves']), equipment: ['support'], mode: 'reps', unilateral: true, bookPage: 210,
     description: 'Sur une cale de 15 cm minimum, sur un pied, une main au mur pour l\'équilibre. Descendre talon au plus bas puis monter sur la pointe, lentement.' }),
-  L({ code: 'X', name: 'Rotations du buste debout', level: 1, muscles: ['obliques', 'colonne'], equipment: ['baton'], mode: 'time', bookPage: 211,
+  L({ code: 'X', name: 'Rotations du buste debout', level: 1, muscles: ROTATION, equipment: ['baton'], mode: 'time', bookPage: 211,
     description: 'Debout ou assis haut, bâton derrière les épaules, bassin bloqué. Rotations lentes et régulières, s\'arrêter dès la première résistance.' }),
-  L({ code: 'Y', name: 'Rotation du cou allongé', level: 2, muscles: ['cou'], equipment: ['aucun'], mode: 'reps', bookPage: 212,
+  L({ code: 'Y', name: 'Rotation du cou allongé', level: 2, muscles: NECK, equipment: ['aucun'], mode: 'reps', bookPage: 212,
     description: 'Allongé sur le côté, coussin sous les côtes, bras dans le prolongement du corps. Tourner lentement la tête vers le haut, sans jamais forcer.' }),
-  L({ code: 'Z', name: 'Pont', level: 2, muscles: ['colonne', 'epaules'], equipment: ['aucun'], mode: 'reps', bookPage: 213,
+  L({ code: 'Z', name: 'Pont', level: 2, muscles: mu(['lower_back'], ['glutes', 'triceps', 'front_delts']), equipment: ['aucun'], mode: 'reps', bookPage: 213,
     description: 'Sur le dos, pieds à plat, mains à plat près des oreilles. Monter le bassin puis tendre les bras pour arquer le dos. 10 répétitions en fin de séance.' }),
 ];
 
@@ -338,11 +367,11 @@ export const LAFAY_EXERCISES: CatalogExercise[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TURBO_EXERCISES: CatalogExercise[] = [
-  { id: 'turbo-curl-sangles', family: 'turbo', name: 'Curl biceps aux sangles', source: 'lafay-turbo', muscles: ['biceps'], equipment: ['sangles', 'barre-traction'], mode: 'reps', bookPage: 98,
+  { id: 'turbo-curl-sangles', family: 'turbo', name: 'Curl biceps aux sangles', source: 'lafay-turbo', muscles: CURL, equipment: ['sangles', 'barre-traction'], mode: 'reps', bookPage: 98,
     description: 'Deux sangles fixées au moins 20 cm au-dessus de la tête, paumes vers le haut, pieds sous la barre. Se laisser partir en arrière bras tendus, puis fléchir les avant-bras sans bouger les coudes. Allonger la sangle de 10 cm si c\'est trop facile.' },
-  { id: 'turbo-vacuum', family: 'turbo', name: 'Transverse à quatre pattes', subtitle: 'Vacuum', source: 'lafay-turbo', muscles: ['abdominaux'], equipment: ['aucun'], mode: 'reps', bookPage: 100,
+  { id: 'turbo-vacuum', family: 'turbo', name: 'Transverse à quatre pattes', subtitle: 'Vacuum', source: 'lafay-turbo', muscles: mu(['abs']), equipment: ['aucun'], mode: 'reps', bookPage: 100,
     description: 'À quatre pattes, bas du dos légèrement creusé. Inspirer en laissant le ventre descendre, puis souffler fort en rentrant le ventre au maximum, tenir 2 s. Lent et contrôlé ; viser 15 répétitions sur 3 séries.' },
-  { id: 'turbo-nordic', family: 'turbo', name: 'Ischios à genoux', subtitle: 'Nordic curl', source: 'lafay-turbo', muscles: ['ischios'], equipment: ['table'], mode: 'reps', bookPage: 102,
+  { id: 'turbo-nordic', family: 'turbo', name: 'Ischios à genoux', subtitle: 'Nordic curl', source: 'lafay-turbo', muscles: mu(['hamstrings'], ['calves']), equipment: ['table'], mode: 'reps', bookPage: 102,
     description: 'À genoux sur un tapis, chevilles bloquées sous une barre basse. Descendre le buste en freinant au maximum, se réceptionner en pompe, remonter en s\'aidant des bras. Très difficile : progresser par l\'amplitude.' },
 ];
 
@@ -353,61 +382,61 @@ export const TURBO_EXERCISES: CatalogExercise[] = [
 const SP = (e: Omit<CatalogExercise, 'source'>): CatalogExercise => ({ source: 'superphysique', ...e });
 
 export const SUPERPHYSIQUE_EXERCISES: CatalogExercise[] = [
-  SP({ id: 'developpe-couche-barre', family: 'sp-pecs', name: 'Développé couché', subtitle: 'Barre', muscles: ['pectoraux', 'triceps', 'epaules'], equipment: ['barre', 'banc'], mode: 'reps',
+  SP({ id: 'developpe-couche-barre', family: 'sp-pecs', name: 'Développé couché', subtitle: 'Barre', muscles: BENCH, equipment: ['barre', 'banc'], mode: 'reps',
     description: 'Allongé sur le banc, omoplates serrées, pieds au sol. Descendre la barre contrôlée jusqu\'au bas des pectoraux, pousser. Avec pareur ou sécurités.' }),
-  SP({ id: 'developpe-couche-halteres', family: 'sp-pecs', name: 'Développé couché', subtitle: 'Haltères', muscles: ['pectoraux', 'triceps', 'epaules'], equipment: ['halteres', 'banc'], mode: 'reps',
+  SP({ id: 'developpe-couche-halteres', family: 'sp-pecs', name: 'Développé couché', subtitle: 'Haltères', muscles: BENCH, equipment: ['halteres', 'banc'], mode: 'reps',
     description: 'Comme à la barre avec une trajectoire convergente : plus d\'étirement en bas, plus de contraction en haut. Environ moitié du poids de la barre moins 15 % par haltère.' }),
-  SP({ id: 'developpe-incline-halteres', family: 'sp-pecs', name: 'Développé incliné', subtitle: 'Haltères', muscles: ['pectoraux', 'epaules', 'triceps'], equipment: ['halteres', 'banc'], mode: 'reps',
+  SP({ id: 'developpe-incline-halteres', family: 'sp-pecs', name: 'Développé incliné', subtitle: 'Haltères', muscles: mu(['chest', 'front_delts'], ['triceps']), equipment: ['halteres', 'banc'], mode: 'reps',
     description: 'Banc incliné à 30–45°. Descendre les haltères à hauteur du haut des pectoraux, coudes sous les poignets, pousser en rapprochant.' }),
-  SP({ id: 'pull-over-haltere', family: 'sp-pecs', name: 'Pull-over', subtitle: 'Haltère', muscles: ['pectoraux', 'dos'], equipment: ['halteres', 'banc'], mode: 'reps',
+  SP({ id: 'pull-over-haltere', family: 'sp-pecs', name: 'Pull-over', subtitle: 'Haltère', muscles: mu(['lats', 'chest'], ['triceps']), equipment: ['halteres', 'banc'], mode: 'reps',
     description: 'Allongé, un haltère tenu à deux mains au-dessus de la poitrine, bras presque tendus. Descendre derrière la tête en ouvrant la cage thoracique, revenir.' }),
-  SP({ id: 'rowing-un-bras-haltere', family: 'sp-dos', name: 'Rowing un bras', subtitle: 'Haltère', muscles: ['dos', 'biceps'], equipment: ['halteres'], mode: 'reps', unilateral: true,
+  SP({ id: 'rowing-un-bras-haltere', family: 'sp-dos', name: 'Rowing un bras', subtitle: 'Haltère', muscles: mu(['lats', 'upper_back'], ['biceps', 'rear_delts', 'forearms']), equipment: ['halteres'], mode: 'reps', unilateral: true,
     description: 'Une main et un genou en appui, dos plat. Tirer l\'haltère vers la hanche en gardant le coude près du corps, redescendre bras tendu pour bien étirer.' }),
-  SP({ id: 'rowing-barre-pronation', family: 'sp-dos', name: 'Rowing barre', subtitle: 'Pronation', muscles: ['dos', 'biceps'], equipment: ['barre'], mode: 'reps',
+  SP({ id: 'rowing-barre-pronation', family: 'sp-dos', name: 'Rowing barre', subtitle: 'Pronation', muscles: mu(['upper_back', 'lats'], ['rear_delts', 'biceps', 'lower_back']), equipment: ['barre'], mode: 'reps',
     description: 'Buste penché à environ 45°, dos plat, genoux fléchis. Tirer la barre vers le nombril, coudes en arrière, redescendre contrôlé.' }),
-  SP({ id: 'rowing-yates-supination', family: 'sp-dos', name: 'Rowing Yates', subtitle: 'Barre, supination', muscles: ['dos', 'biceps'], equipment: ['barre'], mode: 'reps',
+  SP({ id: 'rowing-yates-supination', family: 'sp-dos', name: 'Rowing Yates', subtitle: 'Barre, supination', muscles: mu(['lats', 'upper_back'], ['biceps', 'lower_back']), equipment: ['barre'], mode: 'reps',
     description: 'Buste plus redressé (environ 30° vers l\'avant), paumes vers le haut. Tirer la barre au bas du ventre, coudes serrés.' }),
-  SP({ id: 'shrug-halteres', family: 'sp-dos', name: 'Shrug', subtitle: 'Haltères, prise neutre', muscles: ['trapezes'], equipment: ['halteres'], mode: 'reps',
+  SP({ id: 'shrug-halteres', family: 'sp-dos', name: 'Shrug', subtitle: 'Haltères, prise neutre', muscles: mu(['traps'], ['forearms']), equipment: ['halteres'], mode: 'reps',
     description: 'Debout, haltères le long du corps. Hausser les épaules vers les oreilles sans plier les bras, tenir 1 s, redescendre.' }),
-  SP({ id: 'elevations-laterales', family: 'sp-epaules', name: 'Élévations latérales', subtitle: 'Haltères', muscles: ['epaules'], equipment: ['halteres'], mode: 'reps',
+  SP({ id: 'elevations-laterales', family: 'sp-epaules', name: 'Élévations latérales', subtitle: 'Haltères', muscles: mu(['side_delts'], ['traps']), equipment: ['halteres'], mode: 'reps',
     description: 'Debout, coudes légèrement fléchis. Monter les haltères sur les côtés jusqu\'à l\'horizontale, sans élan, redescendre lentement.' }),
-  SP({ id: 'elevation-laterale-un-bras-incline', family: 'sp-epaules', name: 'Élévation latérale un bras', subtitle: 'Sur banc incliné', muscles: ['epaules'], equipment: ['halteres', 'banc'], mode: 'reps', unilateral: true,
+  SP({ id: 'elevation-laterale-un-bras-incline', family: 'sp-epaules', name: 'Élévation latérale un bras', subtitle: 'Sur banc incliné', muscles: mu(['side_delts']), equipment: ['halteres', 'banc'], mode: 'reps', unilateral: true,
     description: 'Allongé sur le côté sur un banc incliné. Monter l\'haltère jusqu\'à la verticale du bras, redescendre contrôlé : tension constante.' }),
-  SP({ id: 'oiseau-haltere', family: 'sp-epaules', name: 'Oiseau', subtitle: 'Haltères', muscles: ['epaules', 'dos'], equipment: ['halteres'], mode: 'reps',
+  SP({ id: 'oiseau-haltere', family: 'sp-epaules', name: 'Oiseau', subtitle: 'Haltères', muscles: mu(['rear_delts'], ['upper_back', 'traps']), equipment: ['halteres'], mode: 'reps',
     description: 'Buste penché presque à l\'horizontale. Écarter les bras sur les côtés coudes légèrement fléchis, serrer l\'arrière des épaules.' }),
-  SP({ id: 'developpe-militaire', family: 'sp-epaules', name: 'Développé militaire', subtitle: 'Barre, debout', muscles: ['epaules', 'triceps'], equipment: ['barre'], mode: 'reps',
+  SP({ id: 'developpe-militaire', family: 'sp-epaules', name: 'Développé militaire', subtitle: 'Barre, debout', muscles: mu(['front_delts'], ['side_delts', 'triceps', 'traps']), equipment: ['barre'], mode: 'reps',
     description: 'Debout, gainé, barre au niveau des clavicules. Pousser au-dessus de la tête en passant le visage, verrouiller, redescendre.' }),
-  SP({ id: 'developpe-assis-halteres', family: 'sp-epaules', name: 'Développé assis', subtitle: 'Haltères', muscles: ['epaules', 'triceps'], equipment: ['halteres', 'banc'], mode: 'reps',
+  SP({ id: 'developpe-assis-halteres', family: 'sp-epaules', name: 'Développé assis', subtitle: 'Haltères', muscles: mu(['front_delts'], ['side_delts', 'triceps']), equipment: ['halteres', 'banc'], mode: 'reps',
     description: 'Assis dos calé, haltères à hauteur d\'oreilles. Pousser vers le haut en rapprochant, redescendre sous le niveau des oreilles.' }),
-  SP({ id: 'curl-halteres', family: 'sp-bras', name: 'Curl', subtitle: 'Haltères', muscles: ['biceps'], equipment: ['halteres'], mode: 'reps',
+  SP({ id: 'curl-halteres', family: 'sp-bras', name: 'Curl', subtitle: 'Haltères', muscles: CURL, equipment: ['halteres'], mode: 'reps',
     description: 'Debout, coudes collés au corps. Fléchir en tournant la paume vers le haut, redescendre bras tendu sans balancer.' }),
-  SP({ id: 'curl-barre', family: 'sp-bras', name: 'Curl', subtitle: 'Barre droite ou EZ', muscles: ['biceps'], equipment: ['barre'], mode: 'reps',
+  SP({ id: 'curl-barre', family: 'sp-bras', name: 'Curl', subtitle: 'Barre droite ou EZ', muscles: CURL, equipment: ['barre'], mode: 'reps',
     description: 'Debout, prise largeur d\'épaules. Monter la barre sans avancer les coudes ni basculer le buste.' }),
-  SP({ id: 'curl-incline-halteres', family: 'sp-bras', name: 'Curl incliné', subtitle: 'Haltères', muscles: ['biceps'], equipment: ['halteres', 'banc'], mode: 'reps',
+  SP({ id: 'curl-incline-halteres', family: 'sp-bras', name: 'Curl incliné', subtitle: 'Haltères', muscles: CURL, equipment: ['halteres', 'banc'], mode: 'reps',
     description: 'Assis sur banc incliné, bras pendants en arrière du buste. Fléchir sans avancer les coudes : étirement maximal du biceps.' }),
-  SP({ id: 'extension-nuque-un-bras', family: 'sp-bras', name: 'Extension nuque un bras', subtitle: 'Haltère', muscles: ['triceps'], equipment: ['halteres'], mode: 'reps', unilateral: true,
+  SP({ id: 'extension-nuque-un-bras', family: 'sp-bras', name: 'Extension nuque un bras', subtitle: 'Haltère', muscles: mu(['triceps']), equipment: ['halteres'], mode: 'reps', unilateral: true,
     description: 'Haltère tenu au-dessus de la tête, coude pointé vers le plafond. Descendre derrière la nuque, tendre le bras sans bouger le coude.' }),
-  SP({ id: 'tate-press', family: 'sp-bras', name: 'Tate press', subtitle: 'Haltère', muscles: ['triceps'], equipment: ['halteres', 'banc'], mode: 'reps',
+  SP({ id: 'tate-press', family: 'sp-bras', name: 'Tate press', subtitle: 'Haltère', muscles: mu(['triceps']), equipment: ['halteres', 'banc'], mode: 'reps',
     description: 'Allongé, haltère au-dessus de la poitrine, coude ouvert vers l\'extérieur. Descendre l\'haltère vers le sternum, tendre.' }),
-  SP({ id: 'gobelet-squat', family: 'sp-jambes', name: 'Gobelet squat', subtitle: 'Haltère', muscles: ['cuisses', 'fessiers'], equipment: ['halteres'], mode: 'reps',
+  SP({ id: 'gobelet-squat', family: 'sp-jambes', name: 'Gobelet squat', subtitle: 'Haltère', muscles: mu(['quads', 'glutes'], ['adductors', 'abs']), equipment: ['halteres'], mode: 'reps',
     description: 'Haltère tenu verticalement contre la poitrine. Descendre entre les genoux, buste droit, talons au sol, remonter.' }),
-  SP({ id: 'fentes-halteres', family: 'sp-jambes', name: 'Fentes', subtitle: 'Haltères', muscles: ['cuisses', 'fessiers'], equipment: ['halteres'], mode: 'reps', unilateral: true,
+  SP({ id: 'fentes-halteres', family: 'sp-jambes', name: 'Fentes', subtitle: 'Haltères', muscles: LUNGE, equipment: ['halteres'], mode: 'reps', unilateral: true,
     description: 'Grand pas en avant, descendre le genou arrière près du sol, buste droit, repousser sur le talon avant.' }),
-  SP({ id: 'squat-bulgare', family: 'sp-jambes', name: 'Squat bulgare', subtitle: 'Haltères', muscles: ['cuisses', 'fessiers'], equipment: ['halteres', 'banc'], mode: 'reps', unilateral: true,
+  SP({ id: 'squat-bulgare', family: 'sp-jambes', name: 'Squat bulgare', subtitle: 'Haltères', muscles: LUNGE, equipment: ['halteres', 'banc'], mode: 'reps', unilateral: true,
     description: 'Pied arrière posé sur un banc ou une chaise. Descendre verticalement sur la jambe avant, genou dans l\'axe du pied.' }),
-  SP({ id: 'squat-barre', family: 'sp-jambes', name: 'Squat', subtitle: 'Barre', muscles: ['cuisses', 'fessiers'], equipment: ['barre'], mode: 'reps',
+  SP({ id: 'squat-barre', family: 'sp-jambes', name: 'Squat', subtitle: 'Barre', muscles: mu(['quads', 'glutes'], ['hamstrings', 'adductors', 'lower_back']), equipment: ['barre'], mode: 'reps',
     description: 'Barre sur les trapèzes, pieds largeur d\'épaules. Descendre hanches en arrière jusqu\'à la parallèle, dos neutre, remonter. Nécessite un rack.' }),
-  SP({ id: 'squat-avant', family: 'sp-jambes', name: 'Squat avant', subtitle: 'Barre', muscles: ['cuisses'], equipment: ['barre'], mode: 'reps',
+  SP({ id: 'squat-avant', family: 'sp-jambes', name: 'Squat avant', subtitle: 'Barre', muscles: mu(['quads'], ['glutes', 'abs', 'upper_back']), equipment: ['barre'], mode: 'reps',
     description: 'Barre posée sur l\'avant des épaules, coudes hauts. Descendre buste très droit, remonter. Nécessite un rack.' }),
-  SP({ id: 'souleve-de-terre-jambes-tendues', family: 'sp-jambes', name: 'Soulevé de terre jambes tendues', subtitle: 'Barre ou haltères', muscles: ['ischios', 'fessiers', 'lombaires'], equipment: ['halteres'], mode: 'reps',
+  SP({ id: 'souleve-de-terre-jambes-tendues', family: 'sp-jambes', name: 'Soulevé de terre jambes tendues', subtitle: 'Barre ou haltères', muscles: mu(['hamstrings', 'glutes'], ['lower_back', 'forearms']), equipment: ['halteres'], mode: 'reps',
     description: 'Jambes presque tendues, dos plat. Descendre la charge le long des jambes en reculant les hanches jusqu\'à l\'étirement des ischios, remonter.' }),
-  SP({ id: 'mollets-debout-une-jambe', family: 'sp-jambes', name: 'Mollets debout une jambe', subtitle: 'Haltère', muscles: ['mollets'], equipment: ['halteres', 'support'], mode: 'reps', unilateral: true,
+  SP({ id: 'mollets-debout-une-jambe', family: 'sp-jambes', name: 'Mollets debout une jambe', subtitle: 'Haltère', muscles: mu(['calves']), equipment: ['halteres', 'support'], mode: 'reps', unilateral: true,
     description: 'Sur une marche, un haltère dans la main du côté qui travaille. Descendre talon au plus bas, monter sur la pointe, pause en haut.' }),
-  SP({ id: 'gainage', family: 'sp-abdos', name: 'Gainage abdominal', muscles: ['abdominaux'], equipment: ['aucun'], mode: 'time',
+  SP({ id: 'gainage', family: 'sp-abdos', name: 'Gainage abdominal', muscles: mu(['abs'], ['obliques']), equipment: ['aucun'], mode: 'time',
     description: 'En appui sur les avant-bras et la pointe des pieds, corps aligné, fessiers serrés. Tenir le plus longtemps possible.' }),
-  SP({ id: 'gainage-oblique', family: 'sp-abdos', name: 'Gainage oblique', muscles: ['obliques'], equipment: ['aucun'], mode: 'time', unilateral: true,
+  SP({ id: 'gainage-oblique', family: 'sp-abdos', name: 'Gainage oblique', muscles: mu(['obliques'], ['abs']), equipment: ['aucun'], mode: 'time', unilateral: true,
     description: 'Sur le côté, appui avant-bras et pieds, bassin haut. Tenir de chaque côté.' }),
-  SP({ id: 'enroulement-de-bassin', family: 'sp-abdos', name: 'Enroulement de bassin', muscles: ['abdominaux'], equipment: ['aucun'], mode: 'reps',
+  SP({ id: 'enroulement-de-bassin', family: 'sp-abdos', name: 'Enroulement de bassin', muscles: mu(['abs']), equipment: ['aucun'], mode: 'reps',
     description: 'Sur le dos, jambes pliées en l\'air. Enrouler le bassin pour décoller les fesses vers le haut, redescendre lentement.' }),
 ];
 

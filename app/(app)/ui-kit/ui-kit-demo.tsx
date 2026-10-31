@@ -36,6 +36,11 @@ import { sessionRpe } from "@/lib/load";
 import { SetLogger } from "@/components/workout/set-logger";
 import { RouteCard } from "@/components/routes/route-card";
 import { WeatherBanner, WeatherCredit } from "@/components/routes/weather";
+import { BodyMap, MuscleLegend } from "@/components/body/body-map";
+import { MuscleRecovery } from "@/components/body/muscle-recovery";
+import { ExerciseThumb, MusclePanel } from "@/components/workout/catalog-bits";
+import { catalogExercise } from "@/lib/workout/catalog";
+import { musclesOfName, sessionLevels } from "@/lib/workout/body";
 
 export type Screen = "home" | "list" | "run" | "lift" | "workout" | "tokens";
 type Go = (s: Screen, runId?: string) => void;
@@ -303,6 +308,44 @@ function LiftDetail({ back }: { back: () => void }) {
   );
 }
 
+/** Carte des muscles : fiche (md), vignettes, séance (full), récupération, tokens. */
+function BodyMapDemo() {
+  const thumbs = ["B", "C", "J", "G", "M", "F", "W", "K"];
+  const session = sessionLevels(["B - dips", "A3 - pompes", "J1 - pompes piquées", "K2 - triceps", "G - crunch"].map(musclesOfName));
+  return (
+    <div className="space-y-4">
+      <figure>
+        <MusclePanel muscles={catalogExercise("B")!.muscles} />
+        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">md · fiche d&apos;exercice (B, dips) : principaux en muscle-primary, secondaires en muscle-secondary ; ↻ retourne le corps (48 px, tap())</figcaption>
+      </figure>
+      <figure>
+        <div className={cn(ui.card, "flex flex-wrap gap-3 p-4")}>
+          {thumbs.map((id) => <ExerciseThumb key={id} muscles={catalogExercise(id)!.muscles} code={id} />)}
+        </div>
+        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">thumb · avatar d&apos;exercice (feuille d&apos;ajout, préparation, SetLogger en size-14) : vue et cadrage suivent les muscles sollicités</figcaption>
+      </figure>
+      <figure>
+        <div className="rounded-card bg-gradient-to-b from-act-strength-soft to-transparent p-4">
+          <BodyMap size="full" intensity={session} />
+          <MuscleLegend className="mt-2 justify-center" />
+        </div>
+        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">full · fiche de muscu, dans la tête teintée : principal = 1, secondaire = 0,5 par exercice, additionnés et plafonnés</figcaption>
+      </figure>
+      <figure>
+        <div className={cn(ui.card, "p-4")}>
+          <MuscleRecovery levels={{ chest: 0.1, triceps: 0.35, front_delts: 0.6, abs: 0.85, quads: 0.9 }} />
+        </div>
+        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">Récupération · carte du jour de l&apos;accueil quand le coach propose la muscu</figcaption>
+      </figure>
+      <div className="grid grid-cols-6 gap-1.5">
+        {[["primary", "bg-muscle-primary"], ["secondary", "bg-muscle-secondary"], ["tired", "bg-muscle-tired"], ["worked", "bg-muscle-worked"], ["recovering", "bg-muscle-recovering"], ["fresh", "bg-muscle-fresh"]].map(([n, c]) => (
+          <div key={n} className="min-w-0"><div className={cn("h-10 rounded-lg", c)} /><p className="mt-1 truncate text-micro text-ink-mute">muscle-{n}</p></div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────── Tokens : la référence visuelle du système ─────────────── */
 function Tokens() {
   const [theme, setThemeState] = useState<"dark" | "light">(() =>
@@ -400,6 +443,10 @@ function Tokens() {
               <span key={c} className={cn("grid h-10 flex-1 place-items-center rounded-lg font-num text-sm font-bold text-black/80", c)}>Z{i + 1}</span>
             ))}
           </div>
+        </Section>
+
+        <Section title="Carte des muscles · BodyMap">
+          <BodyMapDemo />
         </Section>
 
         <Section title="Art · couvertures dérivées des données">

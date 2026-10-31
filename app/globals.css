@@ -33,6 +33,10 @@
     --act-other-soft: color-mix(in oklch, rgb(var(--act-other)) 18%, transparent);
     /* Barres empilées par sport (Analyse > Tous) : une teinte par sport, identique en clair et en sombre. */
     --stack-workout: 252 76 2; --stack-run: 59 130 246; --stack-ride: 139 92 246; --stack-hike: 34 197 94; --stack-other: 138 138 149;
+    /* Carte des muscles (components/body) : magenta, seule teinte libre (ni Volt, ni zones z1–z6, ni sports act-*, ni good/warn/bad).
+       primary = muscle principal, secondary = secondaire ; récupération du plus frais au plus fatigué, même teinte de plus en plus soutenue. */
+    --muscle-primary: 244 92 180; --muscle-secondary: 153 70 121;
+    --muscle-fresh: 93 55 81; --muscle-recovering: 143 67 114; --muscle-worked: 194 80 147; --muscle-tired: 244 92 180;
     /* En sombre, une ombre portée ne se voit pas : on simule la lumière par un liseré clair en haut de la carte. */
     --shadow-card: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
     --font-display: var(--font-body);
@@ -56,6 +60,9 @@
     --viz-ride-bg: 240 240 245; --viz-ride-ink: 36 36 40;
     /* Zones en clair : assombries pour ≥ 3,2:1 sur surface et sur viz-ride-bg (= surface-2) (z3 émeraude, z4 ocre : ni Volt, ni orange). */
     --z1: 122 122 136; --z2: 47 111 238; --z3: 5 150 105; --z4: 160 112 4; --z5: 229 57 57; --z6: 130 70 240;
+    /* Carte des muscles en clair : magenta plus profond, secondaire et paliers frais en rose pâle. */
+    --muscle-primary: 219 39 140; --muscle-secondary: 224 143 192;
+    --muscle-fresh: 226 181 211; --muscle-recovering: 224 134 188; --muscle-worked: 221 86 164; --muscle-tired: 219 39 140;
     --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
     color-scheme: light;
   }
@@ -78,6 +85,8 @@
       --viz-ride-bg: 240 240 245; --viz-ride-ink: 36 36 40;
       /* Zones en clair : assombries pour ≥ 3,2:1 sur surface et sur viz-ride-bg (= surface-2) (z3 émeraude, z4 ocre : ni Volt, ni orange). */
       --z1: 122 122 136; --z2: 47 111 238; --z3: 5 150 105; --z4: 160 112 4; --z5: 229 57 57; --z6: 130 70 240;
+      --muscle-primary: 219 39 140; --muscle-secondary: 224 143 192;
+      --muscle-fresh: 226 181 211; --muscle-recovering: 224 134 188; --muscle-worked: 221 86 164; --muscle-tired: 219 39 140;
       --shadow-card: 0 1px 2px 0 rgb(16 16 24 / 0.06), 0 0 0 1px rgb(16 16 24 / 0.05);
       color-scheme: light;
     }

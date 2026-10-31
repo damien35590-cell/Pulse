@@ -30,6 +30,8 @@ const config: Config = {
         stack: { workout: c("stack-workout"), run: c("stack-run"), ride: c("stack-ride"), hike: c("stack-hike"), other: c("stack-other") },
         act: Object.fromEntries(["run", "strength", "ride", "hike", "other"].map((k) => [k, { DEFAULT: c(`act-${k}`), soft: `var(--act-${k}-soft)` }])),
         z1: c("z1"), z2: c("z2"), z3: c("z3"), z4: c("z4"), z5: c("z5"), z6: c("z6"),
+        // Carte des muscles : fill-muscle-primary, bg-muscle-tired…
+        muscle: Object.fromEntries(["primary", "secondary", "fresh", "recovering", "worked", "tired"].map((k) => [k, c(`muscle-${k}`)])),
         // Bandes de visuel du fil : suivent le thème (bg-viz-strength-bg, text-viz-strength-ink, bg-viz-ride-bg…).
         viz: Object.fromEntries(["strength-bg", "strength-bar", "strength-bar-dim", "strength-ink", "strength-code", "target", "ride-bg", "ride-ink"].map((k) => [k, c(`viz-${k}`)])),
         // Art : toujours sombre, identique dans les deux thèmes (bg-art-run-bg, text-art-gym-fg, text-art-ink…).
@@ -86,11 +88,14 @@ const config: Config = {
         "sheet-in": { from: { transform: "translateY(100%)" }, to: { transform: "translateY(0)" } },
         pop: { "0%": { transform: "scale(.6)" }, "60%": { transform: "scale(1.12)" }, "100%": { transform: "scale(1)" } },
         "fade-up": { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "none" } },
+        // Carte des muscles : le corps se retourne (face ↔ dos).
+        "body-turn": { from: { opacity: "0.3", transform: "scaleX(0.3)" }, to: { opacity: "1", transform: "none" } },
       },
       animation: {
         "sheet-in": "sheet-in .28s cubic-bezier(.2,.8,.2,1)",
         pop: "pop .32s cubic-bezier(.2,.8,.2,1)",
         "fade-up": "fade-up .3s cubic-bezier(.2,.8,.2,1) both",
+        "body-turn": "body-turn .26s cubic-bezier(.2,.8,.2,1)",
       },
     },
   },

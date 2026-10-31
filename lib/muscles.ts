@@ -75,10 +75,3 @@ export function volumeByMuscle(exercises: Ex[], bodyKg = 70): Record<Group, Musc
   }
   return out;
 }
-
-/** Pêche (peu sollicité) → orange de la marque → rouge profond (très sollicité). Le repos (0) est géré par la carte, en couleur neutre du thème. */
-const HEAT = [[255, 200, 160], [242, 74, 0], [178, 18, 0]];
-export function heatColor(r: number): string {
-  const t = Math.max(0, Math.min(1, r)) * 2, i = Math.min(1, Math.floor(t)), f = t - i, [a, b] = [HEAT[i], HEAT[i + 1]];
-  return `rgb(${a.map((x, k) => Math.round(x + (b[k] - x) * f)).join(",")})`;
-}

@@ -12,6 +12,8 @@ import { Metric } from "@/components/ui/metric";
 import { Switch } from "@/components/ui/switch";
 import { HrPill, zoneText } from "@/components/workout/hr-pill";
 import { CodeBadge } from "@/components/workout/catalog-bits";
+import { BodyMap } from "@/components/body/body-map";
+import { musclesOfName } from "@/lib/workout/body";
 import { useHeartRate } from "@/stores/heart-rate";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { nextVerdict, type NextVerdict } from "@/lib/workout/next-target";
@@ -325,8 +327,13 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onDisc
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
           >
-            <p className={ui.label}>{program ? `${program} · ` : ""}Exercice {idx + 1}/{exs.length}</p>
-            <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-tight">{ex.name}</h1>
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className={ui.label}>{program ? `${program} · ` : ""}Exercice {idx + 1}/{exs.length}</p>
+                <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-tight">{ex.name}</h1>
+              </div>
+              <ExerciseMuscles name={ex.name} />
+            </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className={ui.chip}><Target className="size-3.5" aria-hidden />{ex.sets} × {ex.reps}{ex.timed ? " s" : ""} · {kgTxt(ex.kg, ex.bodyweight)}{ex.bodyweight ? "" : " kg"}</span>
               <span className={ui.chip}><Timer className="size-3.5" aria-hidden />Repos {fmtClock(ex.restS)}</span>
@@ -522,6 +529,12 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onDisc
 }
 
 /** Pastille « Dur » : cible de 48 px, pastille de 28 px ; activée = teinte `warn`. */
+/** Muscles de l'exercice en cours, en vignette à côté de son nom (rien pour un exercice inconnu). */
+function ExerciseMuscles({ name }: { name: string }) {
+  const m = musclesOfName(name);
+  return m ? <BodyMap size="thumb" primary={m.primary} secondary={m.secondary} className="size-14 bg-surface" /> : null;
+}
+
 function HardChip({ on, onClick, label, big }: { on: boolean; onClick: () => void; label: string; big?: boolean }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} aria-label={label} className={cn("grid touch-manipulation place-items-center transition active:scale-90", big ? "h-12 px-1" : "size-12")}>

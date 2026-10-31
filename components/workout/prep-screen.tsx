@@ -9,7 +9,8 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { AddExerciseSheet } from "@/components/workout/add-exercise-sheet";
 import { LAFAY_FAMILIES, catalogExercise, catalogFor, displayName, isLafayCode, nextInLadder, prevInLadder } from "@/lib/workout/catalog";
-import { ExerciseDetail } from "@/components/workout/catalog-bits";
+import { ExerciseDetail, ExerciseThumb } from "@/components/workout/catalog-bits";
+import { musclesOfCode } from "@/lib/workout/body";
 import type { Draft, DraftExercise } from "@/lib/workout/types";
 
 /** « 8·8·8·7·6·5 = 42 » */
@@ -67,6 +68,7 @@ export function PrepScreen({ draft, onStart, onBack }: { draft: Draft; onStart: 
                   <button type="button" disabled={i === 0} onClick={() => move(i, i - 1)} aria-label={`Monter ${e.name}`} className={cn(ui.iconBtn, "disabled:opacity-30")}><ChevronUp className="size-6" aria-hidden /></button>
                   <button type="button" disabled={i === list.length - 1} onClick={() => move(i, i + 1)} aria-label={`Descendre ${e.name}`} className={cn(ui.iconBtn, "disabled:opacity-30")}><ChevronDown className="size-6" aria-hidden /></button>
                 </div>
+                <ExerciseThumb muscles={musclesOfCode(e.code, e.variant)} className="mr-2 self-center" />
                 <div className="min-w-0 flex-1 self-center py-2">
                   <p className="truncate font-semibold">{e.name}</p>
                   {catalogFor(e.code, e.variant)?.subtitle && <p className="truncate text-sm text-ink-soft">{catalogFor(e.code, e.variant)!.subtitle}</p>}
