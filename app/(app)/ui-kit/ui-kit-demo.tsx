@@ -415,7 +415,7 @@ function Tokens() {
                 <ExerciseCard r={cardioDemo} />
                 <ExerciseCard r={cardioDemo} defaultCardioOpen />
               </ul>
-              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">ExerciseCard · FC par série repliée (« ♥ Cardio », zone de toucher 48 px), puis dépliée : pic et récup centrés sous chaque barre, « – » si absent</figcaption>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">ExerciseCard · FC par série repliée (« ♥ Cardio », zone de toucher 48 px), puis dépliée : encart `bg-surface-2` sous les barres, « Pic (bpm) » et « Fin du repos (bpm) » en deux lignes (libellé au-dessus, valeurs centrées sous chaque barre, « – » si absent)</figcaption>
             </figure>
             <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
               {[["strength-bg", "bg-viz-strength-bg"], ["strength-bar", "bg-viz-strength-bar"], ["strength-bar-dim", "bg-viz-strength-bar-dim"], ["strength-ink", "bg-viz-strength-ink"], ["strength-code", "bg-viz-strength-code"], ["target", "bg-viz-target"], ["ride-bg", "bg-viz-ride-bg"], ["ride-ink", "bg-viz-ride-ink"]].map(([n, c]) => (
