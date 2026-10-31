@@ -1,6 +1,7 @@
 /**
  * Dessin du corps de la carte des muscles (components/body/body-map.tsx) : illustration originale de Pulse.
- * Adulte d'environ 7,5 têtes (tête de 46 unités, du sommet y = 12 à la plante y = 357), épaules larges de deux têtes.
+ * Adulte athlétique d'environ 8 têtes (tête de 41 unités, du sommet y = 16 à la plante y = 357), épaules larges de 2,5 têtes,
+ * deltoïdes en coiffes rondes qui débordent du bras, dos en V, mains discrètes.
  * Seule la moitié gauche de l'écran (x ≤ 100) est décrite ; la droite est la même en miroir autour de x = 100.
  * Chaque muscle est une forme arrondie ; l'écart entre deux formes laisse voir la silhouette (le trait de la carte l'accentue).
  * `m: null` : forme décorative, jamais mise en couleur (tibial antérieur).
@@ -11,12 +12,12 @@ export type BodyShape = { m: MuscleId | null; d: string };
 
 /** Silhouette, moitié gauche : déborde de 0,6 sur l'axe pour que les deux moitiés se recouvrent sans liseré. */
 export const BODY_OUTLINE =
-  "M100.6 12 C92 12 85.5 18.5 85 29 C84.6 37 86 45 89.5 50.5 C90.5 52 91 53.5 91 56 L90.5 62 " +
-  "C85 66 76 69 68 71.5 C61 73 56 76 53.5 82 C51.5 88 51.5 97 52.5 104 " + // trapèze, épaule
-  "C50 116 48 130 46.5 146 C44 154 42 164 40.5 174 C39.5 181 39 186 39 190 " + // bras, avant-bras
-  "C36.5 196 35.5 205 36.5 214 C37.5 221 40.5 225 44 225.5 C47.5 225.5 49.5 222 50 217 C50.5 210 50.5 200 50.5 192 " + // main
-  "C52.5 180 56 168 59 158 C60 154 60.5 150 60.5 147 C62 136 64.5 120 66.5 108 C67.5 104 68.5 101 69.5 99 " + // retour par l'intérieur du bras
-  "C71 108 72.5 118 74 128 C75.5 138 76.5 147 76 155 C75.5 162 73.6 168 71.6 174 " + // flanc, taille, hanche
+  "M100.6 16.4 C92.8 16.4 86.95 22.25 86.5 31.7 C86.14 38.9 87.4 46.1 90.55 51.05 C91.45 52.4 91.9 53.75 91.9 56 L91 62 " +
+  "C85 66 76 69 68 71.5 C60 72.6 52.4 75.6 50 82.4 C48 88.6 48.4 97 51.2 104 " + // trapèze, épaule
+  "C49.8 116 48 130 46.5 146 C44 154 42 164 40.5 174 C39.5 181 39 186 39 190 " + // bras, avant-bras
+  "C38 195 38 200 38.8 204.5 C39.6 208.8 41.8 211.5 44.4 211.6 C47 211.6 48.6 209 49 205 C49.4 200.5 49.8 195.5 50.5 192 " + // main
+  "C52.5 180 56 168 59 158 C60 154 60.5 150 60.5 147 C62 136 64.5 120 66.5 108 C67.4 104 68 101 68.6 98.5 " + // retour par l'intérieur du bras
+  "C69 107 70.2 117 72.6 127.5 C75 137.5 76.6 147 76.2 155 C75.5 162 73.6 168 71.6 174 " + // flanc, taille, hanche
   "C69 182 67.8 192 68 202 C68.4 218 71.4 236 76 252 C77 258 77.5 263 76.5 268 " + // cuisse, genou
   "C73.5 276 72 286 72.5 295 C73 308 77 322 80 336 C80.5 340 79.5 344 78 348 C76 352 76.5 356.5 80 357 L92 357 " + // jambe, pied
   "C95 356.5 95.5 352 94.5 347 C93.5 343 93 339 93 335 C94 322 96.5 306 97.5 292 C98 282 97 272 95 265 " +
@@ -26,17 +27,18 @@ const FOREARM_OUT = "M46.8 150 C44.5 156.5 43 164 42.4 172 C42 178 42 183.5 42.3
 const FOREARM_IN = "M53.4 150.5 C52.6 157.5 50.8 165.5 48.8 173 C47 179.5 45.5 185 45 189 L49.6 189.5 C51.2 181 53.8 171 56.8 162 C58 158 59 154 59.2 150.5 Z";
 
 export const FRONT_SHAPES: BodyShape[] = [
-  { m: "neck", d: "M91.5 54.5 C93.5 60 96 65.5 99 70 C99.3 67.5 98.5 64.5 97.2 61.5 C96 58.5 95.3 56 95 53.5 Z" }, // sterno-cléido-mastoïdien
-  { m: "traps", d: "M91 56.5 C91.8 61 92.8 65 94.2 69 C87 70.6 79 71.6 71 72.6 C77.5 70.2 84.5 67.5 90.6 63.2 Z" },
+  { m: "neck", d: "M92.2 54.6 C94 60 96 65.5 99 70 C99.3 67.5 98.5 64.5 97.2 61.5 C96 58.5 95.3 56 95 53.5 Z" }, // sterno-cléido-mastoïdien
+  { m: "traps", d: "M92 57 C92.6 61 93.4 65 94.6 69 C87 70.6 79 71.6 71 72.6 C77.5 70.2 84.5 67.5 91.2 63.6 Z" },
   { m: "chest", d: "M99 77 C93 75.8 85 75.5 78.5 76.5 C75 81 72.5 88 71.5 96 C72.5 102.5 75.5 107.5 80 110 C86.5 113 93.5 113 99 111.5 Z" },
-  { m: "front_delts", d: "M77.5 75 C73.5 74.2 69 74.3 65.5 75.4 C63.2 86 62.5 98 63 108 C65.5 104.5 68.5 100 70.5 95.5 C71.6 88 74 80.5 77.5 75 Z" },
-  { m: "side_delts", d: "M64.5 75.2 C59.5 76 55.8 78.5 54 83 C52.4 89 52.5 97 53.8 103.5 C56 107 59 109 62 110 C61.3 98.5 62 86.5 64.5 75.2 Z" },
+  { m: "front_delts", d: "M78 75 C73.8 73.6 68.8 73.8 66.2 74.8 C63.6 85 62.8 97 63.2 108 C66 104.4 69 99.8 71 95.4 C72.2 88 74.4 80.6 78 75 Z" },
+  { m: "side_delts", d: "M65.2 74.6 C58.8 74.8 52.6 77.8 50.6 84.4 C49.2 90 49.8 97.4 52.6 103.6 C55 107.4 58.6 109.4 62 110 C61 98.5 61.8 86 65.2 74.6 Z" },
   { m: "biceps", d: "M64.5 110 C60.5 112 57 116 55.3 123 C53.8 131 54.2 139 56.5 145 C58.3 146.6 60 146 60.6 144 C62 135 63.2 124 64.6 113 Z" },
   { m: "triceps", d: "M53.5 107.5 C51.5 117 49.8 129 48.8 141 C50 144.5 52 145.5 54 144 C53 136 53.2 125 55 115 C55.6 111.5 55 109 53.5 107.5 Z" }, // vaste latéral, vu de face
   { m: "forearms", d: FOREARM_OUT },
   { m: "forearms", d: FOREARM_IN },
-  { m: "lats", d: "M70.3 101 C70.8 109 72 118 73.6 127 C74.3 121 75 115 76.2 110.2 C74.5 106.5 72.6 103.5 70.3 101 Z" },
+  { m: "lats", d: "M70 102 C70.2 109.5 71 118 72.6 126.5 C73.8 121 75 115 76.2 110.2 C74.4 106.4 72.4 104 70 102 Z" },
   { m: "obliques", d: "M86.6 114.5 C82.5 114.2 79.6 112.8 77.2 111 C75.8 120 76.6 132 77.6 143 C78.2 151 77 160 75 167 C79.5 171 84.5 174.5 89.5 178 C87.6 165 86.6 150 86.4 135 C86.3 127 86.4 120 86.6 114.5 Z" },
+  { m: "glute_med", d: "M76 170.6 C74 173 72.2 176.4 71 180 C70.6 181.6 70.6 182.6 71 183 C73.6 182.6 76.4 181 78.4 178.8 C78.8 176 77.8 173 76 170.6 Z" },
   { m: "abs", d: "M98.8 114 L98.8 127 C95.2 127.6 91.8 127.4 89.2 126.4 C88.5 122.5 88.5 118 89.2 115.2 C92.4 113.8 95.8 113.5 98.8 114 Z" },
   { m: "abs", d: "M98.8 129.5 L98.8 143 C95 143.5 91.5 143.3 88.8 142.4 C88.1 138 88.1 133.5 88.8 130.4 C92.2 129.4 95.6 129.2 98.8 129.5 Z" },
   { m: "abs", d: "M98.8 145.5 L98.8 160 C95 160.5 91.4 160.2 88.7 159.2 C88 154.5 88 150 88.7 146.4 C92.1 145.4 95.5 145.2 98.8 145.5 Z" },
@@ -53,17 +55,17 @@ export const FRONT_SHAPES: BodyShape[] = [
 export const BACK_SHAPES: BodyShape[] = [
   { m: "neck", d: "M99 51.5 C96.2 51.6 93.6 52.6 92 54.2 C92.3 56.8 92.9 59.6 93.6 61.6 C95.4 60.4 97.2 59.8 99 59.6 Z" },
   { m: "traps", d: "M99 61.5 C96.6 62 94.2 63.2 92 64.6 C86 68 78.5 70.4 70.8 72.4 C69.4 74.2 69 76.2 69.6 78.2 C75.4 81 81.2 84.6 86.4 88.6 C89.2 98.5 92.6 110 95.6 122 C97 128 98.1 134 99 140 Z" },
-  { m: "rear_delts", d: "M70.4 79.5 C67.4 78.4 64.4 78 62 78.2 C60.9 88.5 61.2 99 62.6 108.5 C65.2 104.5 67.8 99.5 69.6 94.5 C70.6 89.5 70.9 84.5 70.4 79.5 Z" },
-  { m: "side_delts", d: "M61 77.5 C58.3 77.9 55.6 80 54 84 C52.4 90 52.5 97.5 53.8 103.5 C55.8 106.8 58.2 108.6 60.8 109.6 C59.8 98.8 59.6 87.8 61 77.5 Z" },
+  { m: "rear_delts", d: "M70.6 79.2 C67.6 77.8 64.6 77.2 62.8 77.4 C61.4 88 61.6 99 62.8 108.6 C65.6 104.6 68.2 99.6 69.8 94.6 C70.8 89.6 71.1 84.4 70.6 79.2 Z" },
+  { m: "side_delts", d: "M61.6 77 C57.6 77.2 52.8 79.6 50.8 85 C49.2 90.6 49.8 98 52.6 103.8 C55 107.4 58 109 60.8 109.6 C59.8 98.8 59.8 87.6 61.6 77 Z" },
   { m: "upper_back", d: "M84.6 90.6 C80.2 88 75.8 85.2 71.8 82.6 C72 89 71.8 95.2 70.6 100.8 C74.4 106.6 78.6 110.6 83.4 113 C86 110.5 88.2 107.2 89.4 103.6 C88.4 98.8 86.8 94.4 84.6 90.6 Z" }, // sous-épineux, grand rond
   { m: "triceps", d: "M53.8 108.6 C51.8 116.6 50.4 126 50 134.4 C52.6 132.4 55.2 128.4 57 122.8 C58.4 118 59.2 113.6 59.4 110.6 C57.6 109.2 55.8 108.6 53.8 108.6 Z" }, // vaste latéral
   { m: "triceps", d: "M60.4 111 C58.6 118.6 56.2 126.6 53.6 132.8 C51.8 137 50.4 140.8 49.6 144.6 C52.6 146.6 56.6 147 60 146 C62.2 137.6 63.6 127.6 64.2 117.6 C64.6 114 64 110.6 62.8 108.2 Z" }, // long chef
   { m: "forearms", d: FOREARM_OUT },
   { m: "forearms", d: FOREARM_IN },
-  { m: "lats", d: "M70.2 103.5 C74.4 108.6 78.8 112.4 83.8 115.4 C87.8 117.8 91.6 121.4 93.8 126.2 C95.4 131 96.2 136.2 96.6 141.6 C92.4 145.2 88.4 149 84.6 153.4 C81.8 156.4 79.6 159.2 77.8 162 C77.4 151.5 76 140.5 74 130 C72.4 121.4 71 112.4 70.2 103.5 Z" },
+  { m: "lats", d: "M70 102.8 C74.4 108.6 78.8 112.4 83.8 115.4 C87.8 117.8 91.6 121.4 93.8 126.2 C95.4 131 96.2 136.2 96.6 141.6 C92.4 145.2 88.4 149 84.6 153.4 C81.8 156.4 79.6 159.2 77.8 162 C77.4 151.5 75.8 140.5 73.6 130 C71.8 121 70.6 111.6 70 102.8 Z" },
   { m: "lower_back", d: "M98.8 147 C95 148 91.8 150 89.6 152.6 C88.6 160.5 89 169.5 91 177.5 C93.4 179.6 96.2 180.6 98.8 180.8 Z" },
   { m: "obliques", d: "M78.4 165 C80.8 160.6 84 157.4 87.6 155.4 C87 162.4 87.5 169 88.8 174.6 C84.4 173.2 79.4 172.8 74.6 173.4 C75.8 170.6 77 167.8 78.4 165 Z" },
-  { m: "glutes", d: "M88.8 178 C83.6 176 78.2 175.6 73.4 176.8 C71.8 181 71 185.6 71.2 190 C76.4 186.4 82.2 183.6 88.8 181.6 Z" }, // moyen fessier
+  { m: "glute_med", d: "M88.8 178 C83.6 176 78.2 175.6 73.4 176.8 C71.8 181 71 185.6 71.2 190 C76.4 186.4 82.2 183.6 88.8 181.6 Z" }, // moyen fessier
   { m: "glutes", d: "M98.8 184 C92.6 182.4 85.6 183.4 79.4 186.8 C73.6 190 70 195.4 69.8 201.6 C69.8 208.6 73.2 214 79 216.4 C85 218.8 92.2 218.4 97.4 215.6 C98.4 212 98.8 208 98.8 204 Z" }, // grand fessier
   { m: "hamstrings", d: "M76 219.6 C73.2 227.4 72.8 237 74.2 245.6 C75.2 250.6 77.2 254 79.8 256 C81.2 247.6 82 236.6 82 226.4 C82 223 81.6 220.4 80.6 218.8 Z" }, // biceps fémoral
   { m: "hamstrings", d: "M84.2 219 C84 229 84.6 240.6 86 251 C87.4 255.8 89.8 257.6 91.8 255.6 C93.4 247 94 236 93.6 226 C93.2 221.6 92.2 218.8 90.6 217.4 Z" }, // semi-tendineux
@@ -75,11 +77,11 @@ export const BACK_SHAPES: BodyShape[] = [
 ];
 
 /** Corps entier [x, y, largeur, hauteur]. */
-export const FULL_FRAME = [30, 8, 140, 352] as const;
+export const FULL_FRAME = [30, 12, 140, 348] as const;
 
 /** Hauteur du centre de chaque muscle sur le dessin : la vignette se cadre sur la moyenne pondérée des muscles sollicités. */
 const MUSCLE_Y: Record<MuscleId, number> = {
-  neck: 62, traps: 82, front_delts: 90, side_delts: 92, rear_delts: 92, chest: 94, upper_back: 100, lats: 125, triceps: 126,
+  neck: 62, glute_med: 182, traps: 82, front_delts: 90, side_delts: 92, rear_delts: 92, chest: 94, upper_back: 100, lats: 125, triceps: 126,
   biceps: 128, obliques: 145, abs: 148, lower_back: 164, forearms: 170, glutes: 198, adductors: 210, quads: 220, hamstrings: 237, calves: 292,
 };
 const THUMB = 124;
@@ -91,14 +93,7 @@ export function thumbFrame(levels: Partial<Record<MuscleId, number>>): [number, 
   return [100 - THUMB / 2, Math.round(cy - THUMB / 2), THUMB, THUMB];
 }
 
-/**
- * Couleur d'un niveau 0 à 1, en tokens seulement : secondaire à 0,5, principal à 1, mélange entre les deux,
- * et du muscle au repos (surface-3) au secondaire en dessous de 0,5. undefined : muscle au repos.
- */
-export function muscleFill(v: number): string | undefined {
-  if (!(v > 0)) return undefined;
-  if (v >= 1) return "rgb(var(--muscle-primary))";
-  if (v === 0.5) return "rgb(var(--muscle-secondary))";
-  if (v > 0.5) return `color-mix(in srgb, rgb(var(--muscle-primary)) ${Math.round((v - 0.5) * 200)}%, rgb(var(--muscle-secondary)))`;
-  return `color-mix(in srgb, rgb(var(--muscle-secondary)) ${Math.round(30 + v * 140)}%, rgb(var(--surface-3)))`;
-}
+/** Classe de remplissage d'un palier (tokens muscle-1 à muscle-4, littéraux pour Tailwind). */
+export const STEP_FILL = { 1: "fill-muscle-1", 2: "fill-muscle-2", 3: "fill-muscle-3", 4: "fill-muscle-4" } as const;
+/** Fond d'un palier (barres, légendes). */
+export const STEP_BG = { 1: "bg-muscle-1", 2: "bg-muscle-2", 3: "bg-muscle-3", 4: "bg-muscle-4" } as const;

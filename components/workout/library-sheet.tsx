@@ -10,7 +10,7 @@ import { EQUIPMENT_LABELS, missingEquipment } from "@/lib/workout/catalog";
 import { PROGRAM_TEMPLATES, type Equipment, type ProgramTemplate } from "@/lib/workout/catalog-data";
 import { SOURCE_LABEL, exerciseLabel, libraryTemplate, prescription } from "@/lib/workout/library";
 
-const ORDER: ProgramTemplate["source"][] = ["perso", "lafay", "lafay-turbo", "superphysique"];
+const ORDER: ProgramTemplate["source"][] = ["perso", "lafay", "lafay-turbo", "renfo", "superphysique"];
 const restTxt = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60}` : ""}` : `${s} s`);
 
 /**

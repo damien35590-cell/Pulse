@@ -4,6 +4,7 @@
  * (tests : tools/test-body.ts).
  */
 import { musclesOf, type Group } from "../muscles";
+import { isSoftActivity } from "../sports";
 import { catalogFor, resolveName } from "./catalog";
 import type { MuscleId, Muscles } from "./catalog-data";
 
@@ -14,13 +15,13 @@ export type MuscleLoad = { tonnage: number; sets: number };
 
 export const MUSCLE_IDS: readonly MuscleId[] = [
   "chest", "front_delts", "side_delts", "rear_delts", "biceps", "triceps", "forearms", "abs", "obliques", "traps",
-  "lats", "upper_back", "lower_back", "glutes", "quads", "hamstrings", "adductors", "calves", "neck",
+  "lats", "upper_back", "lower_back", "glutes", "glute_med", "quads", "hamstrings", "adductors", "calves", "neck",
 ];
 
 export const MUSCLE_NAME: Record<MuscleId, string> = {
   chest: "Pectoraux", front_delts: "Avant des épaules", side_delts: "Côté des épaules", rear_delts: "Arrière des épaules",
   biceps: "Biceps", triceps: "Triceps", forearms: "Avant-bras", abs: "Abdominaux", obliques: "Obliques", traps: "Trapèzes",
-  lats: "Grands dorsaux", upper_back: "Haut du dos", lower_back: "Lombaires", glutes: "Fessiers", quads: "Quadriceps",
+  lats: "Grands dorsaux", upper_back: "Haut du dos", lower_back: "Lombaires", glutes: "Fessiers", glute_med: "Moyen fessier", quads: "Quadriceps",
   hamstrings: "Ischio-jambiers", adductors: "Adducteurs", calves: "Mollets", neck: "Cou",
 };
 
@@ -33,7 +34,7 @@ export function muscleList(ids: readonly MuscleId[]): string {
 /** Vue où le muscle se voit le mieux ; « both » : visible des deux côtés, il ne départage pas les vues. */
 const SIDE: Record<MuscleId, "front" | "back" | "both"> = {
   chest: "front", front_delts: "front", biceps: "front", abs: "front", obliques: "front", quads: "front",
-  rear_delts: "back", triceps: "back", traps: "back", lats: "back", upper_back: "back", lower_back: "back", glutes: "back", hamstrings: "back", calves: "back",
+  rear_delts: "back", triceps: "back", traps: "back", lats: "back", upper_back: "back", lower_back: "back", glutes: "back", glute_med: "back", hamstrings: "back", calves: "back",
   side_delts: "both", forearms: "both", adductors: "both", neck: "both",
 };
 
@@ -109,21 +110,22 @@ export function muscleVolume(exercises: readonly Ex[], bodyKg = 70): Record<Musc
  */
 export const RECOVERY_H: Record<MuscleId, number> = {
   chest: 72, lats: 72, upper_back: 72, lower_back: 72, glutes: 72, quads: 72, hamstrings: 72,
-  front_delts: 48, side_delts: 48, rear_delts: 48, traps: 48, biceps: 48, triceps: 48, adductors: 48,
+  glute_med: 48, front_delts: 48, side_delts: 48, rear_delts: 48, traps: 48, biceps: 48, triceps: 48, adductors: 48,
   abs: 36, obliques: 36, calves: 36, forearms: 36, neck: 36,
 };
 
 /**
  * Récupération de chaque muscle, de 0 (sollicité à l'instant) à 1 (récupéré), d'après les séances récentes : la charge d'une séance
- * (sessionLevels : 1 principal, 0,5 secondaire) s'efface linéairement sur RECOVERY_H, les séances s'additionnent.
- * Les muscles récupérés sont absents.
+ * (`levels`, sinon sessionLevels(`muscles`) : 1 principal, 0,5 secondaire) s'efface linéairement sur RECOVERY_H, les séances s'additionnent.
+ * Les muscles récupérés sont absents. Une sortie course passe ses `levels` (runLevels).
  */
-export function recoveryLevels(sessions: readonly { at: Date; muscles: readonly (Muscles | null)[] }[], now = new Date()): MuscleLevels {
+export type RecoveryInput = { at: Date; muscles?: readonly (Muscles | null)[]; levels?: MuscleLevels };
+export function recoveryLevels(sessions: readonly RecoveryInput[], now = new Date()): MuscleLevels {
   const fatigue: MuscleLevels = {};
   for (const s of sessions) {
     const h = (+now - +s.at) / 36e5;
     if (h < 0) continue;
-    for (const [id, load] of Object.entries(sessionLevels(s.muscles)) as [MuscleId, number][]) {
+    for (const [id, load] of Object.entries(s.levels ?? sessionLevels(s.muscles ?? [])) as [MuscleId, number][]) {
       const left = load * (1 - h / RECOVERY_H[id]);
       if (left > 0) fatigue[id] = (fatigue[id] ?? 0) + left;
     }
@@ -131,11 +133,58 @@ export function recoveryLevels(sessions: readonly { at: Date; muscles: readonly 
   return Object.fromEntries((Object.entries(fatigue) as [MuscleId, number][]).map(([id, f]) => [id, Math.round((1 - Math.min(1, f)) * 100) / 100]));
 }
 
-/** Palier de récupération affiché (tokens muscle-tired → muscle-fresh) ; null : récupéré. */
-export type RecoveryStep = "tired" | "worked" | "recovering" | "fresh";
-export function recoveryStep(r: number | undefined): RecoveryStep | null {
+/** Une sortie course pour la récupération : durée, séance dure (clé, fractionné, compétition), sortie longue. */
+export type RunLoad = { minutes: number; hard?: boolean; long?: boolean };
+
+/** Fatigue des jambes après 45 min faciles : mollets et quadriceps d'abord, puis ischios et fessiers. */
+export const RUN_BASE: MuscleLevels = { calves: 0.4, quads: 0.4, hamstrings: 0.25, glutes: 0.2 };
+/** Plafond d'une course : toujours sous une séance de muscu du bas du corps (1 pour un muscle principal). */
+export const RUN_CAP = 0.75;
+
+/**
+ * Fatigue des jambes d'une course : RUN_BASE × durée (45 min = 1, entre 0,3 et 2) × 1,4 pour une séance dure × 1,15 pour une sortie longue,
+ * plafonnée à RUN_CAP par muscle.
+ */
+export function runLevels(r: RunLoad): MuscleLevels {
+  const k = Math.min(2, Math.max(0.3, r.minutes / 45)) * (r.hard ? 1.4 : 1) * (r.long ? 1.15 : 1);
+  return Object.fromEntries((Object.entries(RUN_BASE) as [MuscleId, number][]).map(([id, b]) => [id, Math.round(Math.min(RUN_CAP, b * k) * 100) / 100]));
+}
+
+/**
+ * Une activité compte-t-elle comme course pour la récupération, et avec quelle charge ? Seulement les courses (RUN) ; jamais une activité
+ * douce ni un import Google Fit (déplacements, marches). Dure : séance clé du programme, fractionné détecté, ou type « interval » / « race ».
+ */
+export function runLoadOf(a: {
+  type: string; source?: string | null; dedupeKey?: string | null; title?: string | null; movingTimeS: number;
+  isInterval?: boolean | null; sessionType?: string | null; keySession?: boolean;
+}): RunLoad | null {
+  if (a.type !== "RUN" || isSoftActivity(a) || a.source === "google-fit" || a.dedupeKey?.startsWith("gfit-") || a.movingTimeS <= 0) return null;
+  const hard = !!a.keySession || !!a.isInterval || a.sessionType === "interval" || a.sessionType === "race";
+  return { minutes: a.movingTimeS / 60, hard, long: a.sessionType === "long" };
+}
+
+/** Palier de couleur de la carte (tokens muscle-1 à muscle-4) : 1 = peu, 4 = beaucoup. */
+export type MuscleStep = 1 | 2 | 3 | 4;
+
+/** Récupération → palier : fatigué (moins de 25 % récupéré) = 4 … presque récupéré = 1 ; null : récupéré. */
+export function recoveryStep(r: number | undefined): MuscleStep | null {
   if (r == null || r >= 1) return null;
-  return r < 0.25 ? "tired" : r < 0.5 ? "worked" : r < 0.75 ? "recovering" : "fresh";
+  return r < 0.25 ? 4 : r < 0.5 ? 3 : r < 0.75 ? 2 : 1;
+}
+
+/**
+ * Niveau d'une carte d'exercice ou de séance (sessionLevels) → palier : principal (1) = 4, secondaire seul (0,5) = 1,
+ * pour que le secondaire reste nettement plus faible ; entre les deux, 2 ou 3. null : non sollicité.
+ */
+export function levelStep(v: number | undefined): MuscleStep | null {
+  if (!v || v <= 0) return null;
+  return v >= 1 ? 4 : v >= 0.75 ? 3 : v > 0.5 ? 2 : 1;
+}
+
+/** Part du maximum de la période (0 à 1) → palier en quarts : jusqu'à 25 % = 1 … plus de 75 % = 4. null : non sollicité. */
+export function shareStep(v: number | undefined): MuscleStep | null {
+  if (!v || v <= 0) return null;
+  return Math.min(4, Math.max(1, Math.ceil(v * 4 - 1e-9))) as MuscleStep;
 }
 
 /** Une phrase pour la carte de récupération : les muscles encore à ménager (récupérés à moins de moitié), les plus fatigués d'abord. */

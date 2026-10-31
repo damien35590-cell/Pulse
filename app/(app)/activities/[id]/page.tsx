@@ -51,7 +51,7 @@ import { isCommute } from "@/lib/routes/estimate";
 import { getActivityReps } from "@/lib/data/reps";
 import { gapIfHilly } from "@/lib/run/gap";
 import { WorkReps } from "@/components/activity/work-reps";
-import { BodyMap, MuscleLegend } from "@/components/body/body-map";
+import { BodyPair, MuscleLegend } from "@/components/body/body-map";
 import { musclesOfName, sessionLevels } from "@/lib/workout/body";
 
 export const dynamic = "force-dynamic";
@@ -288,7 +288,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         )}
         {Object.keys(worked).length > 0 && (
           <section aria-label="Muscles travaillés" className="mt-5">
-            <BodyMap size="full" intensity={worked} />
+            {/* Face et dos côte à côte, compacts (176 px) : les barres de la séance et les exercices restent près du haut de l'écran. */}
+            <BodyPair intensity={worked} />
             <MuscleLegend className="mt-2 justify-center" />
           </section>
         )}

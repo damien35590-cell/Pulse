@@ -4,7 +4,7 @@
  * (les mêmes que l'onglet Muscu de la page Programme et que « Démarrer »), et la récupération des muscles d'après les dernières séances.
  */
 import { prisma } from "@/lib/prisma";
-import { musclesOfName, recoveryLevels, type MuscleLevels } from "@/lib/workout/body";
+import { musclesOfName, recoveryLevels, runLevels, runLoadOf, type MuscleLevels, type RecoveryInput } from "@/lib/workout/body";
 import { dayKey, shiftDay, weekKeys } from "@/lib/dates";
 import type { CoachPlan } from "@/lib/coach/today";
 import { planLifts, type LiftHalfKind } from "@/lib/coach/week-plan";
@@ -26,7 +26,7 @@ export type LiftWeek = {
   /** Cible hebdomadaire et séances faites cette semaine (pastilles « Muscu »). */
   target: number;
   done: number;
-  /** Récupération de chaque muscle (0 fatigué → 1 récupéré, récupérés absents) d'après les séances des 4 derniers jours. */
+  /** Récupération de chaque muscle (0 fatigué → 1 récupéré, récupérés absents) d'après les séances de muscu et les courses des 4 derniers jours. */
   recovery: MuscleLevels;
 };
 
@@ -35,11 +35,19 @@ export async function getLiftWeek(userId: string, run: RunProgramView | null, co
     recentSessions(userId, 30), getStrengthProgram(userId, now),
     // 72 h de récupération au plus (lib/workout/body.ts) : 4 jours suffisent.
     prisma.activity.findMany({
-      where: { userId, type: "WORKOUT", startedAt: { gte: new Date(+now - 4 * 864e5), lte: now } },
-      select: { startedAt: true, exercises: { select: { name: true, sets: true } } },
+      where: { userId, type: { in: ["WORKOUT", "RUN"] }, startedAt: { gte: new Date(+now - 4 * 864e5), lte: now } },
+      select: {
+        type: true, title: true, source: true, dedupeKey: true, startedAt: true, movingTimeS: true, isInterval: true, sessionType: true,
+        plannedSession: { select: { isKeySession: true } }, exercises: { select: { name: true, sets: true } },
+      },
     }),
   ]);
-  const recovery = recoveryLevels(lately.map((a) => ({ at: a.startedAt, muscles: a.exercises.filter((e) => e.sets > 0).map((e) => musclesOfName(e.name)) })), now);
+  // Muscu : muscles de chaque exercice ; course : fatigue des jambes selon la durée et l'intensité (ni déplacement ni marche Google Fit).
+  const recovery = recoveryLevels(lately.flatMap((a): RecoveryInput[] => {
+    if (a.type === "WORKOUT") return [{ at: a.startedAt, muscles: a.exercises.filter((e) => e.sets > 0).map((e) => musclesOfName(e.name)) }];
+    const run = runLoadOf({ ...a, keySession: a.plannedSession?.isKeySession });
+    return run ? [{ at: a.startedAt, levels: runLevels(run) }] : [];
+  }), now);
   const keys = weekKeys(now, TZ), today = dayKey(now, TZ), weekEnd = keys[6];
   const dayOf = (iso: string) => dayKey(new Date(iso), TZ);
 

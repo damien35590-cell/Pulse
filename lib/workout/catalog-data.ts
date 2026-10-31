@@ -13,7 +13,7 @@
  * pas recopiés des livres.
  */
 
-export type ExerciseSource = 'lafay' | 'lafay-turbo' | 'superphysique';
+export type ExerciseSource = 'lafay' | 'lafay-turbo' | 'superphysique' | 'renfo';
 
 /** Matériel requis. « Mon matériel » filtre le catalogue sur ces valeurs. */
 export type Equipment =
@@ -29,7 +29,8 @@ export type Equipment =
   | 'sangles'
   | 'halteres'
   | 'barre'
-  | 'banc';
+  | 'banc'
+  | 'elastique';     // bande élastique (marche latérale du renfo course)
 
 /** Matériel actuel de Damien (chaise romaine + maison). À exposer dans les réglages. */
 export const DEFAULT_EQUIPMENT: Equipment[] = [
@@ -40,7 +41,7 @@ export const DEFAULT_EQUIPMENT: Equipment[] = [
 export type MuscleId =
   | 'chest' | 'front_delts' | 'side_delts' | 'rear_delts' | 'biceps' | 'triceps' | 'forearms'
   | 'abs' | 'obliques' | 'traps' | 'lats' | 'upper_back' | 'lower_back'
-  | 'glutes' | 'quads' | 'hamstrings' | 'adductors' | 'calves' | 'neck';
+  | 'glutes' | 'glute_med' | 'quads' | 'hamstrings' | 'adductors' | 'calves' | 'neck';
 
 /** Principaux : moteurs du mouvement. Secondaires : synergistes et stabilisateurs qui travaillent nettement. */
 export interface Muscles { primary: MuscleId[]; secondary: MuscleId[] }
@@ -55,7 +56,7 @@ const CHIN_UP = mu(['lats', 'biceps'], ['upper_back', 'forearms']);     // tract
 const PULL_WIDE = mu(['lats'], ['upper_back', 'biceps', 'forearms']);   // tractions prise large
 const ROW_UNDER = mu(['upper_back', 'lats', 'biceps'], ['rear_delts', 'forearms']);
 const ROW_OVER = mu(['upper_back', 'lats'], ['rear_delts', 'traps', 'biceps', 'forearms']);
-const SINGLE_LEG = mu(['quads', 'glutes'], ['hamstrings', 'adductors']);
+const SINGLE_LEG = mu(['quads', 'glutes'], ['hamstrings', 'adductors', 'glute_med']);
 const SIDE_SQUAT = mu(['quads', 'adductors', 'glutes'], ['hamstrings']);
 const WALL_SIT = mu(['quads'], ['glutes']);
 const PIKE = mu(['front_delts', 'triceps'], ['side_delts', 'chest']);
@@ -160,6 +161,10 @@ export const FAMILIES: ExerciseFamily[] = [
   { id: 'Z', letter: 'Z', name: 'Pont', source: 'lafay', groups: [{ name: 'Pont', progression: ['Z'] }] },
   { id: 'turbo', name: 'Bonus Turbo', source: 'lafay-turbo', groups: [
     { name: 'Bonus', progression: ['turbo-curl-sangles', 'turbo-vacuum', 'turbo-nordic'], ordered: false },
+  ] },
+  // Renfo course : prévention de la course à pied (syndrome de la bandelette ilio-tibiale), au poids du corps
+  { id: 'renfo', name: 'Renfo course', source: 'renfo', groups: [
+    { name: 'Hanches et genoux', progression: ['abduction-hanche-allonge', 'coquillage', 'pont-fessier-une-jambe', 'gainage-lateral-abduction', 'descente-de-marche', 'bascule-bassin-marche', 'marche-laterale-elastique'], ordered: false },
   ] },
   // SuperPhysique (familles par groupe musculaire, pas de code)
   { id: 'sp-pecs', name: 'Pectoraux', source: 'superphysique', groups: [{ name: 'Développés', progression: ['developpe-couche-barre', 'developpe-couche-halteres', 'developpe-incline-halteres', 'pull-over-haltere'], ordered: false }] },
@@ -434,13 +439,38 @@ export const SUPERPHYSIQUE_EXERCISES: CatalogExercise[] = [
     description: 'Sur une marche, un haltère dans la main du côté qui travaille. Descendre talon au plus bas, monter sur la pointe, pause en haut.' }),
   SP({ id: 'gainage', family: 'sp-abdos', name: 'Gainage abdominal', muscles: mu(['abs'], ['obliques']), equipment: ['aucun'], mode: 'time',
     description: 'En appui sur les avant-bras et la pointe des pieds, corps aligné, fessiers serrés. Tenir le plus longtemps possible.' }),
-  SP({ id: 'gainage-oblique', family: 'sp-abdos', name: 'Gainage oblique', muscles: mu(['obliques'], ['abs']), equipment: ['aucun'], mode: 'time', unilateral: true,
+  SP({ id: 'gainage-oblique', family: 'sp-abdos', name: 'Gainage oblique', muscles: mu(['obliques'], ['abs', 'glute_med']), equipment: ['aucun'], mode: 'time', unilateral: true,
     description: 'Sur le côté, appui avant-bras et pieds, bassin haut. Tenir de chaque côté.' }),
   SP({ id: 'enroulement-de-bassin', family: 'sp-abdos', name: 'Enroulement de bassin', muscles: mu(['abs']), equipment: ['aucun'], mode: 'reps',
     description: 'Sur le dos, jambes pliées en l\'air. Enrouler le bassin pour décoller les fesses vers le haut, redescendre lentement.' }),
 ];
 
-export const ALL_EXERCISES: CatalogExercise[] = [...LAFAY_EXERCISES, ...TURBO_EXERCISES, ...SUPERPHYSIQUE_EXERCISES];
+// ─────────────────────────────────────────────────────────────────────────────
+// RENFO COURSE — prévention du syndrome de la bandelette ilio-tibiale : moyen fessier, contrôle du genou.
+// Par défaut 3 × 12–15 par côté, 30 à 45 s de repos, double progression (lib/progression.ts) comme tout exercice hors Lafay.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const R = (e: Omit<CatalogExercise, 'source' | 'family' | 'mode'>): CatalogExercise => ({ source: 'renfo', family: 'renfo', mode: 'reps', ...e });
+
+export const RENFO_EXERCISES: CatalogExercise[] = [
+  R({ id: 'abduction-hanche-allonge', name: 'Abduction de hanche allongé', muscles: mu(['glute_med']), equipment: ['aucun'], unilateral: true,
+    description: 'Allongé sur le côté, jambe du dessous pliée, bassin vertical. Monter la jambe du dessus tendue, légèrement en arrière, pointe de pied vers l\'avant. Redescendre lentement sans basculer le bassin.' }),
+  R({ id: 'coquillage', name: 'Coquillage', subtitle: 'Clamshell', muscles: mu(['glute_med'], ['glutes']), equipment: ['aucun'], unilateral: true,
+    description: 'Allongé sur le côté, hanches et genoux pliés, pieds joints. Ouvrir le genou du dessus sans décoller les pieds ni bouger le bassin, tenir 1 s, refermer. Travaille aussi les rotateurs externes, sous le grand fessier.' }),
+  // Pas le même mouvement que le pont Lafay (Z, pont complet sur les mains) : ici, le bassin seul, sur une jambe.
+  R({ id: 'pont-fessier-une-jambe', name: 'Pont fessier une jambe', muscles: mu(['glutes', 'hamstrings'], ['glute_med', 'lower_back']), equipment: ['aucun'], unilateral: true,
+    description: 'Sur le dos, un pied à plat près des fesses, l\'autre jambe tendue en l\'air. Pousser dans le talon pour aligner épaules, hanches et genou, bassin bien horizontal. Redescendre sans poser les fesses.' }),
+  R({ id: 'gainage-lateral-abduction', name: 'Gainage latéral avec abduction', muscles: mu(['glute_med', 'obliques'], ['abs']), equipment: ['aucun'], unilateral: true,
+    description: 'En gainage sur le côté, sur l\'avant-bras, corps aligné. Monter la jambe du dessus tendue puis la redescendre sans laisser tomber le bassin. Sur les genoux pour commencer.' }),
+  R({ id: 'descente-de-marche', name: 'Descente de marche contrôlée', subtitle: 'Genou au-dessus des orteils', muscles: mu(['quads', 'glute_med'], ['glutes']), equipment: ['support'], unilateral: true,
+    description: 'Debout sur une marche, sur une jambe. Plier lentement pour effleurer le sol du talon de l\'autre pied, genou dans l\'axe du pied, qui avance au-dessus des orteils. Remonter sans pousser avec la jambe libre.' }),
+  R({ id: 'bascule-bassin-marche', name: 'Bascule de bassin sur marche', subtitle: 'Hip hike', muscles: mu(['glute_med'], ['obliques']), equipment: ['support'], unilateral: true,
+    description: 'De profil sur une marche, sur une jambe tendue, l\'autre pied dans le vide. Laisser descendre le bassin côté libre puis le remonter au-dessus de l\'horizontale, sans plier le genou d\'appui.' }),
+  R({ id: 'marche-laterale-elastique', name: 'Marche latérale élastique', muscles: mu(['glute_med'], ['glutes']), equipment: ['elastique'], unilateral: true,
+    description: 'Élastique au-dessus des genoux ou autour des chevilles, demi-flexion, dos droit. Pas chassés sur le côté sans laisser les genoux rentrer ni les pieds se toucher. Le nombre de pas d\'un côté, puis retour.' }),
+];
+
+export const ALL_EXERCISES: CatalogExercise[] = [...LAFAY_EXERCISES, ...TURBO_EXERCISES, ...SUPERPHYSIQUE_EXERCISES, ...RENFO_EXERCISES];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODÈLES DE PROGRAMME
@@ -716,5 +746,17 @@ export const PROGRAM_TEMPLATES: ProgramTemplate[] = [
         { exerciseId: 'mollets-debout-une-jambe', alternatives: ['W'], sets: 3, reps: null, restSec: 45 },
       ] },
     ],
+  },
+  // ── Renfo course ──
+  {
+    id: 'renfo-essuie-glace', name: 'Renfo essuie-glace', source: 'renfo',
+    frequency: '2 à 3 fois par semaine, après une sortie facile ou un jour sans course (≈ 15 min)',
+    progression: 'Prévention du syndrome de l\'essuie-glace (bandelette ilio-tibiale). Double progression : 3 séries de 12 à 15 par côté ; quand les 3 séries atteignent 15, passer à une variante plus dure (élastique, tempo lent, appui instable).',
+    sessions: [{ name: 'Hanches et genoux', exercises: [
+      { exerciseId: 'abduction-hanche-allonge', alternatives: ['coquillage'], sets: 3, reps: 12, repsMax: 15, restSec: 30, note: 'Par côté' },
+      { exerciseId: 'pont-fessier-une-jambe', sets: 3, reps: 12, repsMax: 15, restSec: 30, note: 'Par côté' },
+      { exerciseId: 'descente-de-marche', sets: 3, reps: 12, repsMax: 15, restSec: 45, note: 'Par côté, genou dans l\'axe du pied' },
+      { exerciseId: 'bascule-bassin-marche', alternatives: ['gainage-lateral-abduction', 'marche-laterale-elastique'], sets: 3, reps: 12, repsMax: 15, restSec: 30, note: 'Par côté' },
+    ] }],
   },
 ];
