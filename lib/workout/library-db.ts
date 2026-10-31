@@ -1,4 +1,4 @@
-/** Écritures de la bibliothèque : « Ajouter à mes modèles », « Dupliquer », « Mon matériel ». Filtre toujours sur l'utilisateur. */
+/** Écritures de la bibliothèque : « Ajouter à mes modèles », « Dupliquer », « Mon matériel », « Échauffement ». Filtre toujours sur l'utilisateur. */
 import { prisma } from "../prisma";
 import { equipmentOf } from "./catalog";
 import type { Equipment } from "./catalog-data";
@@ -6,6 +6,7 @@ import { kindOfNames } from "./kind";
 import { displayName } from "./catalog";
 import { libraryTemplate, templateStructures } from "./library";
 import type { Structure } from "./draft";
+import { cleanWarmupDefaults, warmupDefaults, type WarmupItem } from "./warmup";
 
 /** Un nom libre parmi les modèles de l'utilisateur : « Lafay · Niveau 2 », sinon « … (2) ». */
 async function freeName(userId: string, wanted: string): Promise<string> {
@@ -46,6 +47,19 @@ export async function duplicateTemplate(userId: string, templateId: string): Pro
     },
   });
   return name;
+}
+
+/** Échauffement proposé en début de séance (Vous › Réglages) : corde 3 min + gym 5 min tant qu'il n'a jamais été réglé. */
+export async function getWarmupDefaults(userId: string): Promise<WarmupItem[]> {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { warmupDefaults: true } });
+  return warmupDefaults(u?.warmupDefaults);
+}
+
+/** Liste vide = pas d'échauffement en début de séance. */
+export async function setWarmupDefaults(userId: string, list: unknown): Promise<WarmupItem[]> {
+  const clean = cleanWarmupDefaults(list);
+  await prisma.user.update({ where: { id: userId }, data: { warmupDefaults: clean } });
+  return clean;
 }
 
 export async function getEquipment(userId: string): Promise<Equipment[]> {

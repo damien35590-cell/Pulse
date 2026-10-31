@@ -16,6 +16,7 @@ import { isAverageStory } from "@/lib/activity/comparables";
 import { kmSplits } from "@/lib/activity/splits";
 import { heartRate } from "@/lib/activity/heart";
 import { cleanHrSeries, restDrop, setsOf, toSecondSeries } from "@/lib/workout/hr";
+import { liftSamples, warmupLine, warmupOf } from "@/lib/workout/warmup";
 import { getActivityNote } from "@/lib/coach/activity-note";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -119,8 +120,10 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   // FC : la série à 1 Hz enregistrée, sinon reconstruite depuis la trace. Section masquée sans mesure.
   const hr1hz = st?.hr?.length ? st.hr : buildStream(raw)?.hr ?? [];
   const heart = heartRate(hr1hz, zones.hrMax);
-  // Muscu avec ceinture cardio : série enregistrée à la séance (Activity.hrSeries). Rien sans elle.
-  const lift = a.hrSeries != null ? heartRate(toSecondSeries(cleanHrSeries(a.hrSeries)), zones.hrMax) : null;
+  // Muscu : échauffement (corde, mobilité…) en une ligne sous les chiffres ; hors totaux, barres et exercices.
+  const warm = a.type === "WORKOUT" ? warmupOf(a.warmup) : null;
+  // Muscu avec ceinture cardio : série enregistrée à la séance (Activity.hrSeries), sans l'échauffement (enregistré, pas affiché). Rien sans elle.
+  const lift = a.hrSeries != null ? heartRate(toSecondSeries(liftSamples(cleanHrSeries(a.hrSeries), warm)), zones.hrMax) : null;
   const drop = lift ? restDrop(setsOf(a.exercises.map((e) => e.setsDetail))) : null;
   // Muscu : bilan par exercice (dernière fois, règle Lafay) en une requête d'historique, et barres de la séance (mêmes données que le fil).
   const review = a.exercises.length ? await getSessionReview(s.user.id, a) : [];
@@ -280,7 +283,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
             {row.map((m, i) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} animate animateIndex={i + 1} animateKey={`activity:${a.id}`} />)}
           </dl>
         )}
-        {totals && a.avgHr && <p className="mt-3 text-xs text-ink-mute">FC moy. <span className="font-num tabular-nums">{a.avgHr}</span> bpm</p>}
+        {warm && <p className="mt-3 text-xs text-ink-mute">{warmupLine(warm)}</p>}
+        {totals && a.avgHr && <p className={cn(warm ? "mt-1" : "mt-3", "text-xs text-ink-mute")}>FC moy. <span className="font-num tabular-nums">{a.avgHr}</span> bpm</p>}
         {more.length > 0 && (
           <dl className="mt-4 grid grid-cols-3 gap-3">
             {more.map((m) => <Metric key={m.label} size="sm" label={m.label} value={m.value} unit={m.unit} />)}

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Dumbbell, Flag, Gauge, Trophy, UserRound, Wrench } from "lucide-react";
+import { Dumbbell, Flag, Flame, Gauge, Trophy, UserRound, Wrench } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { loadBadgeStats } from "@/lib/data/badges";
 import { getTracesArt } from "@/lib/data/traces";
@@ -20,7 +20,8 @@ import { getGear } from "@/lib/data/gear";
 import { getRecordsBySport } from "@/lib/data/records";
 import { getZones } from "@/lib/data/zones";
 import { thresholdLabel } from "@/lib/zones";
-import { getEquipment } from "@/lib/workout/library-db";
+import { getEquipment, getWarmupDefaults } from "@/lib/workout/library-db";
+import { warmupSummary } from "@/lib/workout/warmup";
 import { EQUIPMENT_LABELS } from "@/lib/workout/catalog";
 import { getPrefs } from "@/lib/notify/prefs";
 import { prisma } from "@/lib/prisma";
@@ -40,11 +41,11 @@ export default async function ProfilePage() {
   const s = await auth();
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
-  const [me, gear, raceRows, zones, equipment, notifyPrefs, traces, lastBackup] = await Promise.all([
+  const [me, gear, raceRows, zones, equipment, warmup, notifyPrefs, traces, lastBackup] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, image: true, email: true } }),
     getGear(userId),
     prisma.raceEvent.findMany({ where: { userId, status: "REGISTERED", date: { gte: new Date(Date.now() - 864e5) } }, orderBy: [{ date: "asc" }, { startTime: "asc" }], take: 5 }),
-    getZones(userId), getEquipment(userId), getPrefs(userId), getTracesArt(userId), getLastBackupAt(userId),
+    getZones(userId), getEquipment(userId), getWarmupDefaults(userId), getPrefs(userId), getTracesArt(userId), getLastBackupAt(userId),
   ]);
   const nextRace = raceRows.map((r) => ({ r, c: getCountdown(r) })).find(({ c }) => !c.isPast);
   const activeGear = gear.filter((g) => !g.retiredAt), wornGear = activeGear.filter((g) => g.level === "critical").length;
@@ -82,6 +83,7 @@ export default async function ProfilePage() {
       <Section title="Réglages">
         <div className={card}>
           <SettingsRow icon={<Dumbbell aria-hidden />} title="Matériel de muscu" href="/vous/materiel-muscu" value={`${equipment.filter((e) => e !== "aucun").length} sur ${Object.keys(EQUIPMENT_LABELS).length}`} />
+          <SettingsRow icon={<Flame aria-hidden />} title="Échauffement" href="/vous/echauffement" value={warmupSummary(warmup)} />
           <NotificationsRow prefs={notifyPrefs} />
           <BackupRow lastBackupAt={lastBackup?.toISOString() ?? null} />
           <PendingRow />
