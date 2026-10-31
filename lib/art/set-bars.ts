@@ -2,7 +2,7 @@
  * Données des SetBars (art d'une séance de muscu dans le fil) : un groupe par exercice (6 au plus, dans l'ordre de la séance ; une séance en compte 4 à 5), une barre par série.
  * Fonction pure (tests : tools/test-zone-ribbon.ts). Reps pour un exercice en répétitions, secondes pour un exercice « au chrono » (mode time).
  */
-import { catalogFor, resolveName } from "../workout/catalog";
+import { LAFAY_LABEL, catalogFor, resolveName } from "../workout/catalog";
 
 export const MAX_GROUPS = 6;
 
@@ -10,8 +10,12 @@ export const MAX_GROUPS = 6;
 export type SetExercise = { name: string; sets: number; reps: number; setsDetail?: unknown };
 
 export type SetGroup = {
-  /** « B2 », « F », ou les initiales d'un exercice hors Lafay. */
+  /** « B2 », « F », ou un nom de 10 caractères au plus pour un exercice hors Lafay. */
   code: string;
+  /** Nom court lisible (« Dips », « Développé couché ») : sous le groupe, dans la fiche. Absent des données de démo. */
+  name?: string;
+  /** Exercice Lafay : `code` est alors un vrai code (« B2 »), affiché au-dessus du nom. */
+  lafay?: boolean;
   /** Reps (ou secondes si `timed`) de chaque série faite. */
   sets: number[];
   /** Cible par série : celle du programme, sinon le maximum de l'exercice. */
@@ -42,19 +46,30 @@ export function exerciseCode(name: string): string {
   return clean.length <= LABEL_MAX ? clean : `${clean.slice(0, LABEL_MAX - 1).trimEnd()}…`;
 }
 
-export function setGroups(exercises: SetExercise[]): SetGroup[] {
-  const rows = exercises.map((e) => {
-    const { code, variant } = resolveName(e.name);
-    return { e, sets: doneReps(e), timed: catalogFor(code, variant)?.mode === "time" };
-  }).filter((r) => r.sets.length > 0);
+/** Nom court lisible sous un groupe de la fiche : « Dips » pour « B2 - dips » (le code est déjà au-dessus), le nom complet sinon. */
+export function exerciseShortName(name: string): string {
+  const { code } = resolveName(name);
+  const short = /^[A-Z]$/.test(code) ? (LAFAY_LABEL[code.toLowerCase()] ?? name) : name.replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim() || name.trim();
+  return short.charAt(0).toUpperCase() + short.slice(1);
+}
+
+/** Exercice « au chrono » (mode time du catalogue) : ses valeurs sont des secondes. */
+export function isTimed(name: string): boolean {
+  const { code, variant } = resolveName(name);
+  return catalogFor(code, variant)?.mode === "time";
+}
+
+/** `limit` : 6 dans le fil (plafond de sécurité) ; la fiche montre toute la séance. */
+export function setGroups(exercises: SetExercise[], limit = MAX_GROUPS): SetGroup[] {
+  const rows = exercises.map((e) => ({ e, sets: doneReps(e), timed: isTimed(e.name) })).filter((r) => r.sets.length > 0);
   // Échelle par mode, sur toute la séance : des secondes de gainage ne doivent pas écraser des séries de pompes.
   const scale = { reps: 0, time: 0 };
   for (const r of rows) {
     const k = r.timed ? "time" : "reps";
     scale[k] = Math.max(scale[k], ...r.sets, r.e.reps > 0 ? r.e.reps : 0);
   }
-  return rows.slice(0, MAX_GROUPS).map((r) => ({
-    code: exerciseCode(r.e.name), sets: r.sets, timed: r.timed,
+  return rows.slice(0, limit).map((r) => ({
+    code: exerciseCode(r.e.name), name: exerciseShortName(r.e.name), lafay: /^[A-Z]$/.test(resolveName(r.e.name).code), sets: r.sets, timed: r.timed,
     target: r.e.reps > 0 ? r.e.reps : Math.max(...r.sets),
     max: scale[r.timed ? "time" : "reps"],
   }));

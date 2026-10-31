@@ -2,10 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MapAttribution } from "@/components/map/map-attribution";
-import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
 import { Segmented } from "@/components/ui/segmented";
 import { BASEMAP_URL, basemapOptions, getMapTheme, hideBrokenTiles, setBasemap, useMapTheme } from "@/lib/map/basemap";
@@ -49,12 +48,12 @@ const HINT_TOUCH = "Utilise deux doigts pour déplacer la carte", HINT_WHEEL = "
 
 /**
  * Carte du parcours (fond Stadia Maps selon le thème) : tracé coloré point par point selon la pente ou la vitesse, sur un halo.
+ * Carte arrondie de 256 px, comme la vignette du fil ; plein écran et zoom +/− en tuiles dans la colonne de droite (cibles de 48 px).
+ * Pente / Vitesse et la légende sont SOUS la carte : rien ne cache le tracé (en plein écran, ils flottent en bas).
  * Gestes coopératifs : un doigt fait défiler la page, deux doigts déplacent / zooment la carte ; sur PC, Ctrl + molette.
  * En plein écran, tous les gestes habituels reviennent. `cursor` : position suivie depuis le profil d'altitude.
- * `hero` : carte plein cadre en tête de fiche (remplit son parent, barre du haut par-dessus, bas recouvert par la carte de contenu) ;
- * Pente / Vitesse devient une pastille flottante.
  */
-export default function InteractiveTopoMap({ points, cursor, className, hero = false }: { points: TrackPoint[]; cursor?: [number, number] | null; className?: string; hero?: boolean }) {
+export default function InteractiveTopoMap({ points, cursor, className }: { points: TrackPoint[]; cursor?: [number, number] | null; className?: string }) {
   const el = useRef<HTMLDivElement>(null), map = useRef<L.Map | null>(null), base = useRef<L.TileLayer | null>(null);
   const layer = useRef<L.LayerGroup | null>(null), bounds = useRef<L.LatLngBounds | null>(null), dot = useRef<L.CircleMarker | null>(null);
   const info = useMemo(() => analyse(points), [points]);
@@ -65,20 +64,19 @@ export default function InteractiveTopoMap({ points, cursor, className, hero = f
   fullRef.current = full;
   const theme = useMapTheme();
   const colored = info.hasEle || info.hasSpeed;
-  // En tête de fiche, la barre du haut couvre le haut de la carte et la carte de contenu son bas : le cadrage les évite.
-  const fit = (m: L.Map, b: L.LatLngBounds, inHero: boolean) =>
-    m.fitBounds(b, inHero ? { paddingTopLeft: [24, 80], paddingBottomRight: [24, 64] } : { padding: [24, 24] });
+  // Les boutons occupent la colonne de droite : le cadrage les évite.
+  const fit = (m: L.Map, b: L.LatLngBounds) => m.fitBounds(b, { paddingTopLeft: [24, 24], paddingBottomRight: [60, 24] });
 
   // Carte : créée une fois par trace, affichée tout de suite (pas de « toucher pour activer »).
   useEffect(() => {
     const box = el.current;
     if (!box || points.length < 2) return;
     const touch = matchMedia(COARSE).matches;
-    const m = L.map(box, { zoomControl: !touch, scrollWheelZoom: false, dragging: !touch, touchZoom: true, zoomSnap: 0.5, preferCanvas: true, attributionControl: false });
+    const m = L.map(box, { zoomControl: false,scrollWheelZoom: false, dragging: !touch, touchZoom: true, zoomSnap: 0.5, preferCanvas: true, attributionControl: false });
     base.current = hideBrokenTiles(L.tileLayer(BASEMAP_URL[getMapTheme()], basemapOptions)).addTo(m);
     layer.current = L.layerGroup().addTo(m);
     bounds.current = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
-    fit(m, bounds.current, hero);
+    fit(m, bounds.current);
     map.current = m;
 
     // Indice discret quand le geste ne pilote pas la carte (un doigt qui glisse, molette sans Ctrl).
@@ -149,7 +147,7 @@ export default function InteractiveTopoMap({ points, cursor, className, hero = f
     if (m) {
       if (full) m.dragging.enable(); else if (matchMedia(COARSE).matches) m.dragging.disable();
       m.invalidateSize();
-      if (bounds.current) fit(m, bounds.current, hero && !full);
+      if (bounds.current) fit(m, bounds.current);
     }
     if (!full) return;
     setHint(null);
@@ -162,36 +160,21 @@ export default function InteractiveTopoMap({ points, cursor, className, hero = f
   const tabs = ([["slope", "Pente", info.hasEle], ["speed", "Vitesse", info.hasSpeed]] as const).filter(([, , ok]) => ok);
   const scale = mode === "slope" ? SLOPE : SPEED;
 
-  const legendRow = colored && (
-    <div className={cn("flex items-center gap-2 font-num text-xs tabular-nums text-ink-soft", hero ? "px-2 pb-1 pt-1.5" : "mt-2")}>
-      <span>{mode === "slope" ? "Descente" : `${Math.round(info.vmin)} km/h`}</span>
-      <i aria-hidden className={cn("h-2 flex-1 rounded-full", hero && "min-w-10")} style={{ background: legend(scale.tokens) }} />
-      <span>{mode === "slope" ? "Montée raide" : `${Math.round(info.vmax)} km/h`}</span>
+  const controls = colored && (
+    <div className="flex items-center gap-3">
+      {tabs.length > 1 && <Segmented className="shrink-0" options={tabs.map(([value, label]) => ({ value, label }))} value={mode} onChange={setMode} />}
+      <div className="flex min-w-0 flex-1 items-center gap-2 font-num text-xs tabular-nums text-ink-soft">
+        <span className="shrink-0">{mode === "slope" ? "Descente" : `${Math.round(info.vmin)} km/h`}</span>
+        <i aria-hidden className="h-2 min-w-6 flex-1 rounded-full" style={{ background: legend(scale.tokens) }} />
+        <span className="shrink-0">{mode === "slope" ? "Montée raide" : `${Math.round(info.vmax)} km/h`}</span>
+      </div>
     </div>
   );
-  const docked = hero && !full; // contrôles regroupés en bas de la carte de tête
-  const fullBtn = (
-    <button
-      type="button"
-      onClick={() => { tap(6); setFull((f) => !f); }}
-      aria-label={full ? "Réduire la carte" : "Carte en plein écran"}
-      className={cn(ui.iconBtn, "z-[1000] bg-surface/90 shadow-pop backdrop-blur", !docked && "absolute right-2", !docked && (full ? "top-[calc(0.5rem_+_env(safe-area-inset-top))]" : "top-2"))}
-    >
-      {full ? <Minimize2 className="size-5" aria-hidden /> : <Maximize2 className="size-5" aria-hidden />}
-    </button>
-  );
+  const zoom = (d: 1 | -1) => { tap(6); if (d > 0) map.current?.zoomIn(); else map.current?.zoomOut(); };
 
   return (
-    <div className={cn(hero && "size-full", className)}>
-      {!hero && tabs.length > 1 && (
-        <Segmented className="mb-3" options={tabs.map(([value, label]) => ({ value, label }))} value={mode} onChange={setMode} />
-      )}
-      <div
-        className={cn(
-          "isolate overflow-hidden bg-surface-2",
-          full ? "fixed inset-0 z-50" : hero ? "relative size-full [&_.leaflet-top]:top-bar" : "relative h-[min(60vw,360px)] w-full rounded-card",
-        )}
-      >
+    <div className={className}>
+      <div className={cn("isolate overflow-hidden bg-surface-2", full ? "fixed inset-0 z-50" : "relative h-64 w-full rounded-card shadow-card")}>
         <div ref={el} className="size-full" role="img" aria-label="Carte du parcours" />
         <div
           aria-live="polite"
@@ -202,24 +185,40 @@ export default function InteractiveTopoMap({ points, cursor, className, hero = f
         >
           {hint && <p className="rounded-full bg-surface/90 px-4 py-2 text-center text-sm font-semibold text-ink shadow-pop">{hint}</p>}
         </div>
-        {hero ? (
-          // Bas de la carte : 24 px sont recouverts par la carte de contenu, les contrôles flottent juste au-dessus.
-          <div className={cn("pointer-events-none absolute inset-x-2 z-[1000] flex items-end justify-between gap-2", full ? "bottom-[calc(0.5rem_+_env(safe-area-inset-bottom))]" : "bottom-8")}>
-            {colored ? (
-              <div className="pointer-events-auto min-w-0 max-w-[calc(100%_-_3.5rem)] overflow-hidden rounded-tile bg-surface/90 p-1 shadow-pop backdrop-blur">
-                {tabs.length > 1 && <Segmented size="sm" options={tabs.map(([value, label]) => ({ value, label }))} value={mode} onChange={setMode} />}
-                {legendRow}
-              </div>
-            ) : <span />}
-            <div className="pointer-events-auto flex shrink-0 items-end gap-1">
-              <MapAttribution className="static" />
-              {docked && fullBtn}
-            </div>
-          </div>
-        ) : <MapAttribution />}
-        {!docked && fullBtn}
+        <MapButton
+          onClick={() => { tap(6); setFull((f) => !f); }}
+          label={full ? "Réduire la carte" : "Carte en plein écran"}
+          className={cn("absolute right-2 z-[1000]", full ? "top-[calc(0.5rem_+_env(safe-area-inset-top))]" : "top-2")}
+        >
+          {full ? <Minimize2 className="size-[18px]" aria-hidden /> : <Maximize2 className="size-[18px]" aria-hidden />}
+        </MapButton>
+        <div className={cn("absolute right-2 z-[1000] flex flex-col gap-2", full ? "bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))]" : "bottom-2")}>
+          <MapButton onClick={() => zoom(1)} label="Zoomer"><Plus className="size-[18px]" aria-hidden /></MapButton>
+          <MapButton onClick={() => zoom(-1)} label="Dézoomer"><Minus className="size-[18px]" aria-hidden /></MapButton>
+        </div>
+        <MapAttribution className={cn("left-1.5 right-auto justify-start", full && "bottom-[calc(0.375rem_+_env(safe-area-inset-bottom))]")} />
+        {full && controls && (
+          <div className="absolute inset-x-2 bottom-[calc(2rem_+_env(safe-area-inset-bottom))] z-[1000] rounded-tile bg-surface/90 p-1.5 shadow-pop backdrop-blur">{controls}</div>
+        )}
       </div>
-      {!hero && legendRow}
+      {!full && controls && <div className="mt-2">{controls}</div>}
     </div>
+  );
+}
+
+/** Tuile de contrôle de la carte : 40 px visibles, 48 px de cible (zone élargie de 4 px tout autour). */
+function MapButton({ onClick, label, className, children }: { onClick: () => void; label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={cn(
+        "relative grid size-10 shrink-0 place-items-center rounded-tile bg-surface/90 text-ink shadow-pop backdrop-blur select-none touch-manipulation transition duration-150 ease-snappy active:scale-90 active:bg-surface-2 after:absolute after:-inset-1",
+        className,
+      )}
+    >
+      {children}
+    </button>
   );
 }

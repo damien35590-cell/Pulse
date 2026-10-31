@@ -25,7 +25,7 @@ import { MapAttribution } from "@/components/map/map-attribution";
 import { ZoneBar } from "@/components/activity/zone-bar";
 import { ZoneRibbon } from "@/components/art/zone-ribbon";
 import { EffortStrip } from "@/components/art/effort-strip";
-import { SetBars } from "@/components/art/set-bars";
+import { ExerciseBars, SetBars } from "@/components/art/set-bars";
 import { Splits } from "@/components/activity/splits";
 import { WorkReps } from "@/components/activity/work-reps";
 import { RpePicker } from "@/components/activity/rpe-picker";
@@ -397,6 +397,16 @@ function Tokens() {
             <figure>
               <div className={cn(ui.card, "overflow-hidden")}><SetBars groups={artDemo.sets} /></div>
               <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">SetBars · une barre par série, pointillé = cible du jour, E4 au chrono (secondes)</figcaption>
+            </figure>
+            <figure>
+              <div className={cn(ui.card, "overflow-hidden")}><SetBars size="detail" groups={artDemo.sets} /></div>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">SetBars size=&quot;detail&quot; · fiche de muscu : barres plus hautes, nom sur 2 lignes sous le code</figcaption>
+            </figure>
+            <figure>
+              <div className={cn(ui.card, "p-4")}>
+                <ExerciseBars sets={[{ value: 11, done: true }, { value: 11, done: true }, { value: 10, done: true }, { value: 9, done: true, hard: true }, { value: 8, done: true }, { value: 0, done: false }]} target={11} timed={false} />
+              </div>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">ExerciseBars · carte d&apos;exercice de la fiche : pleine à la cible, estompée dessous, ✗ = série non faite, point = « Dur »</figcaption>
             </figure>
             <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
               {[["strength-bg", "bg-viz-strength-bg"], ["strength-bar", "bg-viz-strength-bar"], ["strength-bar-dim", "bg-viz-strength-bar-dim"], ["strength-ink", "bg-viz-strength-ink"], ["strength-code", "bg-viz-strength-code"], ["target", "bg-viz-target"], ["ride-bg", "bg-viz-ride-bg"], ["ride-ink", "bg-viz-ride-ink"]].map(([n, c]) => (
