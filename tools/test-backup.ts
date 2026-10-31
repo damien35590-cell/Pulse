@@ -1,6 +1,8 @@
 // Test du CSV de sauvegarde (pur, sans base) : npm test
 import assert from "node:assert/strict";
-import { toCsv, RESTORE_ORDER, SCHEMA_VERSION, type BackupFile } from "../lib/backup/strength-export";
+import { Prisma } from "@prisma/client";
+import { toCsv, ACTIVITY_FIELDS, RESTORE_ORDER, SCHEMA_VERSION, type BackupFile } from "../lib/backup/strength-export";
+import { revive } from "../lib/backup/revive";
 
 const data = Object.fromEntries(RESTORE_ORDER.map(([k]) => [k, []])) as unknown as BackupFile["data"];
 data.exercises = [{ id: "e1", slug: "dips" }];
@@ -17,4 +19,25 @@ assert.equal(lines.length, 1 + 2 + 2, "séries non faites exclues, séries prév
 assert.equal(lines[1], `2026-10-27,"Haut, ""force""",dips,Dips,1,9,10,80,'=risque`); // 23 h 30 UTC = le 27 à Paris ; formule neutralisée
 assert.equal(lines[2], `2026-10-27,"Haut, ""force""",dips,Dips,2,8,10,90,`);
 assert.equal(lines[3], `2026-10-27,"Haut, ""force""",,Gainage,1,30,5,60,`);
+
+// ── Échauffement : sauvegardé avec la séance, sauvegardes d'avant toujours lisibles ──
+assert.ok(ACTIVITY_FIELDS.includes("warmup" as never), "Activity.warmup part dans la sauvegarde");
+assert.ok(ACTIVITY_FIELDS.includes("hrSeries" as never) && !ACTIVITY_FIELDS.includes("trackPoints" as never), "les champs lourds restent exclus");
+assert.equal(SCHEMA_VERSION, 1, "format additif : une sauvegarde d'avant garde la même version (le script de restauration refuse les autres)");
+
+const warm = { v: 1, items: [{ name: "Corde à sauter", durationS: 182, targetS: 180 }, { name: "Gym / mobilité", durationS: 298, targetS: 300 }], endS: 480 };
+const withWarm = revive("Activity", { id: "a1", title: "Haut", startedAt: "2026-10-31T08:00:00.000Z", warmup: warm, hrSeries: null });
+assert.deepEqual(withWarm.warmup, warm, "l'échauffement revient tel quel");
+assert.ok(withWarm.startedAt instanceof Date);
+assert.equal(withWarm.hrSeries, Prisma.DbNull, "null d'un champ Json traduit pour Prisma");
+assert.equal(revive("Activity", { id: "a2", warmup: null }).warmup, Prisma.DbNull, "séance sans échauffement (passé) : null");
+
+const old = revive("Activity", { id: "a0", title: "Ancienne sauvegarde", startedAt: "2026-10-01T08:00:00.000Z" });
+assert.equal("warmup" in old, false, "sauvegarde d'avant : le champ reste absent (null à la création, valeur en base intacte à la mise à jour)");
+assert.deepEqual(Object.keys(revive("Activity", { id: "a3", champFutur: 1, warmup: warm })).sort(), ["id", "warmup"], "champ inconnu ignoré");
+assert.equal(revive("User", { id: "u", warmupDefaults: [{ name: "Corde", min: 3 }] }).warmupDefaults !== undefined, true);
+
+// L'échauffement n'entre pas dans le CSV (une ligne par série d'exercice) : le CSV d'une séance avec échauffement est identique.
+data.activities = [{ ...data.activities[0], warmup: warm }];
+assert.equal(toCsv({ schemaVersion: SCHEMA_VERSION, exportedAt: "", userId: "u", profile: { homeEquipment: [], warmupDefaults: null }, counts: {} as BackupFile["counts"], data }), csv, "CSV inchangé par l'échauffement");
 console.log("backup : ok");
