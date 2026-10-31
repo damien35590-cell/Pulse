@@ -26,7 +26,7 @@ export function NewSessionButton({ className }: { className?: string }) {
       <button type="button" onClick={() => { tap(12); setOpen(true); }} className={cn(ui.btnPrimary, "w-full", className)}>
         <Dumbbell className="size-5" aria-hidden />Nouvelle séance
       </button>
-      <NewSessionSheet open={open} onClose={() => setOpen(false)} />
+      <NewSessionSheet open={open} onClose={() => setOpen(false)} onNavigate={() => setOpen(false)} />
     </>
   );
 }
@@ -34,8 +34,10 @@ export function NewSessionButton({ className }: { className?: string }) {
 /**
  * Démarrer une séance sans retaper les exercices : la suggestion du jour en avant, puis refaire une séance, un modèle, ou partir d'une séance vide.
  * Toutes les voies mènent à /record/session, qui construit le brouillon côté serveur.
+ * `onNavigate` : appelé en partant vers la séance, pour fermer la feuille quand son parent survit à la navigation (feuille du « + ») ;
+ * sinon elle restait ouverte par-dessus l'écran de préparation.
  */
-export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NewSessionSheet({ open, onClose, onNavigate }: { open: boolean; onClose: () => void; onNavigate?: () => void }) {
   const router = useRouter();
   const [data, setData] = useState<StartOptions | null>(null);
   const [failed, setFailed] = useState(false);
@@ -58,6 +60,7 @@ export function NewSessionSheet({ open, onClose }: { open: boolean; onClose: () 
     tap(12);
     setBusy(true);
     router.push(`${SESSION}${query}`);
+    onNavigate?.();
   };
 
   const refresh = () => startOptions().then(setData).catch(() => {});

@@ -26,7 +26,7 @@ const MUSCLE_FILTERS: { label: string; muscles: MuscleId[] }[] = [
   { label: "Dos", muscles: ["lats", "upper_back", "lower_back", "traps"] },
   { label: "Épaules", muscles: ["front_delts", "side_delts", "rear_delts"] },
   { label: "Bras", muscles: ["biceps", "triceps", "forearms"] },
-  { label: "Jambes", muscles: ["quads", "hamstrings", "glutes", "adductors", "calves"] },
+  { label: "Jambes", muscles: ["quads", "hamstrings", "glutes", "glute_med", "adductors", "calves"] },
   { label: "Abdos", muscles: ["abs", "obliques"] },
 ];
 const BY_ID = new Map(ALL_EXERCISES.map((e) => [e.id, e]));
@@ -43,6 +43,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
   const [source, setSource] = useState<Source>("ALL");
   const [muscle, setMuscle] = useState<number | null>(null);
   const [onlyMine, setOnlyMine] = useState(true);
+  const [renfo, setRenfo] = useState(false);
   const [openFam, setOpenFam] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,11 +60,12 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
   const match = useMemo(() => {
     const ms = muscle != null ? MUSCLE_FILTERS[muscle].muscles : null;
     return (e: CatalogExercise) =>
-      (source === "ALL" || (source === "lafay" ? e.source !== "superphysique" : e.source === "superphysique")) &&
+      (source === "ALL" || (source === "lafay" ? e.source === "lafay" || e.source === "lafay-turbo" : e.source === "superphysique")) &&
+      (!renfo || e.source === "renfo") &&
       (!ms || e.muscles.primary.some((m) => ms.includes(m))) &&
       (!onlyMine || !equip || doable(e, equip)) &&
       (!key || searchKey(e).includes(key) || e.code?.toLowerCase() === q.trim().toLowerCase());
-  }, [source, muscle, onlyMine, equip, key, q]);
+  }, [source, muscle, onlyMine, renfo, equip, key, q]);
 
   const families = useMemo(() => FAMILIES.map((f) => ({
     f,
@@ -129,6 +131,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
           <Segmented<Source> className="mt-3" value={source} onChange={setSource} options={[{ value: "ALL", label: "Tout" }, { value: "lafay", label: "Lafay" }, { value: "superphysique", label: "SuperPhysique" }]} />
           <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
             <button type="button" aria-pressed={onlyMine} onClick={() => { tap(6); setOnlyMine((v) => !v); }} className={pill(onlyMine)}>Matériel de muscu</button>
+            <button type="button" aria-pressed={renfo} onClick={() => { tap(6); setRenfo((v) => !v); if (!renfo) setSource("ALL"); }} className={pill(renfo)}>Renfo course</button>
             {MUSCLE_FILTERS.map((m, i) => (
               <button key={m.label} type="button" aria-pressed={muscle === i} onClick={() => { tap(6); setMuscle(muscle === i ? null : i); }} className={pill(muscle === i)}>{m.label}</button>
             ))}

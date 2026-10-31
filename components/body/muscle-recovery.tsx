@@ -5,7 +5,7 @@ import { BodyMap, MuscleLegend } from "./body-map";
 
 /**
  * Récupération des muscles (carte du jour de l'accueil, quand le coach propose la muscu) : face et dos en petit,
- * paliers muscle-tired → muscle-fresh, une phrase sur les muscles encore à ménager. Données : recoveryLevels (lib/workout/body.ts).
+ * paliers muscle-4 (fatigué) → muscle-1 (presque récupéré), une phrase sur les muscles encore à ménager. Données : recoveryLevels (lib/workout/body.ts).
  */
 export function MuscleRecovery({ levels, className }: { levels: MuscleLevels; className?: string }) {
   return (

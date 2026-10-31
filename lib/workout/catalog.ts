@@ -138,6 +138,7 @@ export const EQUIPMENT_LABELS: Record<Exclude<Equipment, "aucun">, string> = {
   halteres: "Haltères",
   barre: "Barre et disques",
   banc: "Banc de musculation",
+  elastique: "Élastique",
 };
 const ALL_EQUIPMENT = new Set<string>(["aucun", ...Object.keys(EQUIPMENT_LABELS)]);
 

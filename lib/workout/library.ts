@@ -14,6 +14,7 @@ export const SOURCE_LABEL: Record<ProgramTemplate["source"], string> = {
   "lafay-turbo": "Lafay · tome 2 (haltères)",
   perso: "Mes programmes",
   superphysique: "SuperPhysique",
+  renfo: "Renfo course",
 };
 
 /** Libellé d'une ligne de modèle : « A3 », « Rowing un bras (haltère) ». */

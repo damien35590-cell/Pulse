@@ -89,14 +89,15 @@ export function frame(p: CoachPeriod) {
 }
 
 /**
- * Sorties par semaine : activités / semaines terminées de la période (la semaine en cours n'est comptée que si elle est finie).
- * Source unique du coach et de la page Analyse. `acts` = les activités de la période, déjà filtrées par sport. null sans semaine terminée.
+ * Sorties par semaine : toutes les activités de la période, semaine en cours comprise (comme « Cette semaine » de l'accueil),
+ * divisées par les semaines écoulées (jours / 7). Ne compter que les semaines terminées oubliait les séances de la semaine en cours
+ * (3 séances dont 2 cette semaine → « 0,3 par semaine »). Source unique du coach et de la page Analyse.
+ * `acts` = les activités de la période, déjà filtrées par sport. null tant qu'aucune semaine n'est terminée.
  */
 export function sessionsPerWeek(acts: { startedAt: Date }[], p: CoachPeriod): number | null {
   const f = frame(p);
   if (f.fullWeeks < 1) return null;
-  const fullEnd = shiftDay(f.lastFullMon, 6);
-  return acts.filter((a) => { const k = dayKey(a.startedAt, p.tz); return k >= f.startKey && k <= fullEnd; }).length / f.fullWeeks;
+  return acts.filter((a) => { const k = dayKey(a.startedAt, p.tz); return k >= f.startKey && k <= f.endKey; }).length / (f.span / 7);
 }
 
 /** Variation en %, à durée égale (la période en cours peut être plus courte que la précédente). null sans référence. */

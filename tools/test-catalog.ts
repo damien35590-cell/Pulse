@@ -34,6 +34,32 @@ assert.deepEqual(catalogExercise("J")!.muscles.primary, ["front_delts", "triceps
 assert.deepEqual(catalogExercise("C2")!.muscles, catalogExercise("C")!.muscles, "une variante hérite de sa famille");
 assert.equal(catalogExercise("A9")!.muscles.primary[0], "triceps", "pompes très serrées : surtout les triceps");
 
+// ── Renfo course (bandelette ilio-tibiale) ──
+const renfo = ALL_EXERCISES.filter((e) => e.source === "renfo");
+assert.equal(renfo.length, 7);
+for (const e of renfo) {
+  assert.equal(e.family, "renfo");
+  assert.ok(e.unilateral, `${e.id} : par côté`);
+  assert.equal(e.mode, "reps");
+  assert.ok(e.description.length > 40 && e.description.length < 320, `${e.id} : descriptif court`);
+  assert.ok([...e.muscles.primary, ...e.muscles.secondary].includes("glute_med") || e.id === "pont-fessier-une-jambe" || e.muscles.primary.includes("glutes"), `${e.id} : hanche`);
+}
+assert.deepEqual(catalogExercise("coquillage")!.muscles.primary, ["glute_med"]);
+assert.deepEqual(catalogExercise("descente-de-marche")!.muscles.primary, ["quads", "glute_med"]);
+assert.deepEqual(catalogExercise("marche-laterale-elastique")!.equipment, ["elastique"]);
+assert.ok(!equipmentOf([]).includes("elastique"), "élastique : décoché par défaut");
+assert.ok(!doable(catalogExercise("marche-laterale-elastique")!, equipmentOf([])), "sans élastique : masqué par « Mon matériel »");
+assert.ok(doable(catalogExercise("coquillage")!, equipmentOf([])), "au poids du corps");
+const rg = PROGRAM_TEMPLATES.find((t) => t.id === "renfo-essuie-glace")!;
+assert.equal(rg.name, "Renfo essuie-glace");
+for (const x of rg.sessions[0].exercises) {
+  assert.equal(x.sets, 3); assert.equal(x.reps, 12); assert.equal(x.repsMax, 15);
+  assert.ok(x.restSec >= 30 && x.restSec <= 45, "30 à 45 s de repos");
+}
+assert.equal(displayLabel(catalogExercise("coquillage")!), "Coquillage (clamshell)");
+assert.equal(catalogFor("Coquillage (clamshell)", null)?.id, "coquillage", "nom enregistré → fiche");
+assert.equal(structureOf(rg.sessions[0].exercises[0]).code, "Abduction de hanche allongé");
+
 // ── Codes saisis ──
 assert.deepEqual(lafayCode("K2 - triceps"), { letter: "k", digits: 2 });
 assert.deepEqual(lafayCode("W - mollets"), { letter: "w", digits: null });

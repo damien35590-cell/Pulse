@@ -8,7 +8,7 @@ import type { CatalogExercise, Equipment, Muscles } from "@/lib/workout/catalog-
 import { muscleList } from "@/lib/workout/body";
 import { BodyMap } from "@/components/body/body-map";
 
-const SOURCE: Record<CatalogExercise["source"], string> = { lafay: "Lafay T1", "lafay-turbo": "Lafay T2", superphysique: "SuperPhysique" };
+const SOURCE: Record<CatalogExercise["source"], string> = { lafay: "Lafay T1", "lafay-turbo": "Lafay T2", superphysique: "SuperPhysique", renfo: "Renfo course" };
 
 /** Niveau de difficulté du livre : 1 à 4 barres (débutant → haut niveau), discrètes, sans couleur de marque. */
 export function LevelBars({ level, className }: { level?: number; className?: string }) {
@@ -47,12 +47,12 @@ export function MusclePanel({ muscles }: { muscles: Muscles }) {
       <dl className="min-w-0 flex-1 space-y-3">
         <div>
           <dt className={ui.label}>Principaux</dt>
-          <dd className="mt-1 flex items-start gap-2 font-semibold leading-snug text-ink"><i aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-muscle-primary" />{muscleList(muscles.primary)}</dd>
+          <dd className="mt-1 flex items-start gap-2 font-semibold leading-snug text-ink"><i aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-muscle-4" />{muscleList(muscles.primary)}</dd>
         </div>
         {muscles.secondary.length > 0 && (
           <div>
             <dt className={ui.label}>Secondaires</dt>
-            <dd className="mt-1 flex items-start gap-2 leading-snug text-ink-soft"><i aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-muscle-secondary" />{muscleList(muscles.secondary)}</dd>
+            <dd className="mt-1 flex items-start gap-2 leading-snug text-ink-soft"><i aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-muscle-1" />{muscleList(muscles.secondary)}</dd>
           </div>
         )}
       </dl>

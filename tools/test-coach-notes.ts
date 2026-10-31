@@ -1,7 +1,7 @@
 // Lancer avec : npx tsx tools/test-coach-notes.ts
 import { muscleVolume } from "../lib/workout/body";
 import assert from "node:assert/strict";
-import { exceptionalPrevious, frame, overviewNotes as overview, timeChange, planNotes, rankNotes, rateChange, runNotes as run, strengthNotes as strength, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
+import { exceptionalPrevious, frame, sessionsPerWeek, overviewNotes as overview, timeChange, planNotes, rankNotes, rateChange, runNotes as run, strengthNotes as strength, type CoachAct, type CoachNote } from "../lib/analytics/coach-notes";
 import type { StrengthAnalysis } from "../lib/analytics/strength";
 
 const tz = "Europe/Paris", now = new Date("2026-10-23T10:00:00Z"); // vendredi
@@ -22,6 +22,14 @@ assert.equal(f.startKey, "2026-09-28"); assert.equal(f.endKey, "2026-10-23");
 assert.equal(f.prevStart, "2026-08-31"); assert.equal(f.prevEnd, "2026-09-27");
 assert.equal(f.span, 26); assert.equal(f.fullWeeks, 3); assert.equal(f.lastFullMon, "2026-10-12");
 assert.equal(frame({ ...period, current: false }).fullWeeks, 4);
+
+// Séances par semaine : la semaine en cours compte (comme l'accueil). Samedi 31 oct., muscu les 19, 27 et 31 → 3 en 26 jours, pas 1 en 3 semaines.
+{
+  const sat = { weeks: 4, tz, now: new Date("2026-10-31T18:00:00Z"), current: true };
+  const per = sessionsPerWeek(["2026-10-19", "2026-10-27", "2026-10-31"].map((d) => act("WORKOUT", d, 45)), sat)!;
+  assert.equal(Math.round(per * 10) / 10, 0.8, "3 séances sur 26 jours");
+  assert.equal(sessionsPerWeek([act("WORKOUT", "2026-10-27", 45)], { ...sat, weeks: 1 }), null, "aucune semaine terminée");
+}
 
 // Variation à durée égale : 26 jours contre 28
 assert.equal(rateChange(26, 26, 28, 28), 0);

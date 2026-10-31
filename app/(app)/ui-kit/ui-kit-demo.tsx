@@ -36,7 +36,7 @@ import { sessionRpe } from "@/lib/load";
 import { SetLogger } from "@/components/workout/set-logger";
 import { RouteCard } from "@/components/routes/route-card";
 import { WeatherBanner, WeatherCredit } from "@/components/routes/weather";
-import { BodyMap, MuscleLegend } from "@/components/body/body-map";
+import { BodyPair, MuscleLegend } from "@/components/body/body-map";
 import { MuscleRecovery } from "@/components/body/muscle-recovery";
 import { ExerciseThumb, MusclePanel } from "@/components/workout/catalog-bits";
 import { catalogExercise } from "@/lib/workout/catalog";
@@ -316,7 +316,7 @@ function BodyMapDemo() {
     <div className="space-y-4">
       <figure>
         <MusclePanel muscles={catalogExercise("B")!.muscles} />
-        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">md · fiche d&apos;exercice (B, dips) : principaux en muscle-primary, secondaires en muscle-secondary ; ↻ retourne le corps (48 px, tap())</figcaption>
+        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">md · fiche d&apos;exercice (B, dips) : principaux en muscle-4, secondaires en muscle-1 ; ↻ retourne le corps (48 px, tap())</figcaption>
       </figure>
       <figure>
         <div className={cn(ui.card, "flex flex-wrap gap-3 p-4")}>
@@ -326,10 +326,10 @@ function BodyMapDemo() {
       </figure>
       <figure>
         <div className="rounded-card bg-gradient-to-b from-act-strength-soft to-transparent p-4">
-          <BodyMap size="full" intensity={session} />
+          <BodyPair intensity={session} />
           <MuscleLegend className="mt-2 justify-center" />
         </div>
-        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">full · fiche de muscu, dans la tête teintée : principal = 1, secondaire = 0,5 par exercice, additionnés et plafonnés</figcaption>
+        <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">BodyPair · fiche de muscu, dans la tête teintée : face et dos (176 px), principal = 1, secondaire = 0,5 par exercice, additionnés et plafonnés</figcaption>
       </figure>
       <figure>
         <div className={cn(ui.card, "p-4")}>
@@ -337,8 +337,8 @@ function BodyMapDemo() {
         </div>
         <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">Récupération · carte du jour de l&apos;accueil quand le coach propose la muscu</figcaption>
       </figure>
-      <div className="grid grid-cols-6 gap-1.5">
-        {[["primary", "bg-muscle-primary"], ["secondary", "bg-muscle-secondary"], ["tired", "bg-muscle-tired"], ["worked", "bg-muscle-worked"], ["recovering", "bg-muscle-recovering"], ["fresh", "bg-muscle-fresh"]].map(([n, c]) => (
+      <div className="grid grid-cols-5 gap-1.5">
+        {[["repos", "bg-ink/10 dark:bg-surface-3"], ["1", "bg-muscle-1"], ["2", "bg-muscle-2"], ["3", "bg-muscle-3"], ["4", "bg-muscle-4"]].map(([n, c]) => (
           <div key={n} className="min-w-0"><div className={cn("h-10 rounded-lg", c)} /><p className="mt-1 truncate text-micro text-ink-mute">muscle-{n}</p></div>
         ))}
       </div>
