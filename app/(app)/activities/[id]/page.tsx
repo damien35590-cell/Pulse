@@ -37,11 +37,11 @@ import { DetachSession } from "@/components/training/program-actions";
 import { isVirtual } from "@/lib/art/card";
 import { GearPicker } from "@/components/gear/gear-picker";
 import { SaveTemplateButton } from "@/components/workout/save-template";
-import { CodeBadge } from "@/components/workout/catalog-bits";
-import { ExerciseBars, SetBars } from "@/components/art/set-bars";
+import { ExerciseCard } from "@/components/workout/exercise-card";
+import { SetBars } from "@/components/art/set-bars";
 import { setGroups } from "@/lib/art/set-bars";
 import { getSessionReview } from "@/lib/data/strength-review";
-import { sessionTotals, type ExerciseReview } from "@/lib/workout/session-review";
+import { sessionTotals } from "@/lib/workout/session-review";
 import { AttachRun } from "@/components/programme/session-sheet";
 import { sessionsForRun } from "@/lib/data/training";
 import { getGear } from "@/lib/data/gear";
@@ -56,50 +56,8 @@ export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
 type TP = { lat?: number; lng?: number; ele?: number; t: number; hr?: number; power?: number; cad?: number };
 
-const CHIP_TONE = { good: "bg-good/15 text-good", warn: "bg-warn/15 text-warn", neutral: "" } as const;
-/** « +6 », « −2 s », « ±0 » : écart de total avec la dernière fois. */
-const signed = (n: number, timed: boolean) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n)}${timed ? " s" : ""}`;
 /** Secondes au chrono, en à-côté des répétitions : « 90 s », « 12 min ». */
 const chrono = (s: number) => (s < 600 ? `${s} s` : `${Math.round(s / 60)} min`);
-
-/** Carte d'un exercice de muscu : code, nom, variante, cible ; séries réelles face à la cible ; total et écart avec la dernière fois ; état Lafay. */
-function ExerciseCard({ r }: { r: ExerciseReview }) {
-  const hr = r.sets.some((s) => s.hrPeak != null);
-  return (
-    <li className={cn(ui.card, "p-4")}>
-      <div className="flex items-start gap-3">
-        {r.code && <CodeBadge code={r.code} className="h-10 min-w-10 bg-act-strength-soft text-act-strength" />}
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold leading-tight text-ink">{r.title}</p>
-          {r.subtitle && <p className="mt-0.5 text-sm leading-snug text-ink-soft">{r.subtitle}</p>}
-          <p className="mt-1 font-num text-sm tabular-nums text-ink-mute">{r.targetText}</p>
-        </div>
-        <dl className="shrink-0">
-          <Metric
-            size="md" align="end" label="Total" value={r.total} unit={r.timed ? "s" : "reps"}
-            hint={r.delta != null && <Delta tone={r.delta > 0 ? "good" : r.delta < 0 ? "bad" : "neutral"}>{signed(r.delta, r.timed)}</Delta>}
-          />
-        </dl>
-      </div>
-      {r.sets.length > 0 && <ExerciseBars className="mt-3" sets={r.sets} target={r.target} timed={r.timed} />}
-      {r.loads && <p className="mt-1 font-num text-sm tabular-nums text-ink-soft">Charges : {r.loads}</p>}
-      {hr && (
-        <ol className="mt-1">
-          {r.sets.map((s, i) => s.hrPeak != null && (
-            <li key={i} className="font-num text-xs tabular-nums text-ink-mute">S{i + 1} · pic {s.hrPeak}{s.hrEndRest != null ? ` · récup ${s.hrEndRest}` : ""}</li>
-          ))}
-        </ol>
-      )}
-      {(r.status || r.next) && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {r.status && <span className={cn(ui.chip, CHIP_TONE[r.status.tone])}>{r.status.label}</span>}
-          {r.next && <p className="text-sm text-ink-soft">{r.next}</p>}
-        </div>
-      )}
-      {r.comment && <p className="mt-2 text-sm text-ink-soft">{r.comment}</p>}
-    </li>
-  );
-}
 
 function feelingToInt(feeling: string | null): number | null {
   switch (feeling) {
@@ -193,7 +151,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
     pace && { label: pace.label, value: pace.value, unit: pace.unit, hint: insight.pace && <Delta tone={insight.pace.tone}>{insight.pace.delta}</Delta> },
     pace && gap != null && { label: "Allure GAP", value: fmtPaceS(gap), unit: pace.unit, hint: "ajustée au dénivelé" },
     hasDist && a.elevationGainM > 0 && { label: "D+", value: fmtNum(a.elevationGainM, 0), unit: "m" },
-    a.avgHr && { label: "FC moy.", value: String(a.avgHr), unit: "bpm" },
+    !totals && a.avgHr && { label: "FC moy.", value: String(a.avgHr), unit: "bpm" },
     a.avgPower && { label: "Puiss. moy.", value: String(a.avgPower), unit: "W" },
     a.calories && { label: "Calories", value: fmtNum(a.calories, 0), unit: "kcal" },
     a.maxPower && { label: "Puiss. max", value: String(a.maxPower), unit: "W" },
@@ -318,6 +276,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
             {row.map((m) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} />)}
           </dl>
         )}
+        {totals && a.avgHr && <p className="mt-3 text-xs text-ink-mute">FC moy. <span className="font-num tabular-nums">{a.avgHr}</span> bpm</p>}
         {more.length > 0 && (
           <dl className="mt-4 grid grid-cols-3 gap-3">
             {more.map((m) => <Metric key={m.label} size="sm" label={m.label} value={m.value} unit={m.unit} />)}

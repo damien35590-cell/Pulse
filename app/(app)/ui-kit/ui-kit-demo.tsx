@@ -26,6 +26,8 @@ import { ZoneBar } from "@/components/activity/zone-bar";
 import { ZoneRibbon } from "@/components/art/zone-ribbon";
 import { EffortStrip } from "@/components/art/effort-strip";
 import { ExerciseBars, SetBars } from "@/components/art/set-bars";
+import { ExerciseCard } from "@/components/workout/exercise-card";
+import type { ExerciseReview } from "@/lib/workout/session-review";
 import { Splits } from "@/components/activity/splits";
 import { WorkReps } from "@/components/activity/work-reps";
 import { RpePicker } from "@/components/activity/rpe-picker";
@@ -408,6 +410,13 @@ function Tokens() {
               </div>
               <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">ExerciseBars · carte d&apos;exercice de la fiche : pleine à la cible, estompée dessous, ✗ = série non faite, point = « Dur »</figcaption>
             </figure>
+            <figure>
+              <ul className="space-y-3">
+                <ExerciseCard r={cardioDemo} />
+                <ExerciseCard r={cardioDemo} defaultCardioOpen />
+              </ul>
+              <figcaption className="mt-1.5 px-1 text-xs text-ink-mute">ExerciseCard · FC par série repliée (« ♥ Cardio », zone de toucher 48 px), puis dépliée : pic et récup centrés sous chaque barre, « – » si absent</figcaption>
+            </figure>
             <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
               {[["strength-bg", "bg-viz-strength-bg"], ["strength-bar", "bg-viz-strength-bar"], ["strength-bar-dim", "bg-viz-strength-bar-dim"], ["strength-ink", "bg-viz-strength-ink"], ["strength-code", "bg-viz-strength-code"], ["target", "bg-viz-target"], ["ride-bg", "bg-viz-ride-bg"], ["ride-ink", "bg-viz-ride-ink"]].map(([n, c]) => (
                 <div key={n} className="min-w-0"><div className={cn("h-10 rounded-lg ring-1 ring-inset ring-line", c)} /><p className="mt-1 truncate text-micro text-ink-mute">viz-{n}</p></div>
@@ -477,3 +486,14 @@ function Tokens() {
     </>
   );
 }
+
+/** Démo d'une carte d'exercice de muscu avec FC par série (une série sans mesure, une non faite). */
+const cardioDemo: ExerciseReview = {
+  id: "demo", code: "A3", title: "Pompes", subtitle: "Mains sur support de 45 cm", timed: false, targetText: "6 × 11 · repos 30 s", target: 11,
+  sets: [
+    { value: 11, done: true, loadKg: null, hrPeak: 128, hrEndRest: 104 }, { value: 11, done: true, loadKg: null, hrPeak: 134, hrEndRest: 108 },
+    { value: 10, done: true, loadKg: null, hrPeak: 141, hrEndRest: 112 }, { value: 9, done: true, hard: true, loadKg: null, hrPeak: 148, hrEndRest: null },
+    { value: 8, done: true, loadKg: null }, { value: 0, done: false, loadKg: null },
+  ],
+  total: 49, delta: 3, status: { label: "Progrès", tone: "good" }, next: "Prochaine fois : 6 × 12", loads: null, comment: null,
+};
