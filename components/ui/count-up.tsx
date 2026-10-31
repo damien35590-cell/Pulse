@@ -44,6 +44,7 @@ export function CountUp({ value, format = (n) => String(Math.round(n)), mode = "
   useIsoLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    el.classList.remove("count-up-pending"); // le JS a la main : le filet CSS (globals.css) ne doit plus intervenir
     el.textContent = final;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || (storageKey && seen(storageKey))) {
       el.style.opacity = "1";
@@ -73,7 +74,7 @@ export function CountUp({ value, format = (n) => String(Math.round(n)), mode = "
   return (
     <span aria-label={final} className={cn("inline-grid font-num tabular-nums", className)}>
       <span aria-hidden className="invisible col-start-1 row-start-1">{final}</span>
-      <span ref={ref} aria-hidden className="col-start-1 row-start-1" style={{ opacity: 0 }}>{final}</span>
+      <span ref={ref} aria-hidden className="count-up-pending col-start-1 row-start-1" style={{ opacity: 0 }}>{final}</span>
     </span>
   );
 }
