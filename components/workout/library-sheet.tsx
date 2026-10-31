@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ChevronRight, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
@@ -75,6 +76,11 @@ export function LibrarySheet({ open, onClose, onAdded }: { open: boolean; onClos
               </ul>
             </section>
           ))}
+          {t.source === "lafay" && (
+            <Link href="/plan/test/nouveau" className={cn(ui.btnSecondary, "w-full")}>
+              <ClipboardCheck className="size-5" aria-hidden />Pas sûr du niveau ? Faire le test
+            </Link>
+          )}
           {err && <p role="alert" className="text-sm text-bad">{err}</p>}
           <button type="button" disabled={busy} onClick={() => add(t.id)} className={cn(ui.btnPrimary, "w-full")}>
             {busy ? "Ajout…" : t.sessions.length > 1 ? `Ajouter les ${t.sessions.length} séances à mes modèles` : "Ajouter à mes modèles"}

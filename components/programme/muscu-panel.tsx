@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { BookOpen, Dumbbell, ListChecks } from "lucide-react";
+import { BookOpen, ClipboardCheck, Dumbbell, ListChecks } from "lucide-react";
 import { SettingsRow } from "@/components/ui/settings-row";
 import type { ExerciseState, ProgressRow, StrengthProgramView } from "@/lib/data/strength-program";
 import { KIND_TITLE } from "@/lib/workout/kind";
+import type { TestResult } from "@/lib/workout/lafay-test";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
@@ -121,16 +122,22 @@ function Empty() {
         </div>
       </div>
       <Link href="/record/session?suggest=1" className={cn(ui.btnPrimary, "w-full")}>Commencer ma première séance</Link>
+      <Link href="/plan/test/nouveau" className={cn(ui.btnSecondary, "w-full")}>Faire le test de niveau Lafay</Link>
     </section>
   );
 }
 
-/** Onglet Muscu : affiche de la prochaine séance, programme, progression, puis catalogue et modèles. */
-export function MuscuPanel({ v, exercises }: { v: StrengthProgramView; exercises: { total: number; toReview: number } }) {
+/** « Test de niveau » : le dernier test (date, B : le chiffre qui fixe le niveau), sinon une invitation. */
+const testValue = (t: { takenAt: string; result: TestResult } | null) =>
+  t ? `Dernier le ${dayLabel(t.takenAt)} · B ${t.result.B} dips` : "A, B, C, A1 au maximum : ton niveau Lafay de départ";
+
+/** Onglet Muscu : affiche de la prochaine séance, programme, progression, puis test de niveau, catalogue et modèles. */
+export function MuscuPanel({ v, exercises, lastTest = null }: { v: StrengthProgramView; exercises: { total: number; toReview: number }; lastTest?: { takenAt: string; result: TestResult } | null }) {
   return (
     <div className="space-y-3">
       {v.hasHistory ? <><Poster v={v} /><ProgrammeCard v={v} /><Progression v={v} /></> : <Empty />}
       <div className={cn(ui.card, "divide-y divide-surface-2 overflow-hidden")}>
+        <SettingsRow icon={<ClipboardCheck />} title="Test de niveau" href="/plan/test" value={testValue(lastTest)} />
         <SettingsRow icon={<BookOpen />} title="Mes exercices" href="/plan/exercices"
           value={`${exercises.total} exercices${exercises.toReview > 0 ? ` · ${exercises.toReview} ${exercises.toReview > 1 ? "noms à vérifier" : "nom à vérifier"}` : ""}`} />
         <SettingsRow icon={<ListChecks />} title="Modèles de séance" href="/record/session" value="Tes modèles et la bibliothèque Lafay" />

@@ -32,6 +32,8 @@ export const RESTORE_ORDER = [
   ["workoutExercises", "WorkoutExercise"],
   ["plannedSessions", "PlannedSession"],
   ["athleteMetrics", "AthleteMetric"],
+  // Tests de niveau Lafay : absents des sauvegardes d'avant (lus comme une liste vide à la restauration).
+  ["lafayTests", "LafayTest"],
 ] as const;
 export type BackupKey = (typeof RESTORE_ORDER)[number][0];
 
@@ -51,7 +53,7 @@ const rows = (r: unknown[]) => r as Row[];
 export async function exportStrength(userId: string, now = new Date()): Promise<BackupFile> {
   const strengthActivity: Prisma.ActivityWhereInput = { userId, OR: [{ type: "WORKOUT" }, { exercises: { some: {} } }] };
   const programs = { userId, sport: "WORKOUT" as const };
-  const [user, exercises, trainingGoals, progs, phases, weeks, workouts, slots, templates, templateExercises, activities, workoutExercises, plannedSessions, athleteMetrics] = await Promise.all([
+  const [user, exercises, trainingGoals, progs, phases, weeks, workouts, slots, templates, templateExercises, activities, workoutExercises, plannedSessions, athleteMetrics, lafayTests] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { homeEquipment: true, warmupDefaults: true } }),
     prisma.exercise.findMany({ orderBy: { slug: "asc" } }),
     prisma.trainingGoal.findMany({ where: { userId, sport: "WORKOUT" }, orderBy: { createdAt: "asc" } }),
@@ -66,11 +68,13 @@ export async function exportStrength(userId: string, now = new Date()): Promise<
     prisma.workoutExercise.findMany({ where: { activity: strengthActivity }, orderBy: [{ activityId: "asc" }, { position: "asc" }] }),
     prisma.plannedSession.findMany({ where: { userId, sport: "WORKOUT" }, orderBy: { date: "asc" } }),
     prisma.athleteMetric.findMany({ where: { userId, type: "BODYWEIGHT_KG" }, orderBy: { measuredAt: "asc" } }),
+    prisma.lafayTest.findMany({ where: { userId }, orderBy: { takenAt: "asc" } }),
   ]);
   const data: BackupFile["data"] = {
     exercises: rows(exercises), trainingGoals: rows(trainingGoals), programs: rows(progs), programPhases: rows(phases), programWeeks: rows(weeks),
     programWorkouts: rows(workouts), programExerciseSlots: rows(slots), workoutTemplates: rows(templates), workoutTemplateExercises: rows(templateExercises),
     activities: rows(activities), workoutExercises: rows(workoutExercises), plannedSessions: rows(plannedSessions), athleteMetrics: rows(athleteMetrics),
+    lafayTests: rows(lafayTests),
   };
   const counts = Object.fromEntries(RESTORE_ORDER.map(([k]) => [k, data[k].length])) as BackupFile["counts"];
   return { schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), userId, profile: { homeEquipment: user?.homeEquipment ?? [], warmupDefaults: user?.warmupDefaults ?? null }, counts, data };
