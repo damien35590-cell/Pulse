@@ -268,12 +268,12 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         {(a.type === "RIDE" || a.type === "EBIKE") && !isVirtual(a) && <div className="mt-3"><BikeTypeSwitch activityId={a.id} type={a.type} /></div>}
         <dl className="mt-5">
           {hasDist
-            ? <Metric size="hero" label="Distance" value={fmtKm(a.distanceM)} unit="km" />
-            : <Metric size="hero" label="Durée" value={fmtClock(a.movingTimeS)} />}
+            ? <Metric size="hero" label="Distance" value={fmtKm(a.distanceM)} unit="km" animate animateKey={`activity:${a.id}`} />
+            : <Metric size="hero" label="Durée" value={fmtClock(a.movingTimeS)} animate animateKey={`activity:${a.id}`} />}
         </dl>
         {row.length > 0 && (
           <dl className="mt-5 grid grid-cols-3 gap-3">
-            {row.map((m) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} />)}
+            {row.map((m) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} animate animateKey={`activity:${a.id}`} />)}
           </dl>
         )}
         {totals && a.avgHr && <p className="mt-3 text-xs text-ink-mute">FC moy. <span className="font-num tabular-nums">{a.avgHr}</span> bpm</p>}
