@@ -3,6 +3,7 @@ import { prisma } from "../prisma";
 import { groupKey, type StrengthRow } from "../analytics/strength";
 import { exerciseKey, type SetDetail } from "../exercises";
 import { isLafayCode, ladderKey } from "./catalog";
+import { resetDipsHistory } from "./lafay-test";
 
 /** Clé de regroupement d'un code d'exercice (même clé que groupKey sur son nom) : pour Lafay, l'échelle de la variante. */
 export const historyKey = (code: string, variant?: string | null) =>
@@ -25,14 +26,17 @@ export const toRow = (e: { name: string; sets: number; reps: number; loadKg: num
   setsDetail: Array.isArray(e.setsDetail) ? (e.setsDetail as unknown as SetDetail[]) : null,
 });
 
-/** Lignes de chaque exercice, de la plus récente à la plus ancienne. */
+/**
+ * Lignes de chaque exercice, de la plus récente à la plus ancienne.
+ * Un test de niveau appliqué (LafayTest.appliedAt) est un nouveau point de départ pour les dips : leurs séances d'avant ne comptent plus (resetDipsHistory).
+ */
 export async function loadHistory(userId: string): Promise<Map<string, StrengthRow[]>> {
-  const found = await prisma.workoutExercise.findMany({
+  const [found, reset] = await Promise.all([prisma.workoutExercise.findMany({
     where: { activity: { userId, type: "WORKOUT" } },
     orderBy: [{ activity: { startedAt: "desc" } }, { position: "asc" }],
     take: 1500,
     select: { activityId: true, name: true, sets: true, reps: true, loadKg: true, setsDetail: true, activity: { select: { startedAt: true } } },
-  });
+  }), prisma.lafayTest.findFirst({ where: { userId, appliedAt: { not: null } }, orderBy: { appliedAt: "desc" }, select: { appliedAt: true } })]);
   const by = new Map<string, StrengthRow[]>();
   for (const e of found) {
     const row = toRow(e, e.activity.startedAt), k = groupKey(e.name);
@@ -40,5 +44,5 @@ export async function loadHistory(userId: string): Promise<Map<string, StrengthR
     const list = by.get(k);
     if (list) list.push(row); else by.set(k, [row]);
   }
-  return by;
+  return resetDipsHistory(by, reset?.appliedAt ?? null);
 }

@@ -40,4 +40,16 @@ assert.equal(revive("User", { id: "u", warmupDefaults: [{ name: "Corde", min: 3 
 // L'échauffement n'entre pas dans le CSV (une ligne par série d'exercice) : le CSV d'une séance avec échauffement est identique.
 data.activities = [{ ...data.activities[0], warmup: warm }];
 assert.equal(toCsv({ schemaVersion: SCHEMA_VERSION, exportedAt: "", userId: "u", profile: { homeEquipment: [], warmupDefaults: null }, counts: {} as BackupFile["counts"], data }), csv, "CSV inchangé par l'échauffement");
+
+// ── Tests de niveau Lafay : sauvegardés et restaurés, anciennes sauvegardes toujours lisibles ──
+assert.deepEqual(RESTORE_ORDER[RESTORE_ORDER.length - 1], ["lafayTests", "LafayTest"], "restaurés en dernier (aucune dépendance)");
+const test = revive("LafayTest", { id: "t1", userId: "u", takenAt: "2026-10-31T08:00:00.000Z", durationS: 900, repsA: 22, repsB: 9, repsC: 6, repsA1: 14, hrSeries: null, warmup: null, appliedAt: null, applied: null, createdAt: "2026-10-31T08:20:00.000Z" });
+assert.ok(test.takenAt instanceof Date && test.createdAt instanceof Date);
+assert.equal(test.repsB, 9);
+assert.equal(test.applied, Prisma.DbNull);
+// Sauvegarde d'avant les tests : pas de clé lafayTests ; la restauration lit « b.data[key] ?? [] » (tools/restore-backup.ts).
+const oldData = { ...data } as Partial<BackupFile["data"]>;
+delete oldData.lafayTests;
+assert.deepEqual(oldData.lafayTests ?? [], []);
+assert.equal(toCsv({ schemaVersion: SCHEMA_VERSION, exportedAt: "", userId: "u", profile: { homeEquipment: [] }, counts: {} as BackupFile["counts"], data: oldData as BackupFile["data"] }), csv, "CSV : les tests n'y entrent pas, ancien fichier lisible");
 console.log("backup : ok");

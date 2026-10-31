@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { dayKey, shiftDay } from "@/lib/dates";
 import { getCoverGoal, getCurrentVma, getRunProgram } from "@/lib/data/training";
 import { getStrengthProgram } from "@/lib/data/strength-program";
+import { lastLafayTest } from "@/lib/data/lafay-test";
 import { autoSyncExerciseCatalog, getExerciseLinkStats } from "@/lib/data/exercises-catalog";
 import { EXERCISE_CATALOG } from "@/lib/training/catalog/exercises";
 import { PlanCalendar } from "@/components/calendar/plan-calendar";
@@ -18,7 +19,7 @@ export default async function PlanPage() {
   if (!s?.user?.id) redirect("/login");
   const userId = s.user.id;
   await autoSyncExerciseCatalog();
-  const [run, gym, ex, goal] = await Promise.all([getRunProgram(userId), getStrengthProgram(userId), getExerciseLinkStats(userId), getCoverGoal(userId)]);
+  const [run, gym, ex, goal, lastTest] = await Promise.all([getRunProgram(userId), getStrengthProgram(userId), getExerciseLinkStats(userId), getCoverGoal(userId), lastLafayTest(userId)]);
   const vma = run ? null : await getCurrentVma(userId);
 
   // Onglet par défaut : celui dont la prochaine séance arrive en premier. Running : la date suggérée de la prochaine séance (programme actif) ;
@@ -37,7 +38,7 @@ export default async function PlanPage() {
       run={run
         ? <RunPanel p={run} goal={goal} calendar={calendar} />
         : <RunEmpty vma={vma && { vmaKmh: vma.vmaKmh, label: vma.label, estimated: vma.source === "ESTIMATED" }} calendar={calendar} />}
-      gym={<MuscuPanel v={gym} exercises={{ total: EXERCISE_CATALOG.length, toReview: ex.toReview }} />}
+      gym={<MuscuPanel v={gym} exercises={{ total: EXERCISE_CATALOG.length, toReview: ex.toReview }} lastTest={lastTest} />}
     />
   );
 }

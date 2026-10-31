@@ -21,6 +21,8 @@ type Props = {
   onMenu: () => void;
   /** Pastille FC de l'en-tête (la FC est enregistrée pendant l'échauffement, sans être affichée ensuite). */
   hr?: ReactNode;
+  /** Libellé de fin (« Commencer le test » pour le test de niveau). */
+  startLabel?: string;
 };
 
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -30,7 +32,7 @@ const newId = () => Math.random().toString(36).slice(2, 10);
  * Objectif atteint : vibration légère + barre et chrono qui passent au vert, sans son ; le chrono continue. Cibles de 56 px, action principale en bas (`h-16`).
  * « Passer l'échauffement » : un tap, rien n'est enregistré.
  */
-export function WarmupBlock({ title, startedAt, warmup, onChange, onDone, onMenu, hr }: Props) {
+export function WarmupBlock({ title, startedAt, warmup, onChange, onDone, onMenu, hr, startLabel = "Commencer la séance" }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [edit, setEdit] = useState<{ id: string | null; name: string; min: number } | null>(null); // id null = nouvel élément
   const [removing, setRemoving] = useState<WarmupLiveItem | null>(null);
@@ -63,7 +65,7 @@ export function WarmupBlock({ title, startedAt, warmup, onChange, onDone, onMenu
     if (!started && items.length) return set(runItem(warmup, items[0].id, Date.now()));
     onDone(finishWarmup(warmup, Date.now()));
   }
-  const label = running && next ? `Suivant : ${next.name}` : !started && items.length ? `Démarrer : ${items[0].name}` : "Commencer la séance";
+  const label = running && next ? `Suivant : ${next.name}` : !started && items.length ? `Démarrer : ${items[0].name}` : startLabel;
 
   function saveEdit() {
     if (!edit) return;

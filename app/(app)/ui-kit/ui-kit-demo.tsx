@@ -34,6 +34,8 @@ import { RpePicker } from "@/components/activity/rpe-picker";
 import { ShareActivity } from "@/components/activity/share-activity";
 import { sessionRpe } from "@/lib/load";
 import { SetLogger } from "@/components/workout/set-logger";
+import { LafayTestFlow } from "@/components/workout/lafay-test-flow";
+import { ApplyToProgram, LevelVerdict, TestHistory, TestResults } from "@/components/workout/lafay-test-result";
 import { DEFAULT_WARMUP, startWarmup, warmupLine, type Warmup } from "@/lib/workout/warmup";
 import { RouteCard } from "@/components/routes/route-card";
 import { WeatherBanner, WeatherCredit } from "@/components/routes/weather";
@@ -43,7 +45,7 @@ import { ExerciseThumb, MusclePanel } from "@/components/workout/catalog-bits";
 import { catalogExercise } from "@/lib/workout/catalog";
 import { musclesOfName, sessionLevels } from "@/lib/workout/body";
 
-export type Screen = "home" | "list" | "run" | "lift" | "workout" | "tokens";
+export type Screen = "home" | "list" | "run" | "lift" | "workout" | "tokens" | "test";
 type Go = (s: Screen, runId?: string) => void;
 
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
@@ -90,9 +92,10 @@ export function UiKitDemo({ screen: controlled, onScreen }: { screen?: Screen; o
       {screen === "list" && <List go={go} />}
       {screen === "run" && <RunDetail run={run} back={() => go("list")} />}
       {screen === "lift" && <LiftDetail back={() => go("list")} />}
-      {screen === "tokens" && <Tokens />}
+      {screen === "tokens" && <Tokens go={go} />}
+      {screen === "test" && <LafayTestFlow demo warmupDefaults={[]} prev={levelTestDemo.prev} onSave={async () => "demo"} />}
       {screen === "workout" && <WorkoutDemo onExit={() => go("home")} />}
-      {!controlled && screen !== "workout" && (
+      {!controlled && screen !== "workout" && screen !== "test" && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 flex justify-center px-6">
           <Segmented
             size="sm"
@@ -362,7 +365,17 @@ function BodyMapDemo() {
 }
 
 /* ─────────────── Tokens : la référence visuelle du système ─────────────── */
-function Tokens() {
+/** Test de niveau Lafay de démo : le test d'avant (écarts), puis l'historique. */
+const levelTestDemo = {
+  result: { A: 24, B: 22, C: 7, A1: 15 },
+  prev: { A: 22, B: 18, C: 7, A1: 16 },
+  history: [
+    { id: "t2", takenAt: "2026-10-31T08:00:00.000Z", result: { A: 24, B: 22, C: 7, A1: 15 }, appliedAt: null },
+    { id: "t1", takenAt: "2026-09-12T08:00:00.000Z", result: { A: 22, B: 18, C: 7, A1: 16 }, appliedAt: "2026-09-12T09:00:00.000Z" },
+  ],
+};
+
+function Tokens({ go }: { go: Go }) {
   const [theme, setThemeState] = useState<"dark" | "light">(() =>
     typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark",
   );
@@ -504,6 +517,16 @@ function Tokens() {
               ))}
             </div>
             <p className="px-1 text-xs text-ink-soft">Les bandes suivent le thème (bascule le thème en haut) : teinte douce en clair, valeurs d'origine en sombre. Jamais derrière un chiffre, jamais dans une séance en direct.</p>
+          </div>
+        </Section>
+
+        <Section title="Test de niveau Lafay" action={<button type="button" onClick={() => go("test")} className="touch-manipulation text-sm font-semibold text-brand active:opacity-60">Test guidé</button>}>
+          <div className="space-y-3">
+            <TestResults result={levelTestDemo.result} prev={levelTestDemo.prev} />
+            <LevelVerdict b={levelTestDemo.result.B} />
+            <ApplyToProgram b={levelTestDemo.result.B} template="Haut du corps" before={{ variant: "B2", sets: 6, reps: 9 }} appliedAt={null} />
+            <TestHistory tests={levelTestDemo.history} href={() => "/ui-kit"} />
+            <p className="px-1 text-xs text-ink-soft">Résultat, niveau d'après B (tome 1 p. 39), départ du niveau 2 (tableau du tome 2), feuille « Appliquer » (seulement les dips), historique. « Test guidé » : le parcours en plein écran (steppers 56 px, repos de 3:00, action en bas en h-16).</p>
           </div>
         </Section>
 

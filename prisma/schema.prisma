@@ -105,6 +105,7 @@ model User {
   gear       Gear[]
 
   workoutTemplates WorkoutTemplate[]
+  lafayTests       LafayTest[]
 
   // Programmes v2
   programs        Program[]
@@ -326,6 +327,27 @@ model WorkoutExercise {
 
   @@index([activityId, position])
   @@index([exerciseId])
+}
+
+/// Test de niveau Lafay (tome 1 p. 39, tome 2 p. 17) : maximum de répétitions à A, B, C puis A1, 3 min de repos entre chaque.
+/// Ce n'est PAS une séance : pas d'Activity ni de WorkoutExercise, donc hors fil, totaux, progression Lafay, records, badges et coach (lib/workout/lafay-test.ts).
+model LafayTest {
+  id        String    @id @default(cuid())
+  userId    String
+  takenAt   DateTime  // début du test (échauffement compris)
+  durationS Int
+  repsA     Int       // pompes, au sol, mains larges
+  repsB     Int       // dips, amplitude complète : fixe le niveau
+  repsC     Int       // tractions supination, amplitude complète
+  repsA1    Int       // pompes, mains et pieds sur des chaises
+  hrSeries  Json?     // [{ t, bpm }] depuis takenAt, si une ceinture était connectée (enregistrée, pas affichée)
+  warmup    Json?     // même forme qu'Activity.warmup (lib/workout/warmup.ts) ; null = passé
+  appliedAt DateTime? // « Appliquer à mon programme » confirmé ; la progression des dips repart de là (lib/workout/history.ts)
+  applied   Json?     // ce qui a été appliqué : { template, before: { variant, sets, reps }, after: { variant, sets, reps, restSec, restAfterSec } }
+  createdAt DateTime  @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, takenAt(sort: Desc)])
 }
 
 /// Modèle de séance de muscu : la structure seulement (exercices, séries, repos), jamais les performances.
