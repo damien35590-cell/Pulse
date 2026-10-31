@@ -28,9 +28,10 @@ export function WeekCard({ run, lift, km, goalKm, days }: Props) {
   return (
     <div className={cn(ui.card, "p-4")}>
       <dl className="grid grid-cols-3 gap-3">
-        <Metric size="lg" label={SPORT_SHORT("RUN")} value={run.done} unit={`/ ${run.target}`} />
-        <Metric size="lg" label="Muscu" value={lift.done} unit={`/ ${lift.target}`} />
+        <Metric size="lg" label={SPORT_SHORT("RUN")} value={run.done} unit={`/ ${run.target}`} animate animateKey="home:week" />
+        <Metric size="lg" label="Muscu" value={lift.done} unit={`/ ${lift.target}`} animate animateKey="home:week" />
         <Metric
+          animate animateKey="home:week"
           size="lg" label="Distance" value={fmtNum(km, 1)} unit={`/ ${fmtNum(goalKm, 0)} km`}
           hint={
             <span className="block h-1 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="Objectif de distance" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>

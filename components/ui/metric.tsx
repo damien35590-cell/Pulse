@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { CountUpText } from "@/components/ui/count-up";
 
 export type MetricSize = "sm" | "md" | "lg" | "xl" | "hero";
 
@@ -18,19 +19,27 @@ type Props = {
   hint?: React.ReactNode;
   align?: "start" | "center" | "end";
   className?: string;
+  /** Compte de 0 à la valeur au montage (chiffres héros seulement : pas dans les listes ni le fil). Sans effet si `value` n'est pas un nombre ou un texte numérique. */
+  animate?: boolean;
+  /** Identifiant stable (ex. `activity:<id>`) : l'animation ne se joue qu'une fois par session pour lui. */
+  animateKey?: string;
 };
 
 /**
  * Une mesure : libellé (capitales, gris) au-dessus, valeur en chiffres tabulaires, unité plus petite et plus claire.
  * À placer dans un <dl> (ex. <dl className="grid grid-cols-3 gap-3">).
  */
-export function Metric({ label, value, unit, size = "md", tone = "default", hint, align = "start", className }: Props) {
+export function Metric({ label, value, unit, size = "md", tone = "default", hint, align = "start", className, animate, animateKey }: Props) {
   const justify = align === "center" ? "justify-center" : align === "end" ? "justify-end" : "";
   return (
     <div className={cn("min-w-0", align === "center" && "text-center", align === "end" && "text-right", className)}>
       <dt className="truncate text-label uppercase text-ink-mute">{label}</dt>
       <dd className={cn("mt-1 flex items-baseline gap-1 whitespace-nowrap font-num tabular-nums", justify, VALUE[size], TONE[tone])}>
-        <span>{value}</span>
+        <span>
+          {animate && (typeof value === "string" || typeof value === "number")
+            ? <CountUpText text={String(value)} storageKey={animateKey ? `${animateKey}:${label}` : undefined} />
+            : value}
+        </span>
         {unit && <span className={cn("font-sans font-medium tracking-normal text-ink-soft", UNIT[size])}>{unit}</span>}
       </dd>
       {hint && <dd className={cn("mt-1 truncate text-xs text-ink-soft", justify && "w-full")}>{hint}</dd>}
