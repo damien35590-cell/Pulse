@@ -34,6 +34,7 @@ import { RpePicker } from "@/components/activity/rpe-picker";
 import { ShareActivity } from "@/components/activity/share-activity";
 import { sessionRpe } from "@/lib/load";
 import { SetLogger } from "@/components/workout/set-logger";
+import { DEFAULT_WARMUP, startWarmup, warmupLine, type Warmup } from "@/lib/workout/warmup";
 import { RouteCard } from "@/components/routes/route-card";
 import { WeatherBanner, WeatherCredit } from "@/components/routes/weather";
 import { BodyPair, MuscleLegend } from "@/components/body/body-map";
@@ -90,9 +91,7 @@ export function UiKitDemo({ screen: controlled, onScreen }: { screen?: Screen; o
       {screen === "run" && <RunDetail run={run} back={() => go("list")} />}
       {screen === "lift" && <LiftDetail back={() => go("list")} />}
       {screen === "tokens" && <Tokens />}
-      {screen === "workout" && (
-        <SetLogger title={workout.title} program={workout.program} exercises={workout.exercises} startedAt={Date.now() - workout.startedMinAgo * 60000} liveHr={false} onExit={() => go("home")} />
-      )}
+      {screen === "workout" && <WorkoutDemo onExit={() => go("home")} />}
       {!controlled && screen !== "workout" && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(theme(spacing.nav)_+_0.75rem)] z-30 flex justify-center px-6">
           <Segmented
@@ -106,6 +105,21 @@ export function UiKitDemo({ screen: controlled, onScreen }: { screen?: Screen; o
       )}
     </div>
   );
+}
+
+/** Échauffement de la fiche de démo : corde 3 min, gym 5 min. */
+const liftWarmup: Warmup = { v: 1, items: [{ name: "Corde à sauter", durationS: 182, targetS: 180 }, { name: "Gym / mobilité", durationS: 304, targetS: 300 }], endS: 486 };
+
+/**
+ * Séance de démo : l'échauffement d'abord (corde lancée à 2:56, l'objectif de 3:00 tombe 4 s après l'ouverture ; gym à l'arrêt),
+ * « Passer l'échauffement » ou « Commencer la séance » mène au SetLogger.
+ */
+function WorkoutDemo({ onExit }: { onExit: () => void }) {
+  const [state] = useState(() => {
+    const now = Date.now(), w = startWarmup(DEFAULT_WARMUP)!;
+    return { startedAt: now - 176_000, warmup: { ...w, items: w.items.map((x, i) => (i === 0 ? { ...x, since: now - 176_000 } : x)) } };
+  });
+  return <SetLogger title={workout.title} program={workout.program} exercises={workout.exercises} startedAt={state.startedAt} warmup={state.warmup} liveHr={false} onExit={onExit} />;
 }
 
 /* ─────────────── Accueil épuré : 5 blocs au lieu de 11 ─────────────── */
@@ -271,6 +285,7 @@ function LiftDetail({ back }: { back: () => void }) {
             <Metric size="xl" label="Séries" value={s.sets} />
             <Metric size="xl" label="Volume" value={fmtNum(s.volumeKg / 1000, 1)} unit="t" />
           </dl>
+          <p className="mt-3 text-xs text-ink-mute">{warmupLine(liftWarmup)}</p>
         </section>
         <Section title="Exercices">
           <div className="space-y-3">

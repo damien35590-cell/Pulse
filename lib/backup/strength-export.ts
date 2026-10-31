@@ -8,9 +8,14 @@ import { prisma } from "@/lib/prisma";
 /** À incrémenter si la forme du fichier change ; le script de restauration refuse une version qu'il ne connaît pas. */
 export const SCHEMA_VERSION = 1;
 
-/** Champs d'Activity trop lourds ou recalculables (traces GPS, rubans, météo) : exclus de la sauvegarde muscu. */
+/**
+ * Champs d'Activity trop lourds ou recalculables (traces GPS, rubans, météo) : exclus de la sauvegarde muscu. Tout le reste part, donc `warmup`
+ * (échauffement de la séance) et `hrSeries` : un nouveau champ d'Activity est sauvegardé sans rien changer ici. Format additif : SCHEMA_VERSION reste 1,
+ * une sauvegarde d'avant l'échauffement (sans `warmup`) se restaure telle quelle (lib/backup/revive.ts).
+ */
 const ACTIVITY_SKIP = new Set(["polyline", "trackPoints", "startLat", "startLng", "weather", "zoneRibbon", "zoneRibbonSource", "zoneRibbonRef", "zoneRibbonAt"]);
-const activitySelect = Object.fromEntries(Object.values(Prisma.ActivityScalarFieldEnum).filter((f) => !ACTIVITY_SKIP.has(f)).map((f) => [f, true])) as Prisma.ActivitySelect;
+export const ACTIVITY_FIELDS = Object.values(Prisma.ActivityScalarFieldEnum).filter((f) => !ACTIVITY_SKIP.has(f));
+const activitySelect = Object.fromEntries(ACTIVITY_FIELDS.map((f) => [f, true])) as Prisma.ActivitySelect;
 
 /** Ordre de restauration (les parents avant les enfants) : clé du fichier → modèle Prisma. */
 export const RESTORE_ORDER = [
@@ -34,7 +39,8 @@ export type BackupFile = {
   schemaVersion: number;
   exportedAt: string;
   userId: string;
-  profile: { homeEquipment: string[] };
+  /** `warmupDefaults` : réglage « Échauffement » (absent des sauvegardes d'avant ; null = jamais réglé). */
+  profile: { homeEquipment: string[]; warmupDefaults?: unknown };
   counts: Record<BackupKey, number>;
   data: Record<BackupKey, Record<string, unknown>[]>;
 };
@@ -46,7 +52,7 @@ export async function exportStrength(userId: string, now = new Date()): Promise<
   const strengthActivity: Prisma.ActivityWhereInput = { userId, OR: [{ type: "WORKOUT" }, { exercises: { some: {} } }] };
   const programs = { userId, sport: "WORKOUT" as const };
   const [user, exercises, trainingGoals, progs, phases, weeks, workouts, slots, templates, templateExercises, activities, workoutExercises, plannedSessions, athleteMetrics] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { homeEquipment: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { homeEquipment: true, warmupDefaults: true } }),
     prisma.exercise.findMany({ orderBy: { slug: "asc" } }),
     prisma.trainingGoal.findMany({ where: { userId, sport: "WORKOUT" }, orderBy: { createdAt: "asc" } }),
     prisma.program.findMany({ where: programs, orderBy: { createdAt: "asc" } }),
@@ -67,7 +73,7 @@ export async function exportStrength(userId: string, now = new Date()): Promise<
     activities: rows(activities), workoutExercises: rows(workoutExercises), plannedSessions: rows(plannedSessions), athleteMetrics: rows(athleteMetrics),
   };
   const counts = Object.fromEntries(RESTORE_ORDER.map(([k]) => [k, data[k].length])) as BackupFile["counts"];
-  return { schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), userId, profile: { homeEquipment: user?.homeEquipment ?? [] }, counts, data };
+  return { schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), userId, profile: { homeEquipment: user?.homeEquipment ?? [], warmupDefaults: user?.warmupDefaults ?? null }, counts, data };
 }
 
 // ───────── CSV ─────────

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getZones } from "@/lib/data/zones";
 import { SessionFlow } from "@/components/workout/session-flow";
 import { buildDraftFromSession, buildDraftFromTemplate, getNextSessionSuggestion } from "@/lib/workout/queries";
+import { getWarmupDefaults } from "@/lib/workout/library-db";
 import type { Draft } from "@/lib/workout/types";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,6 @@ export default async function SessionPage({ searchParams }: { searchParams: SP }
   // Séance ou modèle introuvable (supprimé, autre compte) : retour à la feuille plutôt qu'une page vide.
   if (!draft && (searchParams.from || searchParams.template)) redirect("/record/session");
 
-  const { hrMax } = await getZones(uid);
-  return <SessionFlow key={JSON.stringify(searchParams)} draft={draft} direct={searchParams.go === "1"} hrMax={hrMax} />;
+  const [{ hrMax }, warmup] = await Promise.all([getZones(uid), getWarmupDefaults(uid)]);
+  return <SessionFlow key={JSON.stringify(searchParams)} draft={draft} direct={searchParams.go === "1"} hrMax={hrMax} warmup={warmup} />;
 }

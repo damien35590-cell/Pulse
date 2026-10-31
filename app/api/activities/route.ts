@@ -10,6 +10,7 @@ import { processActivity } from "@/lib/pipeline/post-import";
 import { exactExerciseIds } from "@/lib/data/exercises-catalog";
 import { kindOfNames } from "@/lib/workout/kind";
 import { annotateSets, cleanHrSeries, hrStats } from "@/lib/workout/hr";
+import { cleanWarmup, liftSamples } from "@/lib/workout/warmup";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPES = ["RUN", "RIDE", "EBIKE", "SWIM", "HIKE", "WALK", "WORKOUT", "OTHER"] as const;
@@ -60,10 +61,13 @@ export async function POST(req: Request) {
       }).filter((e: { name: string; sets: number; reps: number }) => e.name && e.sets > 0 && e.reps > 0)
     : [];
   if (isWorkout) { b.distanceM = 0; b.elevationGainM = 0; }
-  // Ceinture cardio : série nettoyée, moyenne / max calculées ici, pic et FC en fin de repos écrits dans chaque série. Sans assez de mesures : rien.
+  // Échauffement (corde, mobilité…) : à part des exercices, jamais dans les totaux ni la progression ; passé = rien.
+  const warmup = isWorkout ? cleanWarmup(b.warmup, b.movingTimeS) : undefined;
+  // Ceinture cardio : série nettoyée (échauffement compris), pic et FC en fin de repos écrits dans chaque série. Sans assez de mesures : rien.
+  // Moyenne / max : la muscu seule, après l'échauffement.
   const hrSamples = isWorkout ? cleanHrSeries(b.hrSeries) : [];
-  const hr = hrStats(hrSamples);
-  if (hr) annotateSets(exercises, hrSamples, +startedAt);
+  const hasHr = hrStats(hrSamples) != null, hr = hasHr ? hrStats(liftSamples(hrSamples, warmup ?? null)) : null;
+  if (hasHr) annotateSets(exercises, hrSamples, +startedAt);
   // Rattachement au catalogue quand la correspondance est exacte ; en cas d'échec, la séance s'enregistre quand même en texte libre.
   if (exercises.length) {
     const ids = await exactExerciseIds(uid, exercises.map((e: { name: string }) => e.name)).catch(() => new Map<string, string>());
@@ -87,7 +91,8 @@ export async function POST(req: Request) {
     const a = await prisma.activity.create({
       data: {
         userId: uid, clientId, type: b.type, kind, templateId, title: String(b.title).slice(0, 120), titleEdited: b.titleEdited === true, notes: b.notes ?? null, feeling: b.feeling ?? null, rpe, startedAt,
-        avgHr: hr?.avg, maxHr: hr?.max, hrSeries: hr ? (hrSamples as unknown as Prisma.InputJsonValue) : undefined,
+        avgHr: hr?.avg, maxHr: hr?.max, hrSeries: hasHr ? (hrSamples as unknown as Prisma.InputJsonValue) : undefined,
+        warmup: warmup ?? undefined,
         distanceM: b.distanceM ?? 0, movingTimeS: b.movingTimeS, elevationGainM: b.elevationGainM ?? 0, calories: b.calories ?? null,
         polyline, startLat, startLng, weather: weather ?? undefined,
         exercises: exercises.length ? { create: exercises } : undefined,

@@ -9,7 +9,8 @@ import { PrepScreen } from "@/components/workout/prep-screen";
 import { NewSessionSheet } from "@/components/workout/new-session-sheet";
 import { StoryReveal } from "@/components/record/story-reveal";
 import { saveTemplate } from "@/app/(app)/record/session/actions";
-import { freeTitle, toLift, toPayload } from "@/lib/workout/lift";
+import { freeTitle, sessionBody, toLift } from "@/lib/workout/lift";
+import { startWarmup, warmupStarted, type WarmupItem, type WarmupLive } from "@/lib/workout/warmup";
 import { enqueuePending, isRetryable, newClientId, removePending } from "@/lib/workout/pending-uploads";
 import { clearHrBuffer, useHeartRate } from "@/stores/heart-rate";
 import type { Draft, Kind } from "@/lib/workout/types";
@@ -18,17 +19,18 @@ const STORE = "pulse-session-v2";
 const MAX_AGE_MS = 12 * 3600 * 1000; // une séance laissée plus longtemps n'est plus reprise
 const SESSION = "/record/session";
 
-type Run = { clientId: string; title: string; kind: Kind; templateId: string | null; startedAt: number; exercises: LiftExercise[] };
+/** `warmup` : échauffement de la séance (null = aucun, ou séance d'avant l'échauffement). */
+type Run = { clientId: string; title: string; kind: Kind; templateId: string | null; startedAt: number; exercises: LiftExercise[]; warmup?: WarmupLive | null };
 type Phase = "boot" | "pick" | "conflict" | "prep" | "run";
 
 const done = (r: Run | LiftExercise[]) => (Array.isArray(r) ? r : r.exercises).reduce((n, e) => n + e.done.length, 0);
 
-/** La séance en cours sur ce téléphone, sans limite d'âge dès qu'elle a une série validée ; une séance vide de plus de 12 h est oubliée. */
+/** La séance en cours sur ce téléphone, sans limite d'âge dès qu'elle a une série validée ; un échauffement commencé se reprend pendant 12 h ; une séance vide de plus de 12 h est oubliée. */
 function readStored(): Run | null {
   try {
     const r = JSON.parse(localStorage.getItem(STORE) ?? "null");
     if (r?.v === 2 && Array.isArray(r.exercises)) {
-      if (done(r.exercises) > 0) return { ...r, clientId: typeof r.clientId === "string" ? r.clientId : newClientId() } as Run;
+      if (done(r.exercises) > 0 || (warmupStarted(r.warmup) && Date.now() - r.startedAt < MAX_AGE_MS)) return { ...r, clientId: typeof r.clientId === "string" ? r.clientId : newClientId() } as Run;
       if (Date.now() - r.startedAt >= MAX_AGE_MS) clearStored();
     }
   } catch { /* stockage indisponible ou illisible */ }
@@ -46,25 +48,28 @@ const clearStored = () => {
 /**
  * Parcours d'une séance de muscu : feuille « Nouvelle séance » → préparation → SetLogger → enregistrement.
  * `draft` vient de l'adresse (?suggest, ?from, ?template, ?empty) ; sans lui, on reprend la séance en cours ou on ouvre la feuille.
- * `direct` saute la préparation (bouton « Démarrer » de la suggestion).
+ * `direct` saute la préparation (bouton « Démarrer » de la suggestion). `warmup` : échauffement proposé (Vous › Réglages), fait avant le premier exercice.
  */
-export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; direct: boolean; hrMax?: number | null }) {
+export function SessionFlow({ draft, direct, hrMax, warmup = [] }: { draft: Draft | null; direct: boolean; hrMax?: number | null; warmup?: WarmupItem[] }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("boot");
   const [run, setRun] = useState<Run | null>(null);
   const [stored, setStored] = useState<Run | null>(null);
   const [res, setRes] = useState<{ story: string; record: boolean; id: string } | null>(null);
   const latest = useRef<LiftExercise[]>([]);
+  const latestWarm = useRef<WarmupLive | null>(null);
 
   function startRun(d: Draft) {
-    const r: Run = { clientId: newClientId(), title: d.title || freeTitle(new Date()), kind: d.kind, templateId: d.templateId, startedAt: Date.now(), exercises: d.exercises.map(toLift) };
+    const r: Run = { clientId: newClientId(), title: d.title || freeTitle(new Date()), kind: d.kind, templateId: d.templateId, startedAt: Date.now(), exercises: d.exercises.map(toLift), warmup: startWarmup(warmup) };
     latest.current = r.exercises;
+    latestWarm.current = r.warmup ?? null;
     setRun(r);
     setPhase("run");
     window.history.replaceState(null, "", SESSION); // un rafraîchissement reprend la séance au lieu de reconstruire le brouillon
   }
   function resume(r: Run) {
     latest.current = r.exercises;
+    latestWarm.current = r.warmup ?? null;
     setRun(r);
     setPhase("run");
     window.history.replaceState(null, "", SESSION);
@@ -79,15 +84,16 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function persist(exs: LiftExercise[]) {
-    latest.current = exs;
+  function store() {
     if (!run) return;
-    try { localStorage.setItem(STORE, JSON.stringify({ v: 2, clientId: run.clientId, title: run.title, kind: run.kind, templateId: run.templateId, startedAt: run.startedAt, exercises: exs })); } catch { /* stockage indisponible */ }
+    try { localStorage.setItem(STORE, JSON.stringify({ v: 2, clientId: run.clientId, title: run.title, kind: run.kind, templateId: run.templateId, startedAt: run.startedAt, exercises: latest.current, warmup: latestWarm.current })); } catch { /* stockage indisponible */ }
   }
+  function persist(exs: LiftExercise[]) { latest.current = exs; store(); }
+  function persistWarm(w: WarmupLive) { latestWarm.current = w; store(); }
 
-  /** Quitter garde les séries validées sur le téléphone ; sans série, il n'y a rien à reprendre. `replace` : l'entrée « garde » du retour Android disparaît. */
+  /** Quitter garde les séries validées (ou l'échauffement commencé) sur le téléphone ; sans rien, il n'y a rien à reprendre. `replace` : l'entrée « garde » du retour Android disparaît. */
   function quit() {
-    if (done(latest.current) === 0) { useHeartRate.getState().discard(); clearStored(); }
+    if (done(latest.current) === 0 && !warmupStarted(latestWarm.current)) { useHeartRate.getState().discard(); clearStored(); }
     router.replace("/record");
   }
 
@@ -101,15 +107,10 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
 
   async function save(exs: LiftExercise[], opts: { templateName?: string }) {
     if (!run) return;
-    const exercises = exs.filter((e) => e.done.length).map(toPayload);
-    if (!exercises.length) throw new Error("Aucune série validée : valide au moins une série avant d’enregistrer.");
-    // Avec une ceinture, la série de FC part avec la séance ; le serveur calcule moyenne, max, pic et récupération de chaque série.
-    const hrSeries = useHeartRate.getState().samples;
-    const body = {
-        clientId: run.clientId, type: "WORKOUT", title: run.title, kind: run.kind, templateId: run.templateId, startedAt: new Date(run.startedAt).toISOString(),
-        movingTimeS: Math.max(60, Math.round((Date.now() - run.startedAt) / 1000)), exercises, gearIds: [],
-        ...(hrSeries.length ? { hrSeries } : {}),
-    };
+    // Avec une ceinture, la série de FC part avec la séance (échauffement compris) ; le serveur calcule moyenne, max, pic et récupération de chaque série.
+    // L'échauffement part à part des exercices, et pas du tout s'il a été passé.
+    const body = sessionBody(run, exs, Date.now(), { hrSeries: useHeartRate.getState().samples, warmup: latestWarm.current });
+    if (!body.exercises.length) throw new Error("Aucune série validée : valide au moins une série avant d’enregistrer.");
     let r: Response | null = null;
     try { r = await fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch { /* pas de réseau */ }
     if (!r?.ok) {
@@ -131,7 +132,7 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
 
   if (res) return <StoryReveal story={res.story} record={res.record} onClose={() => { router.push(`/activities/${res.id}`); router.refresh(); }} />;
   if (phase === "run" && run) {
-    return <SetLogger title={run.title} exercises={run.exercises} startedAt={run.startedAt} templateName={run.title} hrMax={hrMax} onChange={persist} onSave={save} onExit={quit} onDiscard={discard} />;
+    return <SetLogger title={run.title} exercises={run.exercises} startedAt={run.startedAt} templateName={run.title} hrMax={hrMax} warmup={run.warmup} onWarmupChange={persistWarm} onChange={persist} onSave={save} onExit={quit} onDiscard={discard} />;
   }
   if (phase === "prep" && draft) return <PrepScreen draft={draft} onStart={startRun} onBack={() => router.push(SESSION)} />;
 
@@ -142,7 +143,7 @@ export function SessionFlow({ draft, direct, hrMax }: { draft: Draft | null; dir
         {stored && (
           <>
             <p className="mt-1 text-sm text-ink-soft">
-              « {stored.title} » : {done(stored)} série{done(stored) > 1 ? "s" : ""} déjà validée{done(stored) > 1 ? "s" : ""}. Démarrer une nouvelle séance l’abandonne.
+              « {stored.title} » : {done(stored) ? `${done(stored)} série${done(stored) > 1 ? "s" : ""} déjà validée${done(stored) > 1 ? "s" : ""}` : "échauffement commencé"}. Démarrer une nouvelle séance l’abandonne.
             </p>
             <div className="mt-6 grid gap-2">
               <button type="button" onClick={() => resume(stored)} className={cn(ui.btnPrimary, "w-full")}>Reprendre la séance</button>

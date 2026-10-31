@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { RESTORE_ORDER, SCHEMA_VERSION, type BackupFile } from "../lib/backup/strength-export";
+import { revive } from "../lib/backup/revive";
 
 type Row = Record<string, unknown>;
 type Delegate = { findMany(a: unknown): Promise<{ id: string }[]>; upsert(a: unknown): Promise<unknown>; update(a: unknown): Promise<unknown> };
@@ -27,19 +28,7 @@ const OPTIONAL_REFS: Record<string, [field: string, model: string][]> = {
   Program: [["goalId", "TrainingGoal"]],
 };
 
-const fields = (model: string) => new Map(Prisma.dmmf.datamodel.models.find((m) => m.name === model)!.fields.filter((f) => f.kind !== "object").map((f) => [f.name, f]));
 const delegate = (model: string) => (prisma as unknown as Record<string, Delegate>)[model[0].toLowerCase() + model.slice(1)];
-
-/** Dates relues depuis le JSON, null des champs Json traduits pour Prisma. */
-function revive(model: string, row: Row): Row {
-  const f = fields(model), out: Row = {};
-  for (const [k, v] of Object.entries(row)) {
-    const t = f.get(k)?.type;
-    if (!t) continue; // champ inconnu de ce schéma (fichier d'un schéma plus récent)
-    out[k] = t === "DateTime" && typeof v === "string" ? new Date(v) : t === "Json" && v === null ? Prisma.DbNull : v;
-  }
-  return out;
-}
 
 async function main() {
   const [file, ...flags] = process.argv.slice(2);
@@ -90,7 +79,9 @@ async function main() {
     console.log(`${model.padEnd(24)} ${String(rowsIn.length).padStart(5)} ligne(s) : ${created} à créer, ${updated} à mettre à jour${unlinked ? `, ${unlinked} lien(s) vers des lignes absentes mis à null` : ""}`);
   }
 
+  // Profil : le matériel, et l'échauffement par défaut s'il est dans le fichier (absent d'une sauvegarde d'avant : réglage en base inchangé).
   if (apply && b.profile?.homeEquipment) await prisma.user.update({ where: { id: uid }, data: { homeEquipment: b.profile.homeEquipment } });
+  if (apply && b.profile && "warmupDefaults" in b.profile) await prisma.user.update({ where: { id: uid }, data: { warmupDefaults: (b.profile.warmupDefaults as Prisma.InputJsonValue | null) ?? Prisma.DbNull } });
   console.log(apply ? "Terminé." : "Dry-run terminé : relance avec --apply pour écrire.");
 }
 

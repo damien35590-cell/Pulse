@@ -89,6 +89,7 @@ model User {
   homeLat       Float?    // domicile : départ par défaut des itinéraires
   homeLng       Float?
   homeEquipment String[]  @default([]) // « Mon matériel » (valeurs de Equipment dans lib/workout/catalog-data.ts) ; vide = matériel par défaut
+  warmupDefaults Json?    // « Échauffement » (Vous › Réglages) : [{ name, min }] proposé en début de séance de muscu (lib/workout/warmup.ts) ; null = Corde à sauter 3 min + Gym / mobilité 5 min, [] = pas d'échauffement
   lastSyncAt    DateTime? // dernière synchro Intervals.icu + Google Fit (bouton « Synchroniser maintenant » ou tâche de nuit) ; limite les synchros manuelles à une toutes les 5 min
   createdAt     DateTime  @default(now())
 
@@ -179,6 +180,7 @@ model Activity {
   avgHr          Int?
   maxHr          Int?
   hrSeries       Json?                   // muscu avec ceinture cardio : [{ t: secondes depuis startedAt, bpm }] à 1 Hz au plus (lib/workout/hr.ts) ; avgHr / maxHr en sont calculés côté serveur
+  warmup         Json?                   // muscu : échauffement fait avant le premier exercice, { v: 1, items: [{ name, durationS, targetS? }], endS } (lib/workout/warmup.ts) ; null = passé ou séance d'avant. Hors totaux, progression, barres et coach ; compris dans la durée
   avgPower       Int?                    // W (home trainer, capteur de puissance)
   maxPower       Int?
   polyline       String?      @db.Text   // trace simplifiée (polyline encodée)

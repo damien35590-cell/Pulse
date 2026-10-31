@@ -3,7 +3,8 @@ import { auth } from "@/lib/auth";
 import { deleteTemplate, draftExercise, getStartOptions, saveSessionAsTemplate } from "@/lib/workout/queries";
 import type { DraftExercise, StartOptions } from "@/lib/workout/types";
 import { revalidatePath } from "next/cache";
-import { duplicateTemplate, getEquipment, installLibraryTemplate, setEquipment } from "@/lib/workout/library-db";
+import { duplicateTemplate, getEquipment, installLibraryTemplate, setEquipment, setWarmupDefaults } from "@/lib/workout/library-db";
+import type { WarmupItem } from "@/lib/workout/warmup";
 import type { Equipment } from "@/lib/workout/catalog-data";
 
 async function userId() {
@@ -39,6 +40,13 @@ export async function myEquipment(): Promise<Equipment[]> {
 export async function saveEquipment(list: string[]): Promise<Equipment[]> {
   const saved = await setEquipment(await userId(), list);
   revalidatePath("/vous/materiel-muscu"); revalidatePath("/vous");
+  return saved;
+}
+
+/** « Échauffement » : proposé en début de séance ; liste vide = pas d'échauffement. */
+export async function saveWarmupDefaults(list: WarmupItem[]): Promise<WarmupItem[]> {
+  const saved = await setWarmupDefaults(await userId(), list);
+  revalidatePath("/vous/echauffement"); revalidatePath("/vous");
   return saved;
 }
 

@@ -17,6 +17,8 @@ import { musclesOfName } from "@/lib/workout/body";
 import { useHeartRate } from "@/stores/heart-rate";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { nextVerdict, type NextVerdict } from "@/lib/workout/next-target";
+import { WarmupBlock } from "@/components/workout/warmup-block";
+import type { WarmupLive } from "@/lib/workout/warmup";
 import type { PastRow } from "@/lib/workout/types";
 
 /**
@@ -68,6 +70,10 @@ type Props = {
   hrMax?: number | null;
   /** Ceinture cardio Bluetooth, écran allumé et retour Android intercepté. Faux pour la démo de /ui-kit. */
   liveHr?: boolean;
+  /** Échauffement à faire avant le premier exercice (lib/workout/warmup.ts) ; absent ou `done` : directement les exercices. */
+  warmup?: WarmupLive | null;
+  /** Appelé à chaque changement de l'échauffement (chrono lancé, élément ajouté, fin) : de quoi le reprendre après un rafraîchissement. */
+  onWarmupChange?: (w: WarmupLive) => void;
 };
 
 type Rest = { endsAt: number; total: number; next: string; startedAt: number; after: { ex: number; set: number }; hrStart: number | null };
@@ -99,7 +105,7 @@ function useNow(active = true) {
  * - Retour immédiat : vibration + bouton qui passe au vert + coche qui « pop » dans le tableau, puis repos.
  * - Fin d'exercice : coche tamponnée, bandeau résumé (séries, reps, écart, verdict Lafay), puis l'exercice suivant glisse.
  */
-export function SetLogger({ title, program, exercises, startedAt, onExit, onDiscard, onSave, onChange, templateName, hrMax, liveHr = true }: Props) {
+export function SetLogger({ title, program, exercises, startedAt, onExit, onDiscard, onSave, onChange, templateName, hrMax, liveHr = true, warmup, onWarmupChange }: Props) {
   const [exs, setExs] = useState(() => exercises.map((e) => ({ ...e, done: [...e.done] })));
   const [idx, setIdx] = useState(() => Math.max(0, exercises.findIndex((e) => e.done.length < e.sets)));
   const [edit, setEdit] = useState<number | null>(null); // série déjà faite en cours de correction
@@ -114,6 +120,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onDisc
   const [tplName, setTplName] = useState(templateName ?? "");
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState("");
+  const [warm, setWarm] = useState<WarmupLive | null>(warmup ?? null);
   const start = useRef(startedAt ?? Date.now());
   const wrapRef = useRef<Wrap | null>(null);
   const timers = useRef<number[]>([]);
@@ -153,6 +160,10 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onDisc
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   useEffect(() => { onChangeRef.current?.(exs); }, [exs]);
+  const onWarmRef = useRef(onWarmupChange);
+  onWarmRef.current = onWarmupChange;
+  useEffect(() => { if (warm) onWarmRef.current?.(warm); }, [warm]);
+  const warming = !!warm && !warm.done;
 
   // Pré-remplissage : dernière série faite, sinon l'objectif.
   useEffect(() => {
@@ -274,6 +285,10 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onDisc
 
   return (
     <div className="fixed inset-0 z-50 bg-bg">
+      {/* Échauffement : avant le premier exercice, dans la même séance (horloge, FC, écran allumé, retour Android) */}
+      {warming && warm ? (
+        <WarmupBlock title={title} startedAt={start.current} warmup={warm} onChange={setWarm} onDone={setWarm} onMenu={() => setMenu(true)} hr={liveHr ? <HrPill hrMax={hrMax} /> : undefined} />
+      ) : (
       <div className="mx-auto flex h-full max-w-md flex-col">
         {/* ── En-tête : menu / titre + chrono / terminer ── */}
         <header className="pt-safe-top">
@@ -454,6 +469,7 @@ export function SetLogger({ title, program, exercises, startedAt, onExit, onDisc
           )}
         </footer>
       </div>
+      )}
 
       {/* Transition de fin d'exercice : un toucher n'importe où la passe */}
       {wrap && <button type="button" aria-label={wrap.next < 0 ? "Voir le bilan de la séance" : "Passer à l’exercice suivant"} onClick={endWrap} className="fixed inset-0 z-[55] cursor-default touch-manipulation" />}
