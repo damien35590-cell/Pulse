@@ -6,7 +6,8 @@
 import { prisma } from "../prisma";
 import { dayKey, shiftDay, weekKeys } from "../dates";
 import type { SetDetail } from "../exercises";
-import { musclesOf, volumeByMuscle, UPPER_GROUPS, type Group, type MuscleLoad } from "../muscles";
+import { musclesOf, UPPER_GROUPS } from "../muscles";
+import { muscleVolume, type MuscleId, type MuscleLoad } from "../workout/body";
 import { lafayView } from "../workout/lafay";
 import { capOf, doneSets, groupKey, isJump, nextVariant, sumReps, variantOf, type Det, type Entry, type StrengthRow } from "./strength-rows";
 
@@ -35,8 +36,8 @@ export type StrengthAnalysis = {
   exercises: ExerciseProgress[];
   regularity: { perWeek: number; target: readonly [number, number]; upperPct: number | null; lowerPct: number | null };
   insights: string[];
-  /** Volume par muscle sur la période : descriptif, affiché dès une séance (le seuil MIN_SESSIONS ne vaut que pour juger). */
-  muscles: Record<Group, MuscleLoad>;
+  /** Volume par muscle de la carte du corps sur la période (lib/workout/body.ts) : descriptif, affiché dès une séance (le seuil MIN_SESSIONS ne vaut que pour juger). */
+  muscles: Record<MuscleId, MuscleLoad>;
   /** Période précédente de même durée (null si l'historique chargé ne la couvre pas). */
   prev: { sessions: number; reps: number } | null;
 };
@@ -122,7 +123,7 @@ export function buildStrengthAnalysis(rows: StrengthRow[], weeks: number, tz: st
     empty: inPeriod.length === 0, summary,
     weekly: weekly.map((w) => ({ weekStart: w.weekStart, reps: w.reps, sets: w.sets, sessions: w.ids.size })),
     exercises, regularity, insights: insightsOf(rows, exercises, weekOf, weeks, tz, summary.sessions >= MIN_SESSIONS),
-    muscles: volumeByMuscle(inPeriod.flatMap((r) => doneSets(r).map((x) => ({ name: r.name, sets: 1, reps: x.reps, loadKg: x.loadKg }))), bodyKg),
+    muscles: muscleVolume(inPeriod.flatMap((r) => doneSets(r).map((x) => ({ name: r.name, sets: 1, reps: x.reps, loadKg: x.loadKg }))), bodyKg),
     prev: inPrev.length ? { sessions: new Set(inPrev.map((r) => r.activityId)).size, reps: inPrev.reduce((s, r) => s + sumReps(doneSets(r)), 0) } : null,
   };
 }

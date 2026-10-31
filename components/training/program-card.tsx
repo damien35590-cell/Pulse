@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { LiftActions, PauseToggle, SessionActions, VmaTestPrompt } from "./program-actions";
 import { SessionCarousel, type DotGroup, type WeekDot } from "./session-carousel";
+import { MuscleRecovery } from "@/components/body/muscle-recovery";
+import type { MuscleLevels } from "@/lib/workout/body";
 
 /** « Bloc 1 · Semaine 2/4 · Reprise & VMA » : pied de la carte d'accueil, le nom du programme y tient sans tronquer le libellé du haut. */
 const blockLabel = (p: RunProgramView) =>
@@ -248,7 +250,7 @@ export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView |
                 {notes.map((l) => <p key={l} className="mt-1.5 text-[15px] leading-snug text-ink-soft">{l}</p>)}
                 <div className="mt-5"><SessionActions id={planRun.id} variant="card" /></div>
               </div>
-            ) : c && <CoachBody c={c} className="mt-1.5" />}
+            ) : c && <CoachBody c={c} className="mt-1.5" recovery={lw?.recovery} />}
           </div>
         ),
       },
@@ -327,7 +329,7 @@ export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView |
         </div>
         {programLink}
       </div>
-      {c ? <CoachBody c={c} className="relative mt-1.5" /> : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
+      {c ? <CoachBody c={c} className="relative mt-1.5" recovery={lw?.recovery} /> : !paused && !n && <p className="relative mt-2 text-[15px] text-ink-soft">Programme terminé, bravo.</p>}
       {paused && p && (
         <div className="relative mt-4 space-y-3">
           <p className="flex items-center gap-2 text-[15px] text-ink-soft"><Pause className="size-4 shrink-0" aria-hidden />{c ? "Programme en pause : il t’attend, reprends quand tu veux." : "Il t’attend, reprends quand tu veux."}</p>
@@ -341,14 +343,15 @@ export function DayCard({ c, p, lw }: { c: CoachPlan | null; p: RunProgramView |
   );
 }
 
-/** Conseil du coach hors course du programme : titre, lignes, actions muscu, « Demain : … ». */
-function CoachBody({ c, className }: { c: CoachPlan; className?: string }) {
+/** Conseil du coach hors course du programme : titre, lignes, récupération des muscles et actions muscu, « Demain : … ». */
+function CoachBody({ c, className, recovery }: { c: CoachPlan; className?: string; recovery?: MuscleLevels }) {
   return (
     <div className={className}>
       <h2 className="text-balance text-[28px] font-bold leading-tight tracking-tight">{c.title}</h2>
       <ul className="mt-2 space-y-1.5">
         {(c.run ? [c.run.steps] : c.lines).map((l) => <li key={l} className="text-[15px] leading-snug text-ink-soft">{l}</li>)}
       </ul>
+      {c.kind === "lift" && recovery && <MuscleRecovery levels={recovery} className="mt-4" />}
       {c.kind === "lift" && <LiftActions />}
       {c.next && <p className="mt-3 text-sm text-ink-mute">{c.next}</p>}
     </div>

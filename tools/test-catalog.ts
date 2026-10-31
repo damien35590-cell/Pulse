@@ -8,6 +8,7 @@ import {
 import { groupKey, nextVariant, variantOf } from "../lib/analytics/strength";
 import { lafayCode, musclesOf } from "../lib/muscles";
 import { prescription, sessionNames, structureOf, templateStructures } from "../lib/workout/library";
+import { MUSCLE_IDS } from "../lib/workout/body";
 
 // ── Données ──
 const ids = ALL_EXERCISES.map((e) => e.id);
@@ -18,6 +19,20 @@ for (const id of inGroups) assert.ok(catalogExercise(id), `${id} existe`);
 for (const t of PROGRAM_TEMPLATES) for (const s of t.sessions) for (const x of s.exercises) for (const id of [x.exerciseId, ...(x.alternatives ?? [])]) assert.ok(catalogExercise(id), `${t.id} → ${id}`);
 assert.equal(ALL_EXERCISES.filter((e) => e.source === "lafay").length, 77);
 for (const e of ALL_EXERCISES.filter((x) => x.source === "lafay")) assert.ok(isLafayCode(e.family), `${e.id} : lettre connue`);
+
+// ── Muscles (carte du corps) ──
+const KNOWN = new Set<string>(MUSCLE_IDS);
+for (const e of ALL_EXERCISES) {
+  assert.ok(e.muscles.primary.length > 0, `${e.id} : au moins un muscle principal`);
+  for (const m of [...e.muscles.primary, ...e.muscles.secondary]) assert.ok(KNOWN.has(m), `${e.id} : muscle ${m} inconnu`);
+  assert.ok(!e.muscles.secondary.some((m) => e.muscles.primary.includes(m)), `${e.id} : un muscle est principal ou secondaire, pas les deux`);
+}
+assert.deepEqual(catalogExercise("B")!.muscles, { primary: ["chest", "triceps"], secondary: ["front_delts"] }, "dips");
+assert.deepEqual(catalogExercise("C")!.muscles, { primary: ["lats", "biceps"], secondary: ["upper_back", "forearms"] }, "tractions supination");
+assert.deepEqual(catalogExercise("F")!.muscles, { primary: ["quads", "glutes"], secondary: ["calves", "hamstrings"] }, "squat sauté");
+assert.deepEqual(catalogExercise("J")!.muscles.primary, ["front_delts", "triceps"], "pompes piquées");
+assert.deepEqual(catalogExercise("C2")!.muscles, catalogExercise("C")!.muscles, "une variante hérite de sa famille");
+assert.equal(catalogExercise("A9")!.muscles.primary[0], "triceps", "pompes très serrées : surtout les triceps");
 
 // ── Codes saisis ──
 assert.deepEqual(lafayCode("K2 - triceps"), { letter: "k", digits: 2 });

@@ -23,7 +23,7 @@ import { parsePeriod, periodParams, weeksLabel } from "@/lib/analysis/period";
 import { MAX_NOTES, exceptionalPrevious, overviewNotes, frame, rankNotes, rateChange, runNotes, sessionsPerWeek, strengthNotes, timeChange, type CoachNote } from "@/lib/analytics/coach-notes";
 import { getPlanAdherence, getRunGoal } from "@/lib/data/coach";
 import { lastDebrief } from "@/lib/coach/store";
-import { AnatomyHeatmap } from "@/components/musculation/anatomy-heatmap";
+import { MuscleVolume } from "@/components/body/muscle-volume";
 import { TopBar } from "@/components/layout/top-bar";
 import { PeriodPicker } from "@/components/analysis/period-picker";
 import { CoachCard } from "@/components/analysis/coach-card";
@@ -260,7 +260,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Sp 
 
                 {strength && (
                   <Section title="Muscles sollicités">
-                    <div className={cn(ui.card, "p-4")}><AnatomyHeatmap data={strength.muscles} hasData={strength.summary.sessions > 0} span={weeksLabel(W)} /></div>
+                    <div className={cn(ui.card, "p-4")}><MuscleVolume data={strength.muscles} weeks={W} span={weeksLabel(W)} /></div>
                   </Section>
                 )}
               </div>

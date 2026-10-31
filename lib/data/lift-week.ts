@@ -1,8 +1,10 @@
 /**
  * Muscu de la semaine pour la carte du jour de l'accueil : séances faites (total de répétitions et écart avec la précédente
  * du même type) et séances à venir placées en rotation (lib/coach/week-plan.ts), avec leurs exercices et cibles Lafay
- * (les mêmes que l'onglet Muscu de la page Programme et que « Démarrer »).
+ * (les mêmes que l'onglet Muscu de la page Programme et que « Démarrer »), et la récupération des muscles d'après les dernières séances.
  */
+import { prisma } from "@/lib/prisma";
+import { musclesOfName, recoveryLevels, type MuscleLevels } from "@/lib/workout/body";
 import { dayKey, shiftDay, weekKeys } from "@/lib/dates";
 import type { CoachPlan } from "@/lib/coach/today";
 import { planLifts, type LiftHalfKind } from "@/lib/coach/week-plan";
@@ -24,10 +26,20 @@ export type LiftWeek = {
   /** Cible hebdomadaire et séances faites cette semaine (pastilles « Muscu »). */
   target: number;
   done: number;
+  /** Récupération de chaque muscle (0 fatigué → 1 récupéré, récupérés absents) d'après les séances des 4 derniers jours. */
+  recovery: MuscleLevels;
 };
 
 export async function getLiftWeek(userId: string, run: RunProgramView | null, coach: CoachPlan | null, target: number, now = new Date()): Promise<LiftWeek> {
-  const [recent, program] = await Promise.all([recentSessions(userId, 30), getStrengthProgram(userId, now)]);
+  const [recent, program, lately] = await Promise.all([
+    recentSessions(userId, 30), getStrengthProgram(userId, now),
+    // 72 h de récupération au plus (lib/workout/body.ts) : 4 jours suffisent.
+    prisma.activity.findMany({
+      where: { userId, type: "WORKOUT", startedAt: { gte: new Date(+now - 4 * 864e5), lte: now } },
+      select: { startedAt: true, exercises: { select: { name: true, sets: true } } },
+    }),
+  ]);
+  const recovery = recoveryLevels(lately.map((a) => ({ at: a.startedAt, muscles: a.exercises.filter((e) => e.sets > 0).map((e) => musclesOfName(e.name)) })), now);
   const keys = weekKeys(now, TZ), today = dayKey(now, TZ), weekEnd = keys[6];
   const dayOf = (iso: string) => dayKey(new Date(iso), TZ);
 
@@ -58,5 +70,5 @@ export async function getLiftWeek(userId: string, run: RunProgramView | null, co
   if (!placed.some((p) => p.day > today)) {
     planned.push({ state: "planned", id: "lift-next-week", day: shiftDay(weekEnd, 1), kind: after, title: KIND_TITLE[after], items: rows(after), nextWeek: true });
   }
-  return { slides: [...done, ...planned], target, done: done.length };
+  return { slides: [...done, ...planned], target, done: done.length, recovery };
 }

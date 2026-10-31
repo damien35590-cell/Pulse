@@ -11,21 +11,23 @@ import { exerciseForDraft, myEquipment } from "@/app/(app)/record/session/action
 import { exerciseKey, suggestExercises, type ExerciseHistory } from "@/lib/exercises";
 import { lafayCode } from "@/lib/muscles";
 import { catalogExercise, catalogFor, displayLabel, doable } from "@/lib/workout/catalog";
-import { ALL_EXERCISES, FAMILIES, type CatalogExercise, type Equipment, type Muscle } from "@/lib/workout/catalog-data";
+import { ALL_EXERCISES, FAMILIES, type CatalogExercise, type Equipment, type MuscleId } from "@/lib/workout/catalog-data";
+import { musclesOfName } from "@/lib/workout/body";
 import type { DraftExercise } from "@/lib/workout/types";
-import { CodeBadge, ExerciseDetail, LevelBars } from "./catalog-bits";
+import { CodeBadge, ExerciseDetail, ExerciseThumb, LevelBars } from "./catalog-bits";
 
 const item = "flex min-h-14 w-full items-center gap-3 rounded-tile bg-surface px-3 py-2 text-left select-none touch-manipulation transition duration-150 ease-snappy active:scale-[0.985] active:bg-surface-3 disabled:opacity-40";
 const pill = (on: boolean) => cn("h-12 shrink-0 touch-manipulation rounded-full px-4 text-sm font-semibold transition active:scale-95", on ? "bg-ink text-bg" : "bg-surface text-ink-soft");
 
 type Source = "ALL" | "lafay" | "superphysique";
-const MUSCLE_FILTERS: { label: string; muscles: Muscle[] }[] = [
-  { label: "Pectoraux", muscles: ["pectoraux"] },
-  { label: "Dos", muscles: ["dos", "lombaires", "trapezes"] },
-  { label: "Épaules", muscles: ["epaules"] },
-  { label: "Bras", muscles: ["biceps", "triceps"] },
-  { label: "Jambes", muscles: ["cuisses", "fessiers", "ischios", "mollets"] },
-  { label: "Abdos", muscles: ["abdominaux", "obliques"] },
+/** Filtres par groupe : un exercice y figure quand l'un de ses muscles principaux en fait partie. */
+const MUSCLE_FILTERS: { label: string; muscles: MuscleId[] }[] = [
+  { label: "Pectoraux", muscles: ["chest"] },
+  { label: "Dos", muscles: ["lats", "upper_back", "lower_back", "traps"] },
+  { label: "Épaules", muscles: ["front_delts", "side_delts", "rear_delts"] },
+  { label: "Bras", muscles: ["biceps", "triceps", "forearms"] },
+  { label: "Jambes", muscles: ["quads", "hamstrings", "glutes", "adductors", "calves"] },
+  { label: "Abdos", muscles: ["abs", "obliques"] },
 ];
 const BY_ID = new Map(ALL_EXERCISES.map((e) => [e.id, e]));
 const searchKey = (e: CatalogExercise) => exerciseKey(`${e.code ?? ""} ${e.name} ${e.subtitle ?? ""}`);
@@ -58,7 +60,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
     const ms = muscle != null ? MUSCLE_FILTERS[muscle].muscles : null;
     return (e: CatalogExercise) =>
       (source === "ALL" || (source === "lafay" ? e.source !== "superphysique" : e.source === "superphysique")) &&
-      (!ms || e.muscles.some((m) => ms.includes(m))) &&
+      (!ms || e.muscles.primary.some((m) => ms.includes(m))) &&
       (!onlyMine || !equip || doable(e, equip)) &&
       (!key || searchKey(e).includes(key) || e.code?.toLowerCase() === q.trim().toLowerCase());
   }, [source, muscle, onlyMine, equip, key, q]);
@@ -93,7 +95,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
     return (
       <li key={e.id} className="flex items-center gap-1">
         <button type="button" disabled={busy} onClick={() => pick(displayLabel(e))} className={item}>
-          <CodeBadge code={e.code} />
+          <ExerciseThumb muscles={e.muscles} code={e.code} />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold">{e.name}</span>
             {e.subtitle && <span className="block truncate text-sm text-ink-soft">{e.subtitle}</span>}
@@ -140,6 +142,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
                 {recent.map((h) => (
                   <li key={h.key}>
                     <button type="button" disabled={busy} onClick={() => pick(h.name)} className={item}>
+                      <ExerciseThumb muscles={musclesOfName(h.name)} />
                       <span className="flex-1 truncate font-semibold">{h.name}</span>
                       <Plus className="size-5 text-ink-mute" aria-hidden />
                     </button>
@@ -195,6 +198,7 @@ export function AddExerciseSheet({ open, onClose, onAdd, taken }: { open: boolea
                 {mine.map((h) => (
                   <li key={h.key}>
                     <button type="button" disabled={busy} onClick={() => pick(h.name)} className={item}>
+                      <ExerciseThumb muscles={musclesOfName(h.name)} />
                       <span className="flex-1 truncate font-semibold">{h.name}</span>
                       <Plus className="size-5 text-ink-mute" aria-hidden />
                     </button>

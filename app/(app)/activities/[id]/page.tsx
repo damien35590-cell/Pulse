@@ -51,6 +51,8 @@ import { isCommute } from "@/lib/routes/estimate";
 import { getActivityReps } from "@/lib/data/reps";
 import { gapIfHilly } from "@/lib/run/gap";
 import { WorkReps } from "@/components/activity/work-reps";
+import { BodyMap, MuscleLegend } from "@/components/body/body-map";
+import { musclesOfName, sessionLevels } from "@/lib/workout/body";
 
 export const dynamic = "force-dynamic";
 const TZ = "Europe/Paris";
@@ -124,6 +126,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
   const review = a.exercises.length ? await getSessionReview(s.user.id, a) : [];
   const totals = review.length ? sessionTotals(review) : null;
   const groups = a.type === "WORKOUT" ? setGroups(a.exercises, Infinity) : [];
+  // Carte des muscles de la séance : 1 par exercice où le muscle est principal, 0,5 où il est secondaire, plafonné à 1.
+  const worked = a.type === "WORKOUT" ? sessionLevels(a.exercises.filter((e) => e.sets > 0).map((e) => musclesOfName(e.name))) : {};
   // Allure par km : course et rando avec GPS horodaté (FC du km lue dans la trace).
   const splits = (a.type === "RUN" || a.type === "HIKE") ? kmSplits(raw.filter((p) => p.lat != null && p.lng != null) as { lat: number; lng: number; t: number; hr?: number }[]) : [];
 
@@ -281,6 +285,12 @@ export default async function ActivityPage({ params }: { params: { id: string } 
           <dl className="mt-4 grid grid-cols-3 gap-3">
             {more.map((m) => <Metric key={m.label} size="sm" label={m.label} value={m.value} unit={m.unit} />)}
           </dl>
+        )}
+        {Object.keys(worked).length > 0 && (
+          <section aria-label="Muscles travaillés" className="mt-5">
+            <BodyMap size="full" intensity={worked} />
+            <MuscleLegend className="mt-2 justify-center" />
+          </section>
         )}
         {groups.length > 0 && (
           <div className={cn(ui.card, "mt-5 overflow-hidden")}>
