@@ -44,21 +44,21 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
 const km2 = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const QUARTERS = [0, 0.25, 0.5, 0.75, 1];
 
-/** Chiffres héros qui comptent de 0 à leur valeur (~800 ms). Sans clé de session ici : « Rejouer » relance à volonté. */
+/** /** Chiffres héros qui se posent (70 → 100 %, fondu + montée de 6 px, 650 ms), échelonnés de 70 ms. Sans clé de session ici : « Rejouer » relance à volonté. */
 function CountUpDemo() {
   const [n, setN] = useState(0);
   return (
     <div className={cn(ui.card, "space-y-4 p-4")}>
       <dl key={n} className="grid grid-cols-2 gap-4">
-        <Metric animate size="hero" label="Durée (h:mm:ss)" value="1:42:36" />
-        <Metric animate size="xl" label="Allure (m:ss)" value="4:43" unit="/km" />
-        <Metric animate size="lg" label="Décimale" value="25,9" unit="km" />
-        <Metric animate size="lg" label="Entier" value="162" unit="bpm" />
+        <Metric animate animateIndex={0} size="hero" label="Durée (h:mm:ss)" value="1:42:36" />
+        <Metric animate animateIndex={1} size="xl" label="Allure · fondu seul" value="4:43" unit="/km" />
+        <Metric animate animateIndex={2} size="lg" label="Décimale" value="25,9" unit="km" />
+        <Metric animate animateIndex={3} size="lg" label="Entier" value="162" unit="bpm" />
       </dl>
       <button type="button" onClick={() => setN((v) => v + 1)} className={cn(ui.btnSecondary, "w-full")}>
         <RefreshCw className="size-4" aria-hidden />Rejouer
       </button>
-      <p className="text-xs text-ink-soft">Le nombre sous-jacent est animé puis rendu dans son vrai format. Désactivé si « réduire les animations » est demandé. Dans l'app : une seule fois par activité et par session, jamais dans le fil ni les listes.</p>
+      <p className="text-xs text-ink-soft">Le nombre sous-jacent passe de 70 % à 100 % puis est rendu dans son vrai format ; les allures (unité « /km ») n'ont que le fondu. La largeur finale est réservée : l'unité ne bouge pas. Désactivé si « réduire les animations » est demandé. Dans l'app : une seule fois par activité et par session, jamais dans le fil ni les listes.</p>
     </div>
   );
 }

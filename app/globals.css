@@ -128,3 +128,8 @@ html .leaflet-bar a:hover { background: rgb(var(--surface-2)); }
 @layer utilities { .no-scrollbar { scrollbar-width: none; } .no-scrollbar::-webkit-scrollbar { display: none; } }
 
 .font-display { letter-spacing: -0.025em; }
+
+/* CountUp : filet de sécurité. Le chiffre héros part transparent ; si le JS ne l'a pas pris en main
+   au bout de 1,5 s (hydratation lente, JS en échec), il s'affiche quand même. Le JS retire la classe. */
+.count-up-pending { animation: count-up-reveal 0s linear 1.5s forwards; }
+@keyframes count-up-reveal { to { opacity: 1; transform: none; } }
