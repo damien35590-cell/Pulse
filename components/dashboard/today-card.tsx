@@ -30,7 +30,7 @@ export function TodayCard({ program, title, exercises, sets, estMin, href, onSta
       <p className="relative text-label uppercase text-brand">Aujourd’hui · {program}</p>
       <h2 className="relative mt-1.5 text-[28px] font-bold leading-tight tracking-tight">{title}</h2>
       <p className="relative mt-1 font-num text-base tabular-nums text-ink-soft">
-        <CountUp value={exercises.length} storageKey="home:today:exercises" /> exercices · <CountUp value={sets} storageKey="home:today:sets" /> séries · ≈ <CountUp value={estMin} storageKey="home:today:min" /> min
+        <CountUp value={exercises.length} delay={0} storageKey="home:today:exercises" /> exercices · <CountUp value={sets} delay={70} storageKey="home:today:sets" /> séries · ≈ <CountUp value={estMin} delay={140} storageKey="home:today:min" /> min
       </p>
       <ul className="relative mt-3 flex flex-wrap gap-1.5">
         {exercises.map((e) => <li key={e} className={ui.chip}>{e}</li>)}

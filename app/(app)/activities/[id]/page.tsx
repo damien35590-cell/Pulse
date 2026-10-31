@@ -273,7 +273,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
         </dl>
         {row.length > 0 && (
           <dl className="mt-5 grid grid-cols-3 gap-3">
-            {row.map((m) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} animate animateKey={`activity:${a.id}`} />)}
+            {row.map((m, i) => <Metric key={m.label} size="lg" label={m.label} value={m.value} unit={m.unit} hint={m.hint} animate animateIndex={i + 1} animateKey={`activity:${a.id}`} />)}
           </dl>
         )}
         {totals && a.avgHr && <p className="mt-3 text-xs text-ink-mute">FC moy. <span className="font-num tabular-nums">{a.avgHr}</span> bpm</p>}

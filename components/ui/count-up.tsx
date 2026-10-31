@@ -1,56 +1,79 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
-const DURATION_MS = 800;
+const DURATION_MS = 650;
+const FROM = 0.7; // on se pose sur la valeur au lieu de compter depuis zéro
+const RISE_PX = 6;
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const STORAGE_PREFIX = "pulse:count-up:";
+// useLayoutEffect côté client : la décision (jouer ou non) tombe avant la première peinture. Sur le serveur, useEffect évite l'avertissement.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 // sessionStorage peut être indisponible (navigation privée, quota) : on n'en dépend jamais.
 const seen = (key: string) => { try { return sessionStorage.getItem(STORAGE_PREFIX + key) != null; } catch { return false; } };
 const markSeen = (key: string) => { try { sessionStorage.setItem(STORAGE_PREFIX + key, "1"); } catch { /* ignoré */ } };
+
+export type CountUpMode = "count" | "fade";
 
 type Props = {
   /** Valeur finale (le nombre sous-jacent, pas le texte). */
   value: number;
   /** Rend le nombre animé dans son vrai format : allure, durée, décimales… Par défaut : entier. */
   format?: (n: number) => string;
+  /** « count » : se pose de 70 % à 100 % de la valeur. « fade » : apparition seule, sans compter (allures). */
+  mode?: CountUpMode;
+  /** Retard avant le départ, en ms (échelonnement : 70 ms par rang, voir Metric). */
+  delay?: number;
   /** Si fourni, l'animation ne se joue qu'une fois par session pour cette clé (ex. `activity:<id>:Distance`). */
   storageKey?: string;
   className?: string;
 };
 
 /**
- * Compte de 0 à `value` en ~800 ms (ease-out cubic, requestAnimationFrame).
- * Le rendu serveur et le premier rendu affichent la valeur finale ; l'animation démarre au montage.
- * Sans animation si `prefers-reduced-motion`, ou si la clé a déjà été jouée pendant la session.
+ * Chiffre qui se pose : de 70 % à 100 % de la valeur, avec fondu et montée de 6 px (650 ms, ease-out cubic ; transform et opacité seulement).
+ * Le texte final est rendu invisible dans la même cellule de grille : la largeur est réservée, l'unité voisine ne bouge pas.
+ * Tant que l'animation n'a pas démarré le chiffre est transparent (pas de flash final → 0 → final) ; sans animation
+ * (`prefers-reduced-motion`, clé déjà jouée dans la session) il apparaît tel quel, sans transition. aria-label = valeur finale.
  */
-export function CountUp({ value, format = (n) => String(Math.round(n)), storageKey, className }: Props) {
-  const [shown, setShown] = useState(value);
+export function CountUp({ value, format = (n) => String(Math.round(n)), mode = "count", delay = 0, storageKey, className }: Props) {
+  const ref = useRef<HTMLSpanElement>(null);
   const final = format(value);
 
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (storageKey && seen(storageKey)) return;
+  useIsoLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.textContent = final;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || (storageKey && seen(storageKey))) {
+      el.style.opacity = "1";
+      el.style.transform = "";
+      return;
+    }
     let raf = 0, start = 0;
+    const draw = (e: number) => {
+      el.style.opacity = String(e);
+      el.style.transform = e < 1 ? `translateY(${(1 - e) * RISE_PX}px)` : "";
+      el.textContent = mode === "count" && e < 1 ? format(value * (FROM + (1 - FROM) * e)) : final;
+    };
+    draw(0);
     const tick = (now: number) => {
-      start ||= now;
-      const t = Math.min(1, (now - start) / DURATION_MS);
-      setShown(value * easeOutCubic(t));
+      start ||= now + delay;
+      const t = Math.min(1, Math.max(0, (now - start) / DURATION_MS));
+      draw(easeOutCubic(t));
       if (t < 1) raf = requestAnimationFrame(tick);
       else if (storageKey) markSeen(storageKey); // à la fin seulement : le double montage du mode strict rejoue sinon dans le vide
     };
-    setShown(0);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // `format` change d'identité à chaque rendu parent : seule la valeur relance l'animation.
+    // `format` change d'identité à chaque rendu parent : seuls la valeur et le texte final relancent l'animation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, storageKey]);
+  }, [final, mode, delay, storageKey]);
 
   return (
-    <span aria-label={final} className={cn("font-num tabular-nums", className)}>
-      <span aria-hidden>{shown === value ? final : format(shown)}</span>
+    <span aria-label={final} className={cn("inline-grid font-num tabular-nums", className)}>
+      <span aria-hidden className="invisible col-start-1 row-start-1">{final}</span>
+      <span ref={ref} aria-hidden className="col-start-1 row-start-1" style={{ opacity: 0 }}>{final}</span>
     </span>
   );
 }
@@ -91,8 +114,8 @@ export function parseDisplay(text: string): Parsed | null {
 }
 
 /** CountUp à partir d'un texte déjà formaté (voir parseDisplay) ; texte brut s'il n'est pas animable. */
-export function CountUpText({ text, storageKey, className }: { text: string; storageKey?: string; className?: string }) {
+export function CountUpText({ text, mode, delay, storageKey, className }: { text: string; mode?: CountUpMode; delay?: number; storageKey?: string; className?: string }) {
   const parsed = parseDisplay(text);
   if (!parsed) return <span className={className}>{text}</span>;
-  return <CountUp value={parsed.value} format={parsed.format} storageKey={storageKey} className={className} />;
+  return <CountUp value={parsed.value} format={parsed.format} mode={mode} delay={delay} storageKey={storageKey} className={className} />;
 }
