@@ -25,6 +25,13 @@ const nextConfig = {
         "node_modules/@prisma/engines/**",
       ],
     },
+    // Le client (engineType "client") lit query_compiler_bg.wasm par fs.readFileSync sur un chemin
+    // calculé à l'exécution : le traçage ne le voit pas. Sans cette inclusion, la première requête
+    // échoue sur Vercel (en local, node_modules est complet et tout passe) ; dans authorize(),
+    // NextAuth avale l'erreur et répond « Mot de passe incorrect ».
+    outputFileTracingIncludes: {
+      "/**": ["./node_modules/.prisma/client/query_compiler_bg.wasm"],
+    },
   },
 };
 
