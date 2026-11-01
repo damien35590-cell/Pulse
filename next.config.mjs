@@ -13,7 +13,19 @@ const nextConfig = {
     ];
   },
   images: { formats: ["image/avif", "image/webp"] },
-  experimental: { optimizePackageImports: ["lucide-react", "recharts", "framer-motion"] },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "recharts", "framer-motion"],
+    // Le client Prisma passe par le compilateur WebAssembly et l'adaptateur pg (lib/prisma.ts) :
+    // les moteurs Rust restés dans node_modules ne servent plus à l'exécution. Sans cette exclusion,
+    // le traçage les embarque dans chacune des ~57 fonctions qui touchent la base, soit ~15 Mo pièce.
+    outputFileTracingExcludes: {
+      "**": [
+        "node_modules/.prisma/client/*query_engine*.node",
+        "node_modules/.prisma/client/*query_engine*.dll.node",
+        "node_modules/@prisma/engines/**",
+      ],
+    },
+  },
 };
 
 // On utilise une fonction asynchrone pour pouvoir importer la PWA dynamiquement

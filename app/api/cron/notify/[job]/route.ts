@@ -8,10 +8,22 @@ import { morningCanRetry, parseJob } from "@/lib/notify/schedule";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 /** Base Neon en veille ou connexion coupée : vaut la peine de réessayer une fois (P1001 injoignable, P1002/P1008 délai, P1017 fermée). */
-function transientDb(e: unknown) {
+// Codes de coupure du pilote pg : réseau (Node) et SQLSTATE classe 08 / arrêt serveur / trop de connexions.
+// Depuis l'adaptateur pg, une panne de connexion remonte du pilote et plus du moteur Rust : les codes
+// P100x ne sont plus émis, d'où ce second filet pour garder le même réessai.
+const PG_TRANSIENT = new Set([
+  "ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EPIPE", "EHOSTUNREACH", "EAI_AGAIN",
+  "08000", "08003", "08006", "08001", "08004", "57P01", "57P02", "57P03", "53300",
+]);
+function transientDb(e: unknown): boolean {
   if (e instanceof Prisma.PrismaClientInitializationError) return true;
   if (e instanceof Prisma.PrismaClientKnownRequestError) return ["P1001", "P1002", "P1008", "P1017", "P2024"].includes(e.code);
-  return e instanceof Error && /can't reach database|connection|timed out|ECONNRESET/i.test(e.message);
+  const code = (e as { code?: unknown } | null)?.code;
+  if (typeof code === "string" && PG_TRANSIENT.has(code)) return true;
+  if (e instanceof Error && /can't reach database|connection|timed out|ECONNRESET|terminating connection|server closed|socket hang up/i.test(e.message)) return true;
+  // Prisma emballe l'erreur du pilote : on suit la cause.
+  const cause = (e as { cause?: unknown } | null)?.cause;
+  return cause != null && cause !== e ? transientDb(cause) : false;
 }
 async function withRetry<T>(f: () => Promise<T>): Promise<T> {
   try { return await f(); }

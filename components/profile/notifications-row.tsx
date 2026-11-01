@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { SettingsRow } from "@/components/ui/settings-row";
-import type { AllPrefs } from "@/lib/notify/prefs";
+import type { AllPrefs } from "@/lib/notify/prefs-shared";
 
 const fmtTime = (t: string) => `${Number(t.slice(0, 2))} h ${t.slice(3)}`;
 
