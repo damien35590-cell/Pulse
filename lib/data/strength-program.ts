@@ -91,7 +91,7 @@ export async function getStrengthProgram(userId: string, now = new Date()): Prom
   const forKind = (kind: "HAUT" | "BAS"): DraftExercise[] => {
     const t = templates.find((x) => x.kind === kind);
     const structure = t
-      ? t.exercises.map((e) => ({ code: e.exerciseCode, variant: e.variant, sets: e.sets, reps: e.targetReps, restSec: e.restSec, restAfterSec: e.restAfterSec, loadKg: e.loadKg, note: e.note }))
+      ? t.exercises.map((e) => ({ code: e.exerciseCode, variant: e.variant, sets: e.sets, reps: e.targetReps, restSec: e.restSec, restAfterSec: e.restAfterSec, loadKg: e.loadKg, note: e.note, variantSetAt: e.variantSetAt }))
       : builtInStructure(BUILT_IN.find((b) => b.kind === kind)!.codes, history);
     return structure.map((s) => planExercise(s, history.get(historyKey(s.code, s.variant)) ?? []));
   };

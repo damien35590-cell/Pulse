@@ -94,7 +94,7 @@ export async function applyLafayTest(userId: string, id: string): Promise<Applie
   const tpl = await prisma.workoutTemplate.findFirst({ where: { userId, isBuiltIn: true, kind: HAUT }, include: { exercises: { orderBy: { order: "asc" } } } });
   if (!tpl) return null;
   const a = plan.after, row = tpl.exercises.find((e) => e.exerciseCode === "B");
-  const data = { exerciseCode: "B", variant: a.variant, sets: a.sets, targetReps: a.reps, restSec: a.restSec, restAfterSec: a.restAfterSec, note: a.note };
+  const data = { exerciseCode: "B", variant: a.variant, sets: a.sets, targetReps: a.reps, restSec: a.restSec, restAfterSec: a.restAfterSec, note: a.note, variantSetAt: null };
   const change: AppliedChange = { template: tpl.name, before: cur.target, after: a };
   // Pas de ligne de dips (modèle modifié) : elle est ajoutée en tête, les autres reculent d'un rang.
   await prisma.$transaction([

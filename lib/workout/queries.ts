@@ -2,15 +2,16 @@
  * Démarrer une séance de muscu sans retaper les exercices : suggestion du jour, brouillons depuis une séance passée ou un modèle,
  * enregistrement d'une séance comme modèle. Chaque fonction filtre sur l'utilisateur (userId) : jamais d'accès à la séance d'un autre.
  */
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { daysAgo } from "../exercises";
 import { doneSets, sumReps } from "../analytics/strength";
 import { BUILT_IN, builtInStructure, ensureBuiltInTemplates } from "./builtin";
-import { DEFAULT_REPS, REST_BETWEEN_S, resolveName, restAfterFor, isLafayCode, DEFAULT_SETS } from "./catalog";
+import { DEFAULT_REPS, REST_BETWEEN_S, resolveName, restAfterFor, isLafayCode, DEFAULT_SETS, defaultVariant, displayName } from "./catalog";
 import { planExercise, type Structure } from "./draft";
 import { historyKey, loadHistory, toRow } from "./history";
 import { KIND_TITLE, kindOfNames, nextKind } from "./kind";
-import type { Draft, DraftExercise, Kind, RecentSession, StartOptions, Suggestion, TemplateItem } from "./types";
+import type { Draft, DraftExercise, Kind, RecentSession, StartOptions, Suggestion, TemplateEdit, TemplateEditRow, TemplateItem } from "./types";
 
 type History = Awaited<ReturnType<typeof loadHistory>>;
 const plan = (s: Structure, h: History) => planExercise(s, h.get(historyKey(s.code, s.variant)) ?? []);
@@ -40,7 +41,7 @@ export async function buildDraftFromTemplate(templateId: string, userId: string)
   const t = await prisma.workoutTemplate.findFirst({ where: { id: templateId, userId }, include: { exercises: { orderBy: { order: "asc" } } } });
   if (!t) return null;
   const history = await loadHistory(userId);
-  const exercises = t.exercises.map((e) => plan({ code: e.exerciseCode, variant: e.variant, sets: e.sets, reps: e.targetReps, restSec: e.restSec, restAfterSec: e.restAfterSec, loadKg: e.loadKg, note: e.note }, history));
+  const exercises = t.exercises.map((e) => plan({ code: e.exerciseCode, variant: e.variant, sets: e.sets, reps: e.targetReps, restSec: e.restSec, restAfterSec: e.restAfterSec, loadKg: e.loadKg, note: e.note, variantSetAt: e.variantSetAt }, history));
   return { title: t.name, kind: t.kind, templateId: t.id, exercises: unique(exercises) };
 }
 
@@ -124,4 +125,64 @@ export async function draftExercise(userId: string, raw: string): Promise<DraftE
   const lafay = isLafayCode(code), restSec = lafay ? REST_BETWEEN_S : 90;
   const history = await loadHistory(userId);
   return plan({ code, variant, sets: lafay ? DEFAULT_SETS : 3, reps: lafay ? DEFAULT_REPS : 10, restSec, restAfterSec: restAfterFor(restSec), loadKg: null, note: null }, history);
+}
+
+/**
+ * Le modèle tel que l'éditeur l'ouvre. Niveau affiché = celui que viserait la prochaine séance (l'historique prime sur le niveau enregistré) ;
+ * reps, séries et repos = ceux du modèle. `next` ne sert qu'à dire ce que l'historique vise.
+ */
+export async function getTemplateForEdit(templateId: string, userId: string): Promise<TemplateEdit | null> {
+  const t = await prisma.workoutTemplate.findFirst({ where: { id: templateId, userId }, include: { exercises: { orderBy: { order: "asc" } } } });
+  if (!t) return null;
+  const history = await loadHistory(userId);
+  const rows = t.exercises.map((e): TemplateEditRow => {
+    const planned = plan({ code: e.exerciseCode, variant: e.variant, sets: e.sets, reps: e.targetReps, restSec: e.restSec, restAfterSec: e.restAfterSec, loadKg: e.loadKg, note: e.note, variantSetAt: e.variantSetAt }, history);
+    const variant = isLafayCode(e.exerciseCode) ? planned.variant : e.variant;
+    return {
+      key: e.id, rowId: e.id, code: e.exerciseCode, variant, baseVariant: variant, sets: e.sets, reps: e.targetReps,
+      restSec: e.restSec, restAfterSec: e.restAfterSec, loadKg: e.loadKg, note: e.note, next: { variant: planned.variant, reps: planned.reps },
+    };
+  });
+  return { id: t.id, name: t.name, isBuiltIn: t.isBuiltIn, rows };
+}
+
+const clamp = (n: unknown, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(n)) || min));
+
+/**
+ * Enregistre les modifications d'un modèle : nom, exercices, séries, reps visées, repos, niveau. Ne touche ni l'historique ni les séances déjà faites
+ * (elles gardent leur templateId). Un niveau changé à la main est daté (variantSetAt) : jusqu'à la prochaine séance de l'échelle, la cible repart
+ * des reps du modèle (planExercise). Les reps, séries et repos modifiés n'effacent rien : l'historique garde la priorité sur les reps.
+ * Le type (haut / bas) d'un modèle intégré ne change pas : la suggestion du jour et le programme le retrouvent par ce type.
+ */
+export async function updateTemplate(templateId: string, userId: string, input: { name: string; rows: TemplateEditRow[] }): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const t = await prisma.workoutTemplate.findFirst({ where: { id: templateId, userId }, include: { exercises: { select: { id: true, variantSetAt: true } } } });
+  if (!t) return { ok: false, error: "Ce modèle n’existe plus." };
+  const name = input.name.trim().slice(0, 60);
+  if (!name) return { ok: false, error: "Donne un nom au modèle." };
+  const rows = input.rows.slice(0, 40).filter((r) => typeof r.code === "string" && r.code.trim());
+  if (!rows.length) return { ok: false, error: "Un modèle a besoin d’au moins un exercice." };
+  const before = new Map(t.exercises.map((e) => [e.id, e.variantSetAt]));
+  const now = new Date();
+  const data = rows.map((r, order) => {
+    const code = r.code.trim().slice(0, 80), lafay = isLafayCode(code);
+    const variant = lafay ? r.variant ?? defaultVariant(code) : null, base = lafay ? r.baseVariant ?? null : null;
+    return {
+      order, exerciseCode: code, variant,
+      variantSetAt: lafay && variant && variant !== base ? now : (r.rowId ? before.get(r.rowId) ?? null : null),
+      sets: clamp(r.sets, 1, 30), targetReps: clamp(r.reps, 1, 600), restSec: clamp(r.restSec, 0, 600), restAfterSec: clamp(r.restAfterSec, 0, 900),
+      loadKg: r.loadKg != null && Number.isFinite(Number(r.loadKg)) ? Math.min(400, Math.max(0, Number(r.loadKg))) : null,
+      note: r.note?.slice(0, 200) || null,
+    };
+  });
+  const kind = t.isBuiltIn ? t.kind : kindOfNames(data.map((d) => displayName(d.exerciseCode, d.variant)));
+  try {
+    await prisma.$transaction([
+      prisma.workoutTemplateExercise.deleteMany({ where: { templateId } }),
+      prisma.workoutTemplate.update({ where: { id: templateId }, data: { name, kind, exercises: { create: data } } }),
+    ]);
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { ok: false, error: "Un autre modèle porte déjà ce nom." };
+    throw e;
+  }
+  return { ok: true, name };
 }

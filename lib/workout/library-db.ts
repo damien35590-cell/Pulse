@@ -43,7 +43,7 @@ export async function duplicateTemplate(userId: string, templateId: string): Pro
   await prisma.workoutTemplate.create({
     data: {
       userId, name, kind: t.kind, isBuiltIn: false,
-      exercises: { create: t.exercises.map(({ order, exerciseCode, variant, sets, targetReps, restSec, restAfterSec, loadKg, note }) => ({ order, exerciseCode, variant, sets, targetReps, restSec, restAfterSec, loadKg, note })) },
+      exercises: { create: t.exercises.map(({ order, exerciseCode, variant, variantSetAt, sets, targetReps, restSec, restAfterSec, loadKg, note }) => ({ order, exerciseCode, variant, variantSetAt, sets, targetReps, restSec, restAfterSec, loadKg, note })) },
     },
   });
   return name;
