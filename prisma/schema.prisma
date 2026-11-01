@@ -373,6 +373,7 @@ model WorkoutTemplateExercise {
   order        Int
   exerciseCode String  // code Lafay en majuscule (« B ») ; pour un exercice libre, son nom
   variant      String? // « B2 » ; null hors échelle Lafay
+  variantSetAt DateTime? // niveau choisi à la main dans l'éditeur de modèle : prime sur l'historique jusqu'à la prochaine séance de l'échelle
   sets         Int
   targetReps   Int
   restSec      Int     // entre deux séries

@@ -45,3 +45,26 @@ export type Suggestion = {
 export type RecentSession = { id: string; title: string; kind: Kind; date: string; totalReps: number; exercises: number };
 export type TemplateItem = { id: string; name: string; kind: Kind; isBuiltIn: boolean; exercises: number };
 export type StartOptions = { suggestion: Suggestion | null; recent: RecentSession[]; templates: TemplateItem[] };
+
+/** Une ligne de l'éditeur de modèle (lecture et enregistrement). */
+export type TemplateEditRow = {
+  /** Clé React locale. */
+  key: string;
+  /** Identifiant de la ligne en base ; absent pour un exercice ajouté dans l'éditeur. */
+  rowId?: string;
+  /** Lettre Lafay en majuscule, ou nom de l'exercice quand il n'est pas Lafay. */
+  code: string;
+  variant: string | null;
+  /** Niveau à l'ouverture de l'éditeur : s'il change, le choix est enregistré comme choix manuel (WorkoutTemplateExercise.variantSetAt). */
+  baseVariant: string | null;
+  sets: number;
+  /** Répétitions visées par série, ou secondes pour un exercice chronométré. */
+  reps: number;
+  restSec: number;
+  restAfterSec: number;
+  loadKg: number | null;
+  note: string | null;
+  /** Ce que viserait la prochaine séance d'après l'historique (priorité sur les reps du modèle) ; lecture seule. */
+  next?: { variant: string | null; reps: number } | null;
+};
+export type TemplateEdit = { id: string; name: string; isBuiltIn: boolean; rows: TemplateEditRow[] };

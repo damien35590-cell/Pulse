@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Dumbbell, Library, Trash2 } from "lucide-react";
+import { Copy, Dumbbell, Library, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { tap } from "@/lib/haptics";
@@ -63,6 +63,13 @@ export function NewSessionSheet({ open, onClose, onNavigate }: { open: boolean; 
     onNavigate?.();
   };
 
+  const edit = (t: TemplateItem) => {
+    if (busy) return;
+    tap(8);
+    setBusy(true);
+    router.push(`/record/modele/${t.id}`);
+    onNavigate?.();
+  };
   const refresh = () => startOptions().then(setData).catch(() => {});
   async function duplicate(t: TemplateItem) {
     tap(8);
@@ -129,6 +136,9 @@ export function NewSessionSheet({ open, onClose, onNavigate }: { open: boolean; 
                         <span className="block truncate font-semibold">{t.name}</span>
                         <span className="block text-sm text-ink-mute">{t.exercises} exercice{t.exercises > 1 ? "s" : ""}{t.isBuiltIn ? " · intégré" : ""}</span>
                       </span>
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => edit(t)} aria-label={`Modifier le modèle ${t.name}`} className={cn(ui.iconBtn, "text-ink-soft")}>
+                      <Pencil className="size-5" aria-hidden />
                     </button>
                     <button type="button" onClick={() => duplicate(t)} aria-label={`Dupliquer le modèle ${t.name}`} className={cn(ui.iconBtn, "text-ink-soft")}>
                       <Copy className="size-5" aria-hidden />

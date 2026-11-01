@@ -1,7 +1,7 @@
 "use server";
 import { auth } from "@/lib/auth";
-import { deleteTemplate, draftExercise, getStartOptions, saveSessionAsTemplate } from "@/lib/workout/queries";
-import type { DraftExercise, StartOptions } from "@/lib/workout/types";
+import { deleteTemplate, draftExercise, getStartOptions, saveSessionAsTemplate, updateTemplate } from "@/lib/workout/queries";
+import type { DraftExercise, StartOptions, TemplateEditRow } from "@/lib/workout/types";
 import { revalidatePath } from "next/cache";
 import { duplicateTemplate, getEquipment, installLibraryTemplate, setEquipment, setWarmupDefaults } from "@/lib/workout/library-db";
 import type { WarmupItem } from "@/lib/workout/warmup";
@@ -59,4 +59,11 @@ export async function addLibraryTemplate(id: string): Promise<{ ok: true; names:
 export async function copyTemplate(id: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
   const name = await duplicateTemplate(await userId(), id).catch(() => null);
   return name ? { ok: true, name } : { ok: false, error: "Impossible de dupliquer ce modèle : réessaie." };
+}
+
+/** Éditeur de modèle : enregistre nom, exercices, séries, reps visées, repos et niveaux. Les séances déjà faites ne changent pas. */
+export async function saveTemplateEdit(id: string, name: string, rows: TemplateEditRow[]): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const r = await updateTemplate(id, await userId(), { name, rows }).catch(() => ({ ok: false as const, error: "Impossible d’enregistrer le modèle : réessaie." }));
+  if (r.ok) { revalidatePath("/record"); revalidatePath("/plan"); }
+  return r;
 }

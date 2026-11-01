@@ -153,3 +153,26 @@ assert.equal(nameOnly("B1 - dips"), "dips");
 assert.equal(nameOnly("A3 – pompes"), "pompes");
 assert.equal(nameOnly("Développé couché"), "Développé couché", "pas de code : inchangé");
 console.log("noms : ok");
+
+// ── Niveau choisi à la main dans l'éditeur de modèle (variantSetAt) ──
+{
+  const hist = [row("a", "2026-10-12", "B2 - dips", 6, 10, [10, 10, 10, 9, 9, 9])];
+  const picked = (variant: string, reps: number, at: string): Structure => ({ ...base, variant, reps, variantSetAt: new Date(at + "T12:00:00Z") });
+  // Choix plus récent que la dernière séance, niveau différent de l'historique : le modèle prime, la cible repart de ses reps.
+  let q = planExercise(picked("B1", 7, "2026-10-20"), hist);
+  assert.deepEqual([q.variant, q.reps, q.hint], ["B1", 7, "niveau choisi : B1 à 6×7"]);
+  assert.equal(q.last?.variant, "B2", "« dernière fois » reste celle de l'historique");
+  // Une séance de l'échelle plus récente que le choix : l'historique reprend la main.
+  q = planExercise(picked("B1", 7, "2026-10-05"), hist);
+  assert.deepEqual([q.variant, q.reps], ["B2", 10]);
+  // Choix identique au niveau de l'historique : la progression continue, les reps du modèle ne remplacent rien.
+  q = planExercise(picked("B2", 4, "2026-10-20"), hist);
+  assert.deepEqual([q.variant, q.reps], ["B2", 10]);
+  // Reps/séries/repos édités sans changer de niveau (pas de variantSetAt) : la cible vient toujours de l'historique.
+  q = planExercise({ ...base, variant: "B2", reps: 4, sets: 4, restSec: 45 }, hist);
+  assert.deepEqual([q.variant, q.reps, q.sets, q.restSec], ["B2", 10, 4, 45]);
+  // Sans historique : le modèle (déjà le cas).
+  q = planExercise(picked("B2", 6, "2026-10-20"), []);
+  assert.deepEqual([q.variant, q.reps, q.hint], ["B2", 6, null]);
+}
+console.log("niveau choisi dans le modèle : ok");

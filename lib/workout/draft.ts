@@ -10,7 +10,9 @@ import { applyLafayProgress } from "./lafay";
 import type { DraftExercise, LastTime } from "./types";
 
 /** Ce qu'un modèle ou une séance passée décrit d'un exercice : la structure, jamais les performances. */
-export type Structure = { code: string; variant: string | null; sets: number; reps: number; restSec: number; restAfterSec: number; loadKg: number | null; note: string | null };
+export type Structure = { code: string; variant: string | null; sets: number; reps: number; restSec: number; restAfterSec: number; loadKg: number | null; note: string | null;
+  /** Niveau choisi à la main dans l’éditeur de modèle (WorkoutTemplateExercise.variantSetAt) ; absent pour une séance passée. */
+  variantSetAt?: Date | null };
 
 let seq = 0;
 const uid = () => `x${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -35,11 +37,14 @@ export function planExercise(s: Structure, history: StrengthRow[]): DraftExercis
   const base = { id: uid(), code: s.code, sets: s.sets, restSec: s.restSec, restAfterSec: s.restAfterSec, note: s.note, last };
 
   if (isLafayCode(s.code)) {
-    const p = applyLafayProgress(history);
+    // Niveau choisi à la main dans le modèle, pas encore pratiqué depuis : il prime sur l’historique, qui repart des reps du modèle.
+    // Dès qu’une séance de l’échelle est plus récente que le choix, l’historique reprend la main (comme avant).
+    const picked = !!s.variantSetAt && !!s.variant && !!history[0] && history[0].startedAt < s.variantSetAt && applyLafayProgress(history)?.variant !== s.variant;
+    const p = picked ? null : applyLafayProgress(history);
     const variant = p ? p.variant : s.variant ?? defaultVariant(s.code);
     const reps = p?.reps ?? s.reps;
     // Le conseil parle des séries proposées ici (celles du modèle), pas de celles de la dernière séance.
-    const hint = p?.change === "evolve" ? `passe à ${variant} : ${s.sets}×${reps}` : p?.change === "restart" ? `repars à ${s.sets}×${reps}${variant ? ` en ${variant}` : ""}` : p?.hint ?? null;
+    const hint = picked ? `niveau choisi : ${variant} à ${s.sets}×${s.reps}` : p?.change === "evolve" ? `passe à ${variant} : ${s.sets}×${reps}` : p?.change === "restart" ? `repars à ${s.sets}×${reps}${variant ? ` en ${variant}` : ""}` : p?.hint ?? null;
     // De quoi rejouer la même règle en fin d'exercice, sur le téléphone (verdict « prochaine fois »).
     const past = history.slice(0, 6).map((r) => ({ activityId: r.activityId, name: r.name, sets: r.sets, reps: r.reps, setsDetail: r.setsDetail?.map((d) => ({ reps: d.reps, done: d.done !== false && !(d as { isWarmup?: boolean }).isWarmup })) ?? null }));
     return { ...base, variant, name: displayName(s.code, variant), reps, loadKg: s.loadKg, hint, ...(past.length ? { past } : {}) };
