@@ -13,7 +13,26 @@ const nextConfig = {
     ];
   },
   images: { formats: ["image/avif", "image/webp"] },
-  experimental: { optimizePackageImports: ["lucide-react", "recharts", "framer-motion"] },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "recharts", "framer-motion"],
+    // Le client Prisma passe par le compilateur WebAssembly et l'adaptateur pg (lib/prisma.ts) :
+    // les moteurs Rust restés dans node_modules ne servent plus à l'exécution. Sans cette exclusion,
+    // le traçage les embarque dans chacune des ~57 fonctions qui touchent la base, soit ~15 Mo pièce.
+    outputFileTracingExcludes: {
+      "**": [
+        "node_modules/.prisma/client/*query_engine*.node",
+        "node_modules/.prisma/client/*query_engine*.dll.node",
+        "node_modules/@prisma/engines/**",
+      ],
+    },
+    // Le client (engineType "client") lit query_compiler_bg.wasm par fs.readFileSync sur un chemin
+    // calculé à l'exécution : le traçage ne le voit pas. Sans cette inclusion, la première requête
+    // échoue sur Vercel (en local, node_modules est complet et tout passe) ; dans authorize(),
+    // NextAuth avale l'erreur et répond « Mot de passe incorrect ».
+    outputFileTracingIncludes: {
+      "/**": ["./node_modules/.prisma/client/query_compiler_bg.wasm"],
+    },
+  },
 };
 
 // On utilise une fonction asynchrone pour pouvoir importer la PWA dynamiquement

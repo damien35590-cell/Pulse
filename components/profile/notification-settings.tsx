@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ui } from "@/lib/ui";
 import { Switch } from "@/components/ui/switch";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { MORNING_TIMES, type AllPrefs, type Prefs } from "@/lib/notify/prefs";
+import { MORNING_TIMES, type AllPrefs, type Prefs } from "@/lib/notify/prefs-shared";
 
 type State = "loading" | "unsupported" | "nosw" | "denied" | "off" | "on";
 

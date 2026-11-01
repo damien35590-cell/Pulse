@@ -1,5 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  // Client sans moteur Rust (GA depuis 6.16) : engineType "client" génère un client qui ne charge
+  // jamais le moteur Rust natif et exige un adaptateur (lib/prisma.ts, @prisma/adapter-pg). Sans ce
+  // champ, le client reste en mode "library" et requiert le binaire natif à l'exécution même si un
+  // adapter est passé au constructeur : outputFileTracingExcludes l'exclurait alors à tort du build
+  // (vu en preview : PrismaClientInitializationError, moteur rhel-openssl-3.0.x introuvable).
+  engineType = "client"
 }
 
 datasource db {
